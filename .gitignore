@@ -1,0 +1,34 @@
+# --- Build i generisani fajlovi ---
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+build/
+app/build/
+.gradle/
+java (generated)/
+res (generated)/
+
+# --- Lokalna podešavanja (VAŽNO: sadrži SDK putanje i potencijalne API ključeve) ---
+local.properties
+
+# --- Android Studio / IntelliJ IDEA konfiguracija ---
+.idea/
+*.iml
+.navigation/
+captures/
+.cxx/
+.externalNativeBuild/
+
+# --- Keystore fajlovi (za potpisivanje aplikacije) ---
+*.jks
+*.keystore
+
+# --- Operativni sistemi ---
+.DS_Store
+Thumbs.db

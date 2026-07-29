@@ -4,16 +4,32 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 
 @Database(
-    entities = [AppUsageLog::class, BlockConfig::class, AppInternalState::class],
-    version = 1,
+    entities = [
+        AppUsageLog::class,
+        BlockConfig::class,
+        AppInternalState::class,
+        AppLimitRuleEntity::class,
+        ShortVideoConfigEntity::class,
+        ScheduleRuleEntity::class,
+        WakeUpConfigEntity::class,
+        EmergencySessionConfigEntity::class
+    ],
+    version = 3,
     exportSchema = false
 )
+@TypeConverters(LocalDateTimeConverter::class)
 abstract class ScreenManagerDatabase : RoomDatabase() {
     abstract fun appUsageLogDao(): AppUsageLogDao
     abstract fun blockConfigDao(): BlockConfigDao
     abstract fun appInternalStateDao(): AppInternalStateDao
+    abstract fun appLimitRuleDao(): AppLimitRuleDao
+    abstract fun shortVideoConfigDao(): ShortVideoConfigDao
+    abstract fun scheduleRuleDao(): ScheduleRuleDao
+    abstract fun wakeUpConfigDao(): WakeUpConfigDao
+    abstract fun emergencySessionConfigDao(): EmergencySessionConfigDao
 
     companion object {
         @Volatile
@@ -25,7 +41,8 @@ abstract class ScreenManagerDatabase : RoomDatabase() {
                     context.applicationContext,
                     ScreenManagerDatabase::class.java,
                     "screen_manager.db"
-                ).build().also { instance = it }
+                ).fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
         }
     }

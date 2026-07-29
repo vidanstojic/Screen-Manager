@@ -17,10 +17,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.ScreenManagerApplication
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.MainDestination
+import com.example.screenmanager.model.ShortVideoConfig
+import com.example.screenmanager.model.WakeUpConfig
 import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.SectionCard
@@ -33,7 +36,9 @@ import com.example.screenmanager.ui.settings.components.WakeUpSection
 
 @Composable
 fun GeneralSettingsScreen(
-    viewModel: SettingsViewModel = viewModel(),
+    viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(ScreenManagerApplication.getInstance().settingsRepository)
+    ),
     destination: MainDestination,
     onDestinationSelected: (MainDestination) -> Unit
 ) {
@@ -85,7 +90,7 @@ fun GeneralSettingsScreen(
 
             item {
                 ShortVideoSection(
-                    config = shortVideoConfig,
+                    config = shortVideoConfig ?: ShortVideoConfig(),
                     onConfigChange = { viewModel.updateShortVideoConfig(it) },
                     onSelectAppsClick = { activeDialogTarget = AppPickerTarget.SHORT_VIDEO }
                 )
@@ -93,7 +98,7 @@ fun GeneralSettingsScreen(
 
             item {
                 WakeUpSection(
-                    config = wakeUpConfig,
+                    config = wakeUpConfig ?: WakeUpConfig(),
                     onConfigChange = { viewModel.updateWakeUpConfig(it) },
                     onSelectAppsClick = { activeDialogTarget = AppPickerTarget.WAKE_UP }
                 )
@@ -109,18 +114,20 @@ fun GeneralSettingsScreen(
 
             item {
                 EmergencySessionSection(
-                    config = emergencySession,
+                    config = emergencySession ?: EmergencySessionConfig(),
                     onConfigChange = { viewModel.updateEmergencySession(it) },
                     onActivateSession = {
-                        val next = emergencySession.copy(
+                        val cfg = emergencySession ?: EmergencySessionConfig()
+                        val next = cfg.copy(
                             isActive = true,
-                            activeUntilLabel = "${emergencySession.defaultDurationMinutes}m from now"
+                            activeUntilLabel = "${cfg.defaultDurationMinutes}m from now"
                         )
                         viewModel.updateEmergencySession(next)
                     },
                     onEndSession = {
+                        val cfg = emergencySession ?: EmergencySessionConfig()
                         viewModel.updateEmergencySession(
-                            emergencySession.copy(isActive = false, activeUntilLabel = null)
+                            cfg.copy(isActive = false, activeUntilLabel = null)
                         )
                     }
                 )
@@ -142,8 +149,8 @@ fun GeneralSettingsScreen(
 
         if (activeDialogTarget != AppPickerTarget.NONE) {
             val initialIds = when (activeDialogTarget) {
-                AppPickerTarget.WAKE_UP -> wakeUpConfig.selectedAppIds
-                AppPickerTarget.SHORT_VIDEO -> shortVideoConfig.selectedAppIds
+                AppPickerTarget.WAKE_UP -> (wakeUpConfig ?: WakeUpConfig()).selectedAppIds
+                AppPickerTarget.SHORT_VIDEO -> (shortVideoConfig ?: ShortVideoConfig()).selectedAppIds
                 AppPickerTarget.APP_LIMIT -> editingAppLimitRule?.selectedAppIds ?: emptyList()
                 else -> emptyList()
             }
@@ -158,10 +165,14 @@ fun GeneralSettingsScreen(
                 onConfirm = { selectedApps ->
                     when (activeDialogTarget) {
                         AppPickerTarget.WAKE_UP -> {
-                            viewModel.updateWakeUpConfig(wakeUpConfig.copy(selectedAppIds = selectedApps))
+                            (wakeUpConfig ?: WakeUpConfig()).let { cfg ->
+                                viewModel.updateWakeUpConfig(cfg.copy(selectedAppIds = selectedApps))
+                            }
                         }
                         AppPickerTarget.SHORT_VIDEO -> {
-                            viewModel.updateShortVideoConfig(shortVideoConfig.copy(selectedAppIds = selectedApps))
+                            (shortVideoConfig ?: ShortVideoConfig()).let { cfg ->
+                                viewModel.updateShortVideoConfig(cfg.copy(selectedAppIds = selectedApps))
+                            }
                         }
                         AppPickerTarget.APP_LIMIT -> {
                             editingAppLimitRule?.let { rule ->

@@ -87,12 +87,17 @@ class FocusMonitorService : Service() {
             blockRepository.seedDefaultsIfNeeded()
             while (true) {
                 runCatching { tick() }.onFailure { Log.w(TAG, "Monitor tick failed", it) }
-                delay(1_000)
+                delay(POLL_INTERVAL_MS)
             }
         }
     }
 
     private suspend fun tick() {
+        if (!powerManager.isInteractive) {
+            overlayController.hide()
+            return
+        }
+
         val now = System.currentTimeMillis()
         val packageName = usageRepository.findLastForegroundPackage(now - 15_000, now)
         if (packageName != null && packageName != currentPackage) {
@@ -177,5 +182,6 @@ class FocusMonitorService : Service() {
         private const val CHANNEL_ID = "focus_monitor"
         private const val NOTIFICATION_ID = 1001
         private const val TAG = "FocusMonitorService"
+        private const val POLL_INTERVAL_MS = 5_000L
     }
 }

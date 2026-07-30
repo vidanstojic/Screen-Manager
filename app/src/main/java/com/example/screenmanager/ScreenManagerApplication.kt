@@ -73,14 +73,9 @@ class ScreenManagerApplication : Application() {
     }
 
     private fun initializeDefaultData() {
-        val scheduleDao = database.scheduleRuleDao()
-        val appLimitDao = database.appLimitRuleDao()
-        val shortVideoDao = database.shortVideoConfigDao()
-        val wakeUpDao = database.wakeUpConfigDao()
-        val emergencySessionDao = database.emergencySessionConfigDao()
 
-        // Svaka provera je nezavisna od ostalih, pa ih pokrećemo paralelno
         applicationScope.launch {
+            val scheduleDao = database.scheduleRuleDao()
             val scheduleRules = scheduleDao.observeAll().first()
             if (scheduleRules.isEmpty()) {
                 DefaultRulesData.getDefaultScheduleRules().forEach {
@@ -90,6 +85,7 @@ class ScreenManagerApplication : Application() {
         }
 
         applicationScope.launch {
+            val appLimitDao = database.appLimitRuleDao()
             val appLimitRules = appLimitDao.observeAll().first()
             if (appLimitRules.isEmpty()) {
                 DefaultRulesData.getDefaultAppLimitRules().forEach {
@@ -99,6 +95,7 @@ class ScreenManagerApplication : Application() {
         }
 
         applicationScope.launch {
+            val shortVideoDao = database.shortVideoConfigDao()
             val shortVideoConfig = shortVideoDao.get()
             if (shortVideoConfig == null) {
                 shortVideoDao.upsert(DefaultRulesData.getDefaultShortVideoConfig())
@@ -106,6 +103,7 @@ class ScreenManagerApplication : Application() {
         }
 
         applicationScope.launch {
+            val wakeUpDao = database.wakeUpConfigDao()
             val wakeUpConfig = wakeUpDao.get()
             if (wakeUpConfig == null) {
                 wakeUpDao.upsert(DefaultRulesData.getDefaultWakeUpConfig())
@@ -113,6 +111,7 @@ class ScreenManagerApplication : Application() {
         }
 
         applicationScope.launch {
+            val emergencySessionDao = database.emergencySessionConfigDao()
             val emergencySessionConfig = emergencySessionDao.get()
             if (emergencySessionConfig == null) {
                 emergencySessionDao.upsert(DefaultRulesData.getDefaultEmergencySessionConfig())

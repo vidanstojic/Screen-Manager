@@ -72,19 +72,19 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
             }
         )
 
-        MainDestination.GeneralUsage -> GeneralPlaceholderScreen(
-            destination = selectedDestination,
-            title = "General Usage",
-            description = "Ovde ćemo kasnije prikazati globalne obrasce korišćenja, kategorije i dnevne rutine.",
-            onDestinationSelected = { selectedDestination = it }
-        )
-
-        MainDestination.GeneralSettings -> {
+        MainDestination.GeneralUsage -> {
             GeneralSettingsScreen(
                 destination = selectedDestination,
                 onDestinationSelected = { selectedDestination = it }
             )
         }
+
+        MainDestination.GeneralSettings -> GeneralPlaceholderScreen(
+            destination = selectedDestination,
+            title = "General Settings",
+            description = "Ovde ćemo kasnije prikazati globalne obrasce korišćenja, kategorije i dnevne rutine.",
+            onDestinationSelected = { selectedDestination = it }
+        )
 
         MainDestination.AddLimit -> Unit
     }

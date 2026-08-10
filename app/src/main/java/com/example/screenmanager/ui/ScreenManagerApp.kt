@@ -12,10 +12,9 @@ import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
 import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
 
-// Importuj sve potrebne klase (MockUsage, MainDestination, UsageRange, itd.)
-// Importuj ekrane iz dashboard i limits paketa
 
 @Composable
 fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
@@ -24,6 +23,17 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     var selectedApp by remember { mutableStateOf<MockAppUsage?>(null) }
     var selectedDestination by remember { mutableStateOf(MainDestination.UsageStats) }
     var addLimitApp by remember { mutableStateOf<MockAppUsage?>(null) }
+
+    // DODAJ OVO: Stanje koje kontroliše prikaz Scheduled Block ekrana
+    var showScheduledBlockScreen by remember { mutableStateOf(false) }
+
+    // Provera da li se prikazuje Scheduled Block ekran
+    if (showScheduledBlockScreen) {
+        ScheduledBlockScreen(
+            onBack = { showScheduledBlockScreen = false }
+        )
+        return
+    }
 
     if (selectedDestination == MainDestination.AddLimit) {
         AddLimitScreen(
@@ -69,6 +79,10 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
             onAddLimit = {
                 addLimitApp = null
                 selectedDestination = MainDestination.AddLimit
+            },
+            onScheduledBlockClick = {
+                // <--- Ovde palimo prikaz našeg novog ekrana
+                showScheduledBlockScreen = true
             }
         )
 

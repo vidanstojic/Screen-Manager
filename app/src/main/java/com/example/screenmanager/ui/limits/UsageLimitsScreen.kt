@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,7 +38,8 @@ import com.example.screenmanager.ui.theme.PurpleAccent
 fun UsageLimitsScreen(
     selectedDestination: MainDestination,
     onDestinationSelected: (MainDestination) -> Unit,
-    onAddLimit: () -> Unit
+    onAddLimit: () -> Unit,
+    onScheduledBlockClick: () -> Unit = {} // Dodat callback za klik na Scheduled Blocking
 ) {
     Scaffold(
         containerColor = DetailBackground,
@@ -87,7 +87,8 @@ fun UsageLimitsScreen(
             )
             LimitTile(
                 title = "Scheduled blocking",
-                description = "Use time windows to enforce focus during work or sleep."
+                description = "Use time windows to enforce focus during work or sleep.",
+                onClick = onScheduledBlockClick // Povezan klik
             )
             LimitTile(
                 title = "Wake-up blocking",
@@ -102,9 +103,15 @@ fun UsageLimitsScreen(
 }
 
 @Composable
-private fun LimitTile(title: String, description: String) {
+private fun LimitTile(
+    title: String,
+    description: String,
+    onClick: () -> Unit = {}
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {

@@ -31,6 +31,11 @@ import androidx.compose.ui.unit.dp
 import com.example.screenmanager.domain.getInstalledApps
 import com.example.screenmanager.model.AppOption
 
+/**
+ * Dijalog za izbor aplikacija koje će pravilo obuhvatiti.
+ *
+ * Otvara se iz više settings i limit ekrana i vraća listu selektovanih ID-jeva.
+ */
 @Composable
 fun AppPickerDialog(
     availableApps: List<AppOption>,

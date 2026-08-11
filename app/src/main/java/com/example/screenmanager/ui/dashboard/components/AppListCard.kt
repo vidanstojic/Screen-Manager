@@ -15,6 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.MockAppUsage
 
+/**
+ * Kartica koja drži listu aplikacija i prebacuje prikaz između Apps/Categories.
+ */
 @Composable
 fun AppListCard(
     apps: List<MockAppUsage>,

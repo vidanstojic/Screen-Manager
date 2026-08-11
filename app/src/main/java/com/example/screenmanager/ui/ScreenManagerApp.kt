@@ -16,6 +16,13 @@ import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
 
 
+/**
+ * Glavni Compose router aplikacije.
+ *
+ * Pošto [MainActivity] samo podiže temu i ovaj composable, ovde se dešava
+ * ceo tok ulaska u UI: početni pregled, detalji aplikacije, limiti, editor
+ * novog limita, scheduled blocking i settings pregled.
+ */
 @Composable
 fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     var selectedRange by remember { mutableStateOf(UsageRange.Day) }
@@ -24,10 +31,8 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     var selectedDestination by remember { mutableStateOf(MainDestination.UsageStats) }
     var addLimitApp by remember { mutableStateOf<MockAppUsage?>(null) }
 
-    // DODAJ OVO: Stanje koje kontroliše prikaz Scheduled Block ekrana
     var showScheduledBlockScreen by remember { mutableStateOf(false) }
 
-    // Provera da li se prikazuje Scheduled Block ekran
     if (showScheduledBlockScreen) {
         ScheduledBlockScreen(
             onBack = { showScheduledBlockScreen = false }
@@ -81,7 +86,6 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
                 selectedDestination = MainDestination.AddLimit
             },
             onScheduledBlockClick = {
-                // <--- Ovde palimo prikaz našeg novog ekrana
                 showScheduledBlockScreen = true
             }
         )

@@ -33,6 +33,12 @@ import com.example.screenmanager.ui.settings.components.ScheduledBlockSection
 import com.example.screenmanager.ui.settings.components.ShortVideoSection
 import com.example.screenmanager.ui.settings.components.WakeUpSection
 
+/**
+ * Glavni settings ekran za zaštitna pravila aplikacije.
+ *
+ * Do njega se dolazi iz donje navigacije kroz GeneralUsage/GeneralSettings
+ * tok i ovde su objedinjene sve konfiguracije blokiranja.
+ */
 @Composable
 fun GeneralSettingsScreen(
     viewModel: SettingsViewModel = viewModel(
@@ -188,6 +194,9 @@ fun GeneralSettingsScreen(
     }
 }
 
+/**
+ * Mali prikaz jedne dostupne aplikacije u listi referenci.
+ */
 @Composable
 private fun AppOptionRow(app: AppOption) {
     Column {
@@ -196,6 +205,9 @@ private fun AppOptionRow(app: AppOption) {
     }
 }
 
+/**
+ * Interna destinacija za izbor aplikacije u dijalozima.
+ */
 private enum class AppPickerTarget {
     NONE, WAKE_UP, SHORT_VIDEO, APP_LIMIT
 }

@@ -30,6 +30,12 @@ import com.example.screenmanager.model.MainDestination
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Deljeni UI blokovi koje koriste više ekrana.
+ *
+ * Ovde su donja navigacija, kartice, čipovi i placeholder ekran. Do ovih
+ * kompozabila dolaze dashboard, details, limits i settings ekrani.
+ */
 @Composable
 fun BottomNavBar(
     selected: MainDestination,
@@ -89,6 +95,9 @@ fun BottomNavBar(
     }
 }
 
+/**
+ * Standardna bela kartica za grupisanje sekcija u settings i limit ekranima.
+ */
 @Composable
 fun SectionCard(
     title: String,
@@ -124,6 +133,9 @@ fun SectionCard(
     }
 }
 
+/**
+ * Plavi informativni banner za objašnjenje korisničkog konteksta na ekranu.
+ */
 @Composable
 fun InfoBanner(
     title: String,
@@ -155,6 +167,9 @@ fun InfoBanner(
     }
 }
 
+/**
+ * Mali selektabilni čip koji predstavlja filter ili vrstu pravila.
+ */
 @Composable
 fun ToggleChip(
     text: String,
@@ -181,6 +196,9 @@ fun ToggleChip(
     }
 }
 
+/**
+ * Status indikator za brojčane i logičke signale poput broja aplikacija.
+ */
 @Composable
 fun StatusChip(
     text: String,
@@ -207,6 +225,9 @@ fun StatusChip(
     }
 }
 
+/**
+ * Generički placeholder ekran za destinacije koje još nemaju pun sadržaj.
+ */
 @Composable
 fun GeneralPlaceholderScreen(
     destination: MainDestination,

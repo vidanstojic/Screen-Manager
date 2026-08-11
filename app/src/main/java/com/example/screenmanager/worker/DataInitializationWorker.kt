@@ -8,11 +8,20 @@ import com.example.screenmanager.data.DefaultRulesData
 import com.example.screenmanager.data.local.ScreenManagerDatabase
 import kotlinx.coroutines.flow.first
 
+/**
+ * Pozadinska inicijalizacija početnih pravila i konfiguracija.
+ *
+ * Ovo podržava startup tok: ako UI dođe bez podataka, Worker obezbeđuje da
+ * baza ima default pravila za ekrane limita i podešavanja.
+ */
 class DataInitializationWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    /**
+     * Popunjava default rule-ove i vraća success/failure za WorkManager.
+     */
     override suspend fun doWork(): Result {
         return try {
             val database = ScreenManagerDatabase.getInstance(applicationContext)

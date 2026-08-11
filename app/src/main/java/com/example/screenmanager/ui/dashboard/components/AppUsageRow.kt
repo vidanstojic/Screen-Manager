@@ -18,6 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.MockAppUsage
 
+/**
+ * Jedan red u listi aplikacija sa trajanjem i vizuelnom progres bar trakom.
+ *
+ * Do ovog kompozabila se dolazi iz dashboard kartice koja prikazuje top
+ * aplikacije za izabrani opseg.
+ */
 @Composable
 fun AppUsageRow(
     app: MockAppUsage,

@@ -2,11 +2,19 @@ package com.example.screenmanager.model
 
 import androidx.compose.ui.graphics.Color
 
+/**
+ * Presek svih UI režima pregleda potrošnje.
+ *
+ * Koristi ga dashboard za izbor dnevnog ili nedeljnog prikaza.
+ */
 enum class UsageRange(val label: String) {
     Week("Week"),
     Day("Day")
 }
 
+/**
+ * Donje navigacione destinacije kroz koje korisnik prolazi iz glavnog UI-a.
+ */
 enum class MainDestination(
     val navLabel: String,
     val icon: String
@@ -22,6 +30,9 @@ enum class MainDestination(
     }
 }
 
+/**
+ * Pojedinačni dan sa agregiranim podacima za grafike i listu aplikacija.
+ */
 data class MockDayUsage(
     val shortLabel: String,
     val dateLabel: String,
@@ -30,6 +41,9 @@ data class MockDayUsage(
     val hourlyMinutes: List<Int>
 )
 
+/**
+ * Jedna stavka potrošnje aplikacije na dashboardu ili u detaljima.
+ */
 data class MockAppUsage(
     val name: String,
     val minutes: Int,
@@ -38,6 +52,9 @@ data class MockAppUsage(
     val category: String
 )
 
+/**
+ * Sažetak metrika koje ekran detalja prikazuje u gridu kartica.
+ */
 data class AppDetailStats(
     val usageMinutes: Int,
     val sessions: Int,

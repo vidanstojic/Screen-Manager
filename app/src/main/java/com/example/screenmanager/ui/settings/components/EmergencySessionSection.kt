@@ -18,6 +18,11 @@ import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 
+/**
+ * Sekcija za emergency session konfiguraciju.
+ *
+ * Korisnik odavde kontroliše privremeni bypass svih blokada i trajanje sesije.
+ */
 @Composable
 fun EmergencySessionSection(
     config: EmergencySessionConfig,

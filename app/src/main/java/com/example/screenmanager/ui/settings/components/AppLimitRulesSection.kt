@@ -25,6 +25,9 @@ import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 
+/**
+ * Sekcija koja prikazuje, aktivira i uređuje app limit pravila.
+ */
 @Composable
 fun AppLimitRulesSection(
     rules: List<AppLimitRule>,

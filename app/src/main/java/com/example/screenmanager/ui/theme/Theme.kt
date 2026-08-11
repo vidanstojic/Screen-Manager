@@ -12,6 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+/**
+ * Globalna Compose tema koja se postavlja iz [MainActivity].
+ *
+ * Ovo je prvi vizuelni sloj kroz koji prolaze svi UI ekrani aplikacije.
+ */
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
 val Pink80 = Color(0xFFEFB8C8)
@@ -42,6 +47,9 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * Omotač celog UI stabla aplikacije.
+ */
 @Composable
 fun ScreenManagerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

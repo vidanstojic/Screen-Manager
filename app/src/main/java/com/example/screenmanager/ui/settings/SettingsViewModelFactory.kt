@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.screenmanager.data.repository.SettingsRepository
 
+/**
+ * Fabrika koja pravi [SettingsViewModel] sa već pripremljenim repozitorijumom.
+ */
 class SettingsViewModelFactory(
     private val settingsRepository: SettingsRepository
 ) : ViewModelProvider.Factory {

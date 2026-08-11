@@ -13,6 +13,12 @@ import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.dashboard.components.*
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 
+/**
+ * Početni dashboard ekran sa pregledom korišćenja.
+ *
+ * Do njega se dolazi odmah nakon ulaska u [com.example.screenmanager.ui.ScreenManagerApp]
+ * kroz [com.example.screenmanager.model.MainDestination.UsageStats].
+ */
 @Composable
 fun UsageStatsHomeScreen(
     selectedRange: UsageRange,

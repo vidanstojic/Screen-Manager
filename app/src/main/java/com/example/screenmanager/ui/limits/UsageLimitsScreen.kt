@@ -34,12 +34,18 @@ import com.example.screenmanager.ui.components.StatusChip
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Glavni pregled limit funkcija aplikacije.
+ *
+ * Do ovog ekrana se dolazi iz donje navigacije i on služi kao ulaz u
+ * app limits, shorts/reels, scheduled blocking, wake-up blocking i emergency.
+ */
 @Composable
 fun UsageLimitsScreen(
     selectedDestination: MainDestination,
     onDestinationSelected: (MainDestination) -> Unit,
     onAddLimit: () -> Unit,
-    onScheduledBlockClick: () -> Unit = {} // Dodat callback za klik na Scheduled Blocking
+    onScheduledBlockClick: () -> Unit = {}
 ) {
     Scaffold(
         containerColor = DetailBackground,
@@ -102,6 +108,9 @@ fun UsageLimitsScreen(
     }
 }
 
+/**
+ * Jedna stavka na limit dashboardu koja objašnjava koju vrstu zaštite pokriva.
+ */
 @Composable
 private fun LimitTile(
     title: String,

@@ -20,6 +20,12 @@ import com.example.screenmanager.ui.details.components.*
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Ekran detalja jedne aplikacije.
+ *
+ * Do njega se dolazi iz dashboard liste aplikacija i ovde korisnik vidi
+ * granularne statistike, grafike i ulaz u kreiranje novog limita.
+ */
 @Composable
 fun AppDetailsScreen(
     app: MockAppUsage,

@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Gornja traka ekrana detalja sa povratkom, ikoncom aplikacije i menijem.
+ */
 @Composable
 fun AppDetailsTopBar(app: MockAppUsage, onBack: () -> Unit) {
     Row(
@@ -59,6 +62,9 @@ fun AppDetailsTopBar(app: MockAppUsage, onBack: () -> Unit) {
     }
 }
 
+/**
+ * Tab sekcija u detaljima koja vizuelno razlikuje Stats i Settings.
+ */
 @Composable
 fun AppDetailsTabs() {
     Row(modifier = Modifier.fillMaxWidth()) {
@@ -67,6 +73,9 @@ fun AppDetailsTabs() {
     }
 }
 
+/**
+ * Jedan tab u detaljima, koristi se samo za vizuelno označavanje aktivnog taba.
+ */
 @Composable
 private fun DetailTab(label: String, active: Boolean, modifier: Modifier = Modifier) {
     Column(

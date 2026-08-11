@@ -17,6 +17,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/**
+ * Globalni Application sloj.
+ *
+ * Kreira bazu, repozitorijume i podrazumevane konfiguracije pre nego što UI
+ * dobije podatke. Odavde se dolazi indirektno kroz [MainActivity] i kroz
+ * Compose/VM sloj koji koristi [settingsRepository].
+ */
 class ScreenManagerApplication : Application() {
 
     private val database by lazy { ScreenManagerDatabase.getInstance(this) }
@@ -65,6 +72,9 @@ class ScreenManagerApplication : Application() {
         fun getInstance(): ScreenManagerApplication = instance
     }
 
+    /**
+     * Pamti globalnu instancu i pokreće inicijalno popunjavanje podataka.
+     */
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -72,6 +82,9 @@ class ScreenManagerApplication : Application() {
         initializeDefaultData()
     }
 
+    /**
+     * Dodaje default konfiguracije ako baza još nema zapise za UI ekrane.
+     */
     private fun initializeDefaultData() {
 
         applicationScope.launch {

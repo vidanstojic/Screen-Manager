@@ -18,6 +18,12 @@ import com.example.screenmanager.model.WakeUpConfig
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 
+/**
+ * Sekcija za wake-up blocking pravilo.
+ *
+ * Ovo je deo settings ekrana koji korisniku daje kontrolu nad inaktivnošću
+ * uređaja i izborom aplikacija koje treba blokirati.
+ */
 @Composable
 fun WakeUpSection(
     config: WakeUpConfig,

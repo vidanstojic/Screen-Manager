@@ -5,10 +5,19 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.screenmanager.domain.ServiceLocator
 
+/**
+ * Periodični maintenance posao za usage podatke.
+ *
+ * Ne prikazuje UI, ali drži dashboard i detalje svežim tako što sinhronizuje
+ * događaje i čisti stare logove.
+ */
 class UsageAggregationWorker(
     appContext: Context,
     params: WorkerParameters
 ) : CoroutineWorker(appContext, params) {
+    /**
+     * Sinhronizuje usage događaje i uklanja stare zapise.
+     */
     override suspend fun doWork(): Result {
         return runCatching {
             val usageRepository = ServiceLocator.usageStatsRepository(applicationContext)

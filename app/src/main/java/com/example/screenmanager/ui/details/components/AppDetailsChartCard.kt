@@ -32,6 +32,11 @@ import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.DetailCard
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Grafička kartica za detalje jedne aplikacije.
+ *
+ * Menja prikaz između satnog i dnevnog toka i prikazuje ukupnu potrošnju.
+ */
 @Composable
 fun AppDetailsChartCard(
     app: MockAppUsage,
@@ -95,6 +100,9 @@ fun AppDetailsChartCard(
     }
 }
 
+/**
+ * Tamni grafikon koji crta trend potrošnje za detalje aplikacije.
+ */
 @Composable
 private fun DarkUsageChart(
     points: List<Int>,
@@ -152,6 +160,9 @@ private fun DarkUsageChart(
     }
 }
 
+/**
+ * Legenda sa kategorijama potrošnje unutar detalja aplikacije.
+ */
 @Composable
 private fun DetailLegend(app: MockAppUsage, totalMinutes: Int) {
     Row(
@@ -168,6 +179,9 @@ private fun DetailLegend(app: MockAppUsage, totalMinutes: Int) {
     }
 }
 
+/**
+ * Jedan element legende za grafikone detalja.
+ */
 @Composable
 private fun LegendItem(color: Color, label: String, value: String) {
     Column {

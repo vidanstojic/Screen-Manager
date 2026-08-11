@@ -19,6 +19,11 @@ import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.DetailCard
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Privremeni dijalog koji predstavlja budući limit editor iz detalja aplikacije.
+ *
+ * Do njega se dolazi iz ekrana detalja kada korisnik pritisne plus.
+ */
 @Composable
 fun UsageLimitMockDialog(app: MockAppUsage, onClose: () -> Unit) {
     Box(

@@ -17,6 +17,12 @@ import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
 import com.example.screenmanager.domain.getInstalledApps
 
+/**
+ * Poseban ekran za upravljanje vremenskim blok pravilima.
+ *
+ * Do njega se dolazi iz [UsageLimitsScreen] i ovde korisnik pravi nova
+ * scheduled pravila kroz lokalni dialog.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduledBlockScreen(
@@ -24,7 +30,6 @@ fun ScheduledBlockScreen(
 ) {
     val context = LocalContext.current
 
-    // Učitavamo stvarne aplikacije sa uređaja/emulatora
     val realApps = remember { getInstalledApps(context) }
 
     var rules by remember { mutableStateOf<List<ScheduleRule>>(emptyList()) }

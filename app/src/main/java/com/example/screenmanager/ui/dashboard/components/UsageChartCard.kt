@@ -27,6 +27,12 @@ import com.example.screenmanager.utils.formatCompactMinutes
 import com.example.screenmanager.utils.formatHeadline
 import com.example.screenmanager.utils.formatSentenceMinutes
 
+/**
+ * Glavna grafička kartica na dashboardu.
+ *
+ * Prikazuje dnevni ili nedeljni trend, proseke i ukupan zbir, pa je to
+ * centralni vizuelni element početnog ekrana.
+ */
 @Composable
 fun UsageChartCard(
     range: UsageRange,
@@ -109,6 +115,9 @@ fun UsageChartCard(
     }
 }
 
+/**
+ * Crta linijski grafikon sa oznakama i prosečnom linijom.
+ */
 @Composable
 private fun UsageLineChart(
     points: List<Int>,

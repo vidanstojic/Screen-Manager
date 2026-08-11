@@ -17,6 +17,11 @@ import com.example.screenmanager.model.AppDetailStats
 import com.example.screenmanager.ui.theme.DetailCard
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Grid kartica sa ključnim metrikama za izabranu aplikaciju.
+ *
+ * Ovaj deo prikazuje usage, sesije, trend, baznu liniju i status limita.
+ */
 @Composable
 fun DetailStatsGrid(details: AppDetailStats) {
     Card(
@@ -41,6 +46,9 @@ fun DetailStatsGrid(details: AppDetailStats) {
     }
 }
 
+/**
+ * Jedna ćelija unutar statističkog grida.
+ */
 @Composable
 private fun DetailStatCell(
     label: String,

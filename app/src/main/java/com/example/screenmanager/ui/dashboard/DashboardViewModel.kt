@@ -14,6 +14,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel koji hrani početni dashboard stvarnim podacima i statusima.
+ *
+ * Odavde UI dobija dozvole, usage zbirke i blok konfiguracije za pregled
+ * odmah po ulasku u aplikaciju.
+ */
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val permissions = ServiceLocator.permissionStateChecker(application)
     private val blockRepository = ServiceLocator.blockRepository(application)
@@ -50,10 +56,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /**
+     * Osvežava trenutni snapshot dozvola iz sistemskih podešavanja.
+     */
     fun refreshPermissions() {
         _permissionState.value = permissions.snapshot()
     }
 
+    /**
+     * Menja wake-up blok u local store-u.
+     */
     fun setWakeupBlocked(config: BlockConfig, enabled: Boolean) {
         viewModelScope.launch {
             blockRepository.upsertConfig(config.copy(isBlockedDuringWakeup = enabled))

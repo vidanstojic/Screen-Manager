@@ -27,6 +27,12 @@ import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 
+/**
+ * Sekcija koja prikazuje scheduled pravila unutar settings ekrana.
+ *
+ * Korisnik ovde dodaje, pali i gasi vremenska pravila koja su pokrenuta iz
+ * [com.example.screenmanager.ui.settings.GeneralSettingsScreen].
+ */
 @Composable
 fun ScheduledBlockSection(
     rules: List<ScheduleRule>,

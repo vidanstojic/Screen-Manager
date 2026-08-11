@@ -8,9 +8,18 @@ import com.example.screenmanager.data.local.ScreenManagerDatabase
 import com.example.screenmanager.worker.UsageAggregationWorker
 import java.util.concurrent.TimeUnit
 
+/**
+ * Centralna fabrika zavisnosti za UI i pozadinske komponente.
+ *
+ * Ekrani i ViewModel-i dobijaju repozitorijume preko ovog sloja, dok boot
+ * tok koristi istu tačku za zakazivanje održavanja.
+ */
 object ServiceLocator {
     fun database(context: Context) = ScreenManagerDatabase.getInstance(context)
 
+    /**
+     * Pravi repository koji dashboard koristi za usage statistike.
+     */
     fun usageStatsRepository(context: Context): UsageStatsRepository {
         val db = database(context)
         return UsageStatsRepository(
@@ -20,6 +29,9 @@ object ServiceLocator {
         )
     }
 
+    /**
+     * Pravi repository za blok pravila i interne state vrednosti.
+     */
     fun blockRepository(context: Context): BlockRepository {
         val db = database(context)
         return BlockRepository(db.blockConfigDao(), db.appInternalStateDao())
@@ -27,6 +39,9 @@ object ServiceLocator {
 
     fun permissionStateChecker(context: Context) = PermissionStateChecker(context.applicationContext)
 
+    /**
+     * Zakazuje periodični maintenance posao za usage agregaciju.
+     */
     fun scheduleDailyMaintenance(context: Context) {
         val request = PeriodicWorkRequestBuilder<UsageAggregationWorker>(6, TimeUnit.HOURS)
             .addTag(UsageAggregationWorker.TAG)

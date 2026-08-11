@@ -18,6 +18,12 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 import java.util.UUID
 
+/**
+ * ViewModel za settings i pravila blokiranja.
+ *
+ * Ovaj sloj povezuje UI sa repozitorijumima i upravlja izmenama konfiguracija
+ * za wake-up, shorts, schedules, app limits i emergency session.
+ */
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
@@ -39,24 +45,36 @@ class SettingsViewModel(
     private val _availableApps = MutableStateFlow(defaultAppOptions())
     val availableApps: StateFlow<List<AppOption>> = _availableApps.asStateFlow()
 
+    /**
+     * Upisuje novu konfiguraciju wake-up pravila.
+     */
     fun updateWakeUpConfig(config: WakeUpConfig) {
         viewModelScope.launch {
             settingsRepository.updateWakeUpConfig(config)
         }
     }
 
+    /**
+     * Upisuje novu konfiguraciju shorts/reels ograničenja.
+     */
     fun updateShortVideoConfig(config: ShortVideoConfig) {
         viewModelScope.launch {
             settingsRepository.updateShortVideoConfig(config)
         }
     }
 
+    /**
+     * Menja emergency session konfiguraciju.
+     */
     fun updateEmergencySession(config: EmergencySessionConfig) {
         viewModelScope.launch {
             settingsRepository.updateEmergencySessionConfig(config)
         }
     }
 
+    /**
+     * Uključuje ili isključuje postojeće schedule pravilo.
+     */
     fun toggleScheduleRule(ruleId: String, isEnabled: Boolean) {
         viewModelScope.launch {
             val rules = scheduleRules.value
@@ -67,6 +85,9 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Dodaje novo podrazumevano schedule pravilo.
+     */
     fun addScheduleRule() {
         viewModelScope.launch {
             val newRule = ScheduleRule(
@@ -82,12 +103,18 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Briše schedule pravilo po identifikatoru.
+     */
     fun removeScheduleRule(ruleId: String) {
         viewModelScope.launch {
             settingsRepository.deleteScheduleRuleById(ruleId)
         }
     }
 
+    /**
+     * Uključuje ili isključuje app limit pravilo.
+     */
     fun toggleAppLimitRule(ruleId: String, isEnabled: Boolean) {
         viewModelScope.launch {
             val rules = appLimitRules.value
@@ -98,12 +125,18 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Čuva izmenjeno app limit pravilo.
+     */
     fun updateAppLimitRule(rule: AppLimitRule) {
         viewModelScope.launch {
             settingsRepository.updateAppLimitRule(rule)
         }
     }
 
+    /**
+     * Dodaje primer app limit pravila sa podrazumevanim vrednostima.
+     */
     fun addAppLimitRule() {
         viewModelScope.launch {
             updateAppLimitRule(
@@ -119,16 +152,25 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Briše app limit pravilo po identifikatoru.
+     */
     fun removeAppLimitRule(ruleId: String) {
         viewModelScope.launch {
             settingsRepository.deleteAppLimitRuleById(ruleId)
         }
     }
 
+    /**
+     * Menja lokalnu listu dostupnih aplikacija koje dijalozi prikazuju.
+     */
     fun replaceAvailableApps(apps: List<AppOption>) {
         _availableApps.value = apps
     }
 
+    /**
+     * Vraća statičnu listu aplikacija ako UI još nema realne podatke.
+     */
     private fun defaultAppOptions(): List<AppOption> {
         return listOf(
             AppOption("com.google.android.youtube", "YouTube", "Video", "YT"),

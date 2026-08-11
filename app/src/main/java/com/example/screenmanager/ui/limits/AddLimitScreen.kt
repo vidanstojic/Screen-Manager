@@ -34,6 +34,12 @@ import com.example.screenmanager.ui.components.StatusChip
 import com.example.screenmanager.ui.components.ToggleChip
 import com.example.screenmanager.ui.settings.components.AppPickerDialog
 
+/**
+ * Ekran za kreiranje i uređivanje limita aplikacije.
+ *
+ * Do njega se dolazi iz detalja aplikacije ili iz limits pregleda i ovde
+ * korisnik bira aplikacije, tip pravila i trajanje blokade.
+ */
 @Composable
 fun AddLimitScreen(
     selectedApp: MockAppUsage?,

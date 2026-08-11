@@ -21,6 +21,12 @@ import com.example.screenmanager.model.UsageRange
 import com.example.screenmanager.ui.theme.DetailCard
 import com.example.screenmanager.ui.theme.PurpleAccent
 
+/**
+ * Filter traka za detalje aplikacije.
+ *
+ * Pokriva izbor opsega, dana i dodatnih lokalnih filtera koji menjaju grafikone
+ * i metrike u [AppDetailsScreen].
+ */
 @Composable
 fun DetailFilterBar(
     selectedRange: UsageRange,
@@ -73,6 +79,9 @@ fun DetailFilterBar(
     }
 }
 
+/**
+ * Tamni pill kontroler koji predstavlja jedan aktivni ili neaktivni filter.
+ */
 @Composable
 private fun DarkPill(text: String, active: Boolean = false, onClick: () -> Unit = {}) {
     Box(

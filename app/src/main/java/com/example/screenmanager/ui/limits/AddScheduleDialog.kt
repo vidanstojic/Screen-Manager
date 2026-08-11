@@ -26,6 +26,11 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 import java.util.UUID
 
+/**
+ * Dijalog za unos novog scheduled block pravila.
+ *
+ * Do njega se dolazi iz [ScheduledBlockScreen] ili iz sekcije u settings-u.
+ */
 @Composable
 fun AddScheduleDialog(
     availableApps: List<AppOption>,
@@ -44,7 +49,6 @@ fun AddScheduleDialog(
     var selectedAppIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var showAppPicker by remember { mutableStateOf(false) }
 
-    // TimePicker dijalog za početno i krajnje vreme
     fun pickTime(initialHour: Int, initialMinute: Int, onTimePicked: (Int, Int) -> Unit) {
         TimePickerDialog(
             context,
@@ -72,7 +76,6 @@ fun AddScheduleDialog(
         title = { Text("New Scheduled Block", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Naziv pravila
                 OutlinedTextField(
                     value = ruleName,
                     onValueChange = { ruleName = it },
@@ -81,7 +84,6 @@ fun AddScheduleDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Izbor Vremena (Od - Do)
                 Text("Time Interval", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -101,7 +103,6 @@ fun AddScheduleDialog(
                     )
                 }
 
-                // Izbor Dana u nedelji
                 Text("Days of Week", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -139,7 +140,6 @@ fun AddScheduleDialog(
                     }
                 }
 
-                // Izbor Aplikacija
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,6 +189,9 @@ fun AddScheduleDialog(
     )
 }
 
+/**
+ * Mali time selector koji prikazuje trenutno izabrano vreme i otvara picker.
+ */
 @Composable
 private fun TimeBox(label: String, timeStr: String, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

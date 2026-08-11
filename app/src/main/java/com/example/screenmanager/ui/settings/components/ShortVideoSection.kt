@@ -18,6 +18,9 @@ import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 
+/**
+ * Sekcija za Shorts/Reels ograničenje i dodatni penalty block.
+ */
 @Composable
 fun ShortVideoSection(
     config: ShortVideoConfig,

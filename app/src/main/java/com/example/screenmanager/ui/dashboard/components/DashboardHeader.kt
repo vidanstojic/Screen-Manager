@@ -22,6 +22,9 @@ import com.example.screenmanager.model.MockDayUsage
 import com.example.screenmanager.model.MockUsage
 import com.example.screenmanager.model.UsageRange
 
+/**
+ * Gornji deo dashboard pregleda sa naslovom, vremenskim opsegom i izborom dana.
+ */
 @Composable
 fun AppUsageHeader(modifier: Modifier = Modifier) {
     Box(
@@ -48,6 +51,9 @@ fun AppUsageHeader(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Segmentirani prekidač za izbor dnevnog ili nedeljnog prikaza potrošnje.
+ */
 @Composable
 fun RangeSegmentedControl(
     selected: UsageRange,
@@ -85,6 +91,9 @@ fun RangeSegmentedControl(
     }
 }
 
+/**
+ * Horizontalni izbor dana koji se prikazuje samo u dnevnom režimu.
+ */
 @Composable
 fun DayPicker(
     visible: Boolean,

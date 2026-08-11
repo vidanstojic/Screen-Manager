@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.ui.theme.PurpleAccent
 
@@ -22,7 +23,7 @@ import com.example.screenmanager.ui.theme.PurpleAccent
  * Gornja traka ekrana detalja sa povratkom, ikoncom aplikacije i menijem.
  */
 @Composable
-fun AppDetailsTopBar(app: MockAppUsage, onBack: () -> Unit) {
+fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

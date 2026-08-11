@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.model.AppOption
+import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
@@ -42,7 +43,7 @@ import com.example.screenmanager.ui.settings.components.AppPickerDialog
  */
 @Composable
 fun AddLimitScreen(
-    selectedApp: MockAppUsage?,
+    selectedApp: AppUsageSummary?,
     onBack: () -> Unit,
     onCancel: () -> Unit,
     onSave: () -> Unit

@@ -1,37 +1,55 @@
 package com.example.screenmanager.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.*
 import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.dashboard.components.*
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
+import com.example.screenmanager.model.AppUsageSummary
+import com.example.screenmanager.ui.dashboard.components.DayUiModel
 
-/**
- * Početni dashboard ekran sa pregledom korišćenja.
- *
- * Do njega se dolazi odmah nakon ulaska u [com.example.screenmanager.ui.ScreenManagerApp]
- * kroz [com.example.screenmanager.model.MainDestination.UsageStats].
- */
 @Composable
 fun UsageStatsHomeScreen(
     selectedRange: UsageRange,
-    selectedDay: MockDayUsage,
+    selectedDayStart: Long, // NOVO
     selectedDestination: MainDestination,
+    appsUsage: List<AppUsageSummary>, // NOVO
+    days: List<DayUiModel>, // NOVO
+    chartTitle: String, // NOVO
+    chartHeadlineMinutes: Int, // NOVO
+    chartPoints: List<Int>, // NOVO
+    chartLabels: List<String>, // NOVO
+    chartAverage: Float, // NOVO
+    chartBottomLabel: String, // NOVO
     onRangeSelected: (UsageRange) -> Unit,
-    onDaySelected: (MockDayUsage) -> Unit,
-    onAppClick: (MockAppUsage) -> Unit,
+    onDaySelected: (Long) -> Unit, // PROMENJENO
+    onAppClick: (AppUsageSummary) -> Unit, // PROMENJENO
     onDestinationSelected: (MainDestination) -> Unit
 ) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val scale = (screenWidth / 360.dp).coerceIn(0.85f, 1.3f)
+    val hPadding = screenWidth * 0.04f
+
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFFF1F5F8),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0B0A1F), Color(0xFF1A1233), Color(0xFF0E0B22))
+                )
+            ),
+        containerColor = Color.Transparent,
         bottomBar = {
             BottomNavBar(
                 selected = selectedDestination,
@@ -43,11 +61,11 @@ fun UsageStatsHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = hPadding),
+            verticalArrangement = Arrangement.spacedBy(16.dp * scale)
         ) {
             item {
-                AppUsageHeader(modifier = Modifier.padding(top = 16.dp))
+                AppUsageHeader(modifier = Modifier.padding(top = 16.dp * scale))
             }
             item {
                 RangeSegmentedControl(
@@ -56,38 +74,46 @@ fun UsageStatsHomeScreen(
                 )
             }
             item {
+                // AŽURIRANO DA KORISTI NOVE PARAMETRE
                 DayPicker(
                     visible = selectedRange == UsageRange.Day,
-                    selectedDay = selectedDay,
+                    selectedDayStart = selectedDayStart,
+                    days = days,
                     onSelectedDay = onDaySelected
                 )
             }
             item {
+                // AŽURIRANO DA KORISTI NOVE PARAMETRE
                 UsageChartCard(
-                    range = selectedRange,
-                    selectedDay = selectedDay
+                    title = chartTitle,
+                    headlineMinutes = chartHeadlineMinutes,
+                    points = chartPoints,
+                    labels = chartLabels,
+                    average = chartAverage,
+                    bottomLabel = chartBottomLabel
                 )
             }
             item {
+                // AŽURIRANO DA KORISTI NOVE PARAMETRE
                 AppListCard(
-                    apps = MockUsage.appsFor(selectedRange, selectedDay),
+                    apps = appsUsage,
                     onAppClick = onAppClick
                 )
             }
             item {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(10.dp * scale))
             }
         }
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-private fun DashboardPreview() {
-    ScreenManagerTheme(dynamicColor = false) {
-        UsageChartCard(
-            range = UsageRange.Day,
-            selectedDay = MockUsage.days.last()
-        )
-    }
-}
+//
+//@Preview(showBackground = true)
+//@Composable
+//private fun DashboardPreview() {
+//    ScreenManagerTheme(dynamicColor = false) {
+//        UsageChartCard(
+//            range = UsageRange.Day,
+//            selectedDay = MockUsage.days.last()
+//        )
+//    }
+//}

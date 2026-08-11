@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,7 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,12 +31,6 @@ import com.example.screenmanager.model.MainDestination
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
 
-/**
- * Deljeni UI blokovi koje koriste više ekrana.
- *
- * Ovde su donja navigacija, kartice, čipovi i placeholder ekran. Do ovih
- * kompozabila dolaze dashboard, details, limits i settings ekrani.
- */
 @Composable
 fun BottomNavBar(
     selected: MainDestination,
@@ -45,7 +40,18 @@ fun BottomNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(Color(0xFF1F1B29))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF1A1233), Color(0xFF0E0B22))
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
+                ),
+                shape = RectangleShape
+            )
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -53,22 +59,34 @@ fun BottomNavBar(
         MainDestination.bottomItems.forEach { item ->
             val active = selected == item
             val isAction = item == MainDestination.AddLimit
+
+            val cornerRadius = if (isAction) 16.dp else 14.dp
+            val shape = RoundedCornerShape(cornerRadius)
+
+            val bgColor = when {
+                isAction -> PurpleAccent
+                active -> Color(0xFF3A334B)
+                else -> Color(0xFF2A2535)
+            }
+
+            val customBorderColor = if (active) PurpleAccent else Color(0xFF3A334B)
+
+            val iconColor = if (isAction) Color(0xFF1F1B29) else if (active) PurpleAccent else Color.White
+            val textColor = if (isAction) Color(0xFF1F1B29) else Color(0xFFE8E4EE)
+
+            val itemHeight = if (isAction) 48.dp else 44.dp
+            val itemWeight = if (isAction) 1.1f else 1f
+
             Box(
                 modifier = Modifier
-                    .weight(if (isAction) 1.1f else 1f)
-                    .height(if (isAction) 48.dp else 44.dp)
-                    .clip(RoundedCornerShape(if (isAction) 16.dp else 14.dp))
-                    .background(
-                        when {
-                            isAction -> PurpleAccent
-                            active -> Color(0xFF3A334B)
-                            else -> Color(0xFF2A2535)
-                        }
-                    )
+                    .weight(itemWeight)
+                    .height(itemHeight)
+                    .clip(shape)
+                    .background(bgColor)
                     .border(
-                        1.dp,
-                        if (active) PurpleAccent else Color(0xFF3A334B),
-                        RoundedCornerShape(if (isAction) 16.dp else 14.dp)
+                        width = 1.dp,
+                        color = customBorderColor,
+                        shape = shape
                     )
                     .clickable { onSelected(item) }
                     .padding(horizontal = 8.dp),
@@ -77,14 +95,14 @@ fun BottomNavBar(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = item.icon,
-                        color = if (isAction) Color(0xFF1F1B29) else if (active) PurpleAccent else Color.White,
+                        color = iconColor,
                         fontSize = if (isAction) 22.sp else 19.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 20.sp
                     )
                     Text(
                         text = item.navLabel,
-                        color = if (isAction) Color(0xFF1F1B29) else Color(0xFFE8E4EE),
+                        color = textColor,
                         fontSize = 10.sp,
                         lineHeight = 11.sp,
                         maxLines = 2
@@ -95,9 +113,6 @@ fun BottomNavBar(
     }
 }
 
-/**
- * Standardna bela kartica za grupisanje sekcija u settings i limit ekranima.
- */
 @Composable
 fun SectionCard(
     title: String,
@@ -110,7 +125,11 @@ fun SectionCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Color.White)
-            .border(1.dp, Color(0xFFE5E9EF), RoundedCornerShape(20.dp))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFE5E9EF),
+                shape = RoundedCornerShape(20.dp)
+            )
             .padding(16.dp)
     ) {
         Text(
@@ -133,9 +152,6 @@ fun SectionCard(
     }
 }
 
-/**
- * Plavi informativni banner za objašnjenje korisničkog konteksta na ekranu.
- */
 @Composable
 fun InfoBanner(
     title: String,
@@ -149,7 +165,11 @@ fun InfoBanner(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(Color(0xFFEAF4FF))
-            .border(1.dp, Color(0xFFD4E9FF), RoundedCornerShape(18.dp))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFD4E9FF),
+                shape = RoundedCornerShape(18.dp)
+            )
             .padding(16.dp)
     ) {
         Text(title, color = Color(0xFF176FBA), fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -167,9 +187,6 @@ fun InfoBanner(
     }
 }
 
-/**
- * Mali selektabilni čip koji predstavlja filter ili vrstu pravila.
- */
 @Composable
 fun ToggleChip(
     text: String,
@@ -177,12 +194,20 @@ fun ToggleChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val bgColor = if (selected) PurpleAccent else Color(0xFFF1F4F8)
+    val customBorderColor = if (selected) PurpleAccent else Color(0xFFD5DCE3)
+    val chipShape = RoundedCornerShape(12.dp)
+
     Box(
         modifier = modifier
             .height(36.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) PurpleAccent else Color(0xFFF1F4F8))
-            .border(1.dp, if (selected) PurpleAccent else Color(0xFFD5DCE3), RoundedCornerShape(12.dp))
+            .clip(chipShape)
+            .background(bgColor)
+            .border(
+                width = 1.dp,
+                color = customBorderColor,
+                shape = chipShape
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
@@ -196,23 +221,24 @@ fun ToggleChip(
     }
 }
 
-/**
- * Status indikator za brojčane i logičke signale poput broja aplikacija.
- */
 @Composable
 fun StatusChip(
     text: String,
     isActive: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val bgColor = if (isActive) Color(0xFFE6F5EC) else Color(0xFFF3F4F7)
+    val customBorderColor = if (isActive) Color(0xFF76C893) else Color(0xFFDCE1E7)
+    val chipShape = RoundedCornerShape(999.dp)
+
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(if (isActive) Color(0xFFE6F5EC) else Color(0xFFF3F4F7))
+            .clip(chipShape)
+            .background(bgColor)
             .border(
-                1.dp,
-                if (isActive) Color(0xFF76C893) else Color(0xFFDCE1E7),
-                RoundedCornerShape(999.dp)
+                width = 1.dp,
+                color = customBorderColor,
+                shape = chipShape
             )
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
@@ -225,9 +251,6 @@ fun StatusChip(
     }
 }
 
-/**
- * Generički placeholder ekran za destinacije koje još nemaju pun sadržaj.
- */
 @Composable
 fun GeneralPlaceholderScreen(
     destination: MainDestination,

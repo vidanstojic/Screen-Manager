@@ -1,20 +1,27 @@
 package com.example.screenmanager.ui
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext // NOVI IMPORT
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.domain.TimeBuckets // NOVI IMPORT
+import com.example.screenmanager.domain.toAppUsageSummaries // NOVI IMPORT
+import com.example.screenmanager.domain.toHourlyMinutesList // NOVI IMPORT
+import com.example.screenmanager.model.AppUsageSummary // NOVI IMPORT
 import com.example.screenmanager.model.MainDestination
-import com.example.screenmanager.model.MockAppUsage
-import com.example.screenmanager.model.MockUsage
 import com.example.screenmanager.model.UsageRange
 import com.example.screenmanager.ui.components.GeneralPlaceholderScreen
 import com.example.screenmanager.ui.dashboard.DashboardViewModel
 import com.example.screenmanager.ui.dashboard.UsageStatsHomeScreen
 import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
-import com.example.screenmanager.ui.limits.UsageLimitsScreen
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen
+import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
 import com.example.screenmanager.ui.FocusFlowHomeScreen
+import java.text.SimpleDateFormat // NOVI IMPORT
+import java.util.Date // NOVI IMPORT
+import java.util.Locale // NOVI IMPORT
+import java.util.concurrent.TimeUnit // NOVI IMPORT
 
 /**
  * Glavni Compose router aplikacije.
@@ -25,11 +32,25 @@ import com.example.screenmanager.ui.FocusFlowHomeScreen
  */
 @Composable
 fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
+    val context = LocalContext.current
+
+    // --- SKUP PRAVIH PODATAKA IZ VIEWMODELA (NOVO) ---
+    val dailyTotals by viewModel.dailyTotals.collectAsState()
+    val hourlyUsage by viewModel.hourlyUsage.collectAsState()
+
+    // Mapiramo podatke iz baze u tvoj UI model za listu
+    val appsUsage = remember(dailyTotals) {
+        dailyTotals.toAppUsageSummaries(context).sortedByDescending { it.minutes }
+    }
+
     var selectedRange by remember { mutableStateOf(UsageRange.Day) }
-    var selectedDay by remember { mutableStateOf(MockUsage.days.last()) }
-    var selectedApp by remember { mutableStateOf<MockAppUsage?>(null) }
+    // PROMENJENO: Umesto MockUsage.days.last() sada koristimo pravi timestamp za danas
+    var selectedDayStart by remember { mutableStateOf(TimeBuckets.startOfToday()) }
+    // PROMENJENO: Umesto MockAppUsage sada koristimo tvoj novi AppUsageSummary
+    var selectedApp by remember { mutableStateOf<AppUsageSummary?>(null) }
     var selectedDestination by remember { mutableStateOf(MainDestination.UsageStats) }
-    var addLimitApp by remember { mutableStateOf<MockAppUsage?>(null) }
+    // PROMENJENO: Umesto MockAppUsage sada koristimo tvoj novi AppUsageSummary
+    var addLimitApp by remember { mutableStateOf<AppUsageSummary?>(null) }
 
     var showScheduledBlockScreen by remember { mutableStateOf(false) }
 
@@ -82,10 +103,21 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     when (selectedDestination) {
         MainDestination.UsageStats -> UsageStatsHomeScreen(
             selectedRange = selectedRange,
-            selectedDay = selectedDay,
+            selectedDayStart = selectedDayStart, // PROMENJENO
             selectedDestination = selectedDestination,
+            appsUsage = appsUsage, // NOVO: Prosleđujemo pravu mapiranu listu aplikacija
+            days = generateLast7DaysUiModels(), // NOVO: Generišemo poslednjih 7 dana
+
+            // NOVO: Podaci za grafikon prilagođeni pravim modelima
+            chartTitle = if (selectedRange == UsageRange.Day) "Today's Usage" else "Last 7 Days",
+            chartHeadlineMinutes = appsUsage.sumOf { it.minutes }, // Ukupno minuta
+            chartPoints = hourlyUsage.toHourlyMinutesList(), // Koristimo maper iz UsageMappers.kt
+            chartLabels = listOf("12am", "6am", "Noon", "6pm", "11pm"),
+            chartAverage = hourlyUsage.toHourlyMinutesList().average().toFloat().takeIf { !it.isNaN() } ?: 0f,
+            chartBottomLabel = "Daily Average: ...",
+
             onRangeSelected = { selectedRange = it },
-            onDaySelected = { selectedDay = it },
+            onDaySelected = { selectedDayStart = it }, // PROMENJENO
             onAppClick = { selectedApp = it },
             onDestinationSelected = { selectedDestination = it }
         )
@@ -117,5 +149,32 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
         )
 
         MainDestination.AddLimit -> Unit
+    }
+}
+
+// NOVO: Data klasa za UI prikaz dana u DayPicker-u
+data class DayUiModel(
+    val timestamp: Long,
+    val shortLabel: String,
+    val dateLabel: String
+)
+
+// NOVO: Funkcija za generisanje poslednjih 7 dana
+fun generateLast7DaysUiModels(): List<DayUiModel> {
+    val formatter = SimpleDateFormat("d", Locale.getDefault())
+    val shortFormatter = SimpleDateFormat("EEE", Locale.getDefault())
+    val now = System.currentTimeMillis()
+    val startOfToday = TimeBuckets.startOfToday(now)
+    val dayMs = TimeUnit.DAYS.toMillis(1)
+
+    // Generiše listu unazad od pre 6 dana do danas (ukupno 7 dana)
+    return (6 downTo 0).map { daysAgo ->
+        val timestamp = startOfToday - (daysAgo * dayMs)
+        val date = Date(timestamp)
+        DayUiModel(
+            timestamp = timestamp,
+            shortLabel = shortFormatter.format(date),
+            dateLabel = formatter.format(date)
+        )
     }
 }

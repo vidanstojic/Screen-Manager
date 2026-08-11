@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.model.MockDayUsage
 import com.example.screenmanager.model.MockUsage
@@ -39,7 +40,7 @@ import com.example.screenmanager.ui.theme.PurpleAccent
  */
 @Composable
 fun AppDetailsChartCard(
-    app: MockAppUsage,
+    app: AppUsageSummary,
     selectedRange: UsageRange,
     selectedDay: MockDayUsage,
     onToggleRange: () -> Unit

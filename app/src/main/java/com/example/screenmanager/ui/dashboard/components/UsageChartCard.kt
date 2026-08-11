@@ -1,14 +1,15 @@
 package com.example.screenmanager.ui.dashboard.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -27,97 +28,72 @@ import com.example.screenmanager.utils.formatCompactMinutes
 import com.example.screenmanager.utils.formatHeadline
 import com.example.screenmanager.utils.formatSentenceMinutes
 
-/**
- * Glavna grafička kartica na dashboardu.
- *
- * Prikazuje dnevni ili nedeljni trend, proseke i ukupan zbir, pa je to
- * centralni vizuelni element početnog ekrana.
- */
 @Composable
 fun UsageChartCard(
-    range: UsageRange,
-    selectedDay: MockDayUsage
+    title: String,
+    headlineMinutes: Int,
+    points: List<Int>,
+    labels: List<String>,
+    average: Float,
+    bottomLabel: String
 ) {
-    val weekUsage = MockUsage.weekUsage
-    val title = if (range == UsageRange.Day) {
-        "${selectedDay.displayLabel}'s Usage"
-    } else {
-        "Last 7 Days"
-    }
-    val headlineMinutes = if (range == UsageRange.Day) {
-        selectedDay.totalMinutes
-    } else {
-        weekUsage.sumOf { it.totalMinutes }
-    }
-    val points = if (range == UsageRange.Day) selectedDay.hourlyMinutes else weekUsage.map { it.totalMinutes }
-    val labels = if (range == UsageRange.Day) {
-        listOf("12am", "6am", "Noon", "6pm", "11pm")
-    } else {
-        weekUsage.map { it.shortLabel }
-    }
-    val average = if (range == UsageRange.Day) selectedDay.hourlyMinutes.average() else weekUsage.map { it.totalMinutes }.average()
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))),
+                RoundedCornerShape(18.dp)
+            )
+            .padding(14.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(title, color = Color(0xFF6B7680), fontSize = 16.sp)
+        Text(title, color = Color(0xFFA9A3C4), fontSize = 16.sp)
+        Text(
+            text = formatHeadline(headlineMinutes),
+            color = Color(0xFFB13BFF),
+            fontSize = 30.sp,
+            fontWeight = FontWeight.ExtraBold,
+            lineHeight = 34.sp
+        )
+        UsageLineChart(
+            points = points,
+            labels = labels,
+            average = average,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.95f)
+                .padding(top = 10.dp)
+        )
+        Text(
+            text = bottomLabel,
+            color = Color(0xFFFF9A5C),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = formatHeadline(headlineMinutes),
-                color = Color(0xFF25A7F2),
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                lineHeight = 34.sp
-            )
-            UsageLineChart(
-                points = points,
-                labels = labels,
-                average = average.toFloat(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.95f)
-                    .padding(top = 10.dp)
+                text = "Total Usage: ${formatSentenceMinutes(headlineMinutes)}",
+                color = Color(0xFFA9A3C4),
+                fontSize = 14.sp
             )
             Text(
-                text = if (range == UsageRange.Day) {
-                    "Daily Average: ${formatCompactMinutes(MockUsage.dailyAverageMinutes)}"
-                } else {
-                    "Average Day: ${formatCompactMinutes((headlineMinutes / 7f).toInt())}"
-                },
-                color = Color(0xFFF3A346),
+                text = "More  >",
+                color = Color(0xFFB13BFF),
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
+                fontWeight = FontWeight.Bold
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Total Usage: ${formatSentenceMinutes(headlineMinutes)}",
-                    color = Color(0xFF7D8992),
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "More  >",
-                    color = Color(0xFF2EA7F0),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }
-
-/**
- * Crta linijski grafikon sa oznakama i prosečnom linijom.
- */
 @Composable
 private fun UsageLineChart(
     points: List<Int>,
@@ -125,8 +101,8 @@ private fun UsageLineChart(
     average: Float,
     modifier: Modifier = Modifier
 ) {
-    val blue = Color(0xFF25A7F2)
-    val orange = Color(0xFFF1A64B)
+    val purple = Color(0xFFB13BFF)
+    val orange = Color(0xFFFF9A5C)
     Canvas(modifier = modifier) {
         val left = 22.dp.toPx()
         val right = 8.dp.toPx()
@@ -150,7 +126,7 @@ private fun UsageLineChart(
         for (i in 0..4) {
             val y = top + chartHeight * (i / 4f)
             drawLine(
-                color = Color(0xFFE9EEF2),
+                color = Color.White.copy(alpha = 0.08f),
                 start = Offset(left, y),
                 end = Offset(size.width - right, y),
                 strokeWidth = 1.dp.toPx()
@@ -160,7 +136,7 @@ private fun UsageLineChart(
         labels.forEachIndexed { index, label ->
             val x = left + chartWidth * (index.toFloat() / (labels.lastIndex).coerceAtLeast(1).toFloat())
             drawLine(
-                color = Color(0xFFE9EEF2),
+                color = Color.White.copy(alpha = 0.08f),
                 start = Offset(x, top),
                 end = Offset(x, top + chartHeight),
                 strokeWidth = 1.dp.toPx()
@@ -170,7 +146,7 @@ private fun UsageLineChart(
                 x - 12.dp.toPx(),
                 size.height - 5.dp.toPx(),
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.rgb(118, 130, 140)
+                    color = android.graphics.Color.argb(180, 169, 163, 196)
                     textSize = 10.sp.toPx()
                     isAntiAlias = true
                 }
@@ -206,21 +182,21 @@ private fun UsageLineChart(
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(Color(0x5525A7F2), Color(0x0525A7F2)),
+                colors = listOf(Color(0x55B13BFF), Color(0x05B13BFF)),
                 startY = top,
                 endY = top + chartHeight
             )
         )
         drawPath(
             path = linePath,
-            color = blue,
+            color = purple,
             style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
         )
         points.forEachIndexed { index, value ->
             val point = Offset(xFor(index), yFor(value.toFloat()))
-            drawCircle(Color.White, radius = 5.dp.toPx(), center = point)
+            drawCircle(Color(0xFF1A1233), radius = 5.dp.toPx(), center = point)
             drawCircle(
-                color = if (index == points.lastIndex) Color(0xFFFF625A) else blue,
+                color = if (index == points.lastIndex) Color(0xFFFF5CA8) else purple,
                 radius = 4.dp.toPx(),
                 center = point
             )

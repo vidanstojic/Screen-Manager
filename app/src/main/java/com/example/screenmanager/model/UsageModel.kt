@@ -64,3 +64,16 @@ data class AppDetailStats(
     val trendColor: Color,
     val limitStatus: String
 )
+
+/**
+ * Agregirana potrošnja jedne aplikacije, spremna za prikaz u dashboard listi.
+ *
+ * Ime i ikonica se učitavaju iz PackageManager-a preko [AppIconLoader],
+ * pa ovaj model čuva samo packageName kao referencu, a ne samu sliku.
+ */
+data class AppUsageSummary(
+    val packageName: String,
+    val name: String,
+    val minutes: Int,
+    val category: String = "App"
+)

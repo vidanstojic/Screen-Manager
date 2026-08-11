@@ -37,6 +37,19 @@ object TimeBuckets {
         }.timeInMillis
     }
 
+    /**
+     * Početak "klizećeg" prozora od poslednjih 7 dana (danas uključen),
+     * normalizovano na ponoć — ne prati kalendarsku nedelju kao [startOfWeek].
+     *
+     * Koristi se za retenciju logova i za "poslednjih 7 dana" grafike
+     * (weekly daily breakdown), jer korisnik uvek treba da vidi tačno
+     * 7 tačaka, bez obzira koji je dan danas.
+     */
+    fun startOfRollingWeek(now: Long = System.currentTimeMillis()): Long {
+        val todayStart = startOfToday(now)
+        return todayStart - TimeUnit.DAYS.toMillis(6)
+    }
+
     val sevenHoursMs: Long = TimeUnit.HOURS.toMillis(7)
     val wakeupEvaluationWindowMs: Long = TimeUnit.MINUTES.toMillis(2)
     val defaultWakeupBlockMs: Long = TimeUnit.MINUTES.toMillis(60)

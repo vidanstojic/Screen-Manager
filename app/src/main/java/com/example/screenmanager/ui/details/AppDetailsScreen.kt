@@ -28,7 +28,7 @@ import com.example.screenmanager.ui.theme.PurpleAccent
  */
 @Composable
 fun AppDetailsScreen(
-    app: MockAppUsage,
+    app: AppUsageSummary,
     selectedDestination: MainDestination,
     onDestinationSelected: (MainDestination) -> Unit,
     onBack: () -> Unit,

@@ -7,6 +7,8 @@ import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.data.local.AppInternalStateDao
 import com.example.screenmanager.data.local.AppUsageLog
 import com.example.screenmanager.data.local.AppUsageLogDao
+import com.example.screenmanager.data.local.DailyUsage
+import com.example.screenmanager.data.local.HourlyUsage
 import kotlinx.coroutines.flow.Flow
 import java.util.concurrent.TimeUnit
 
@@ -18,10 +20,50 @@ class UsageStatsRepository(
     private val usageStatsManager: UsageStatsManager
         get() = context.getSystemService(UsageStatsManager::class.java)
 
-    fun observeTodayHourlyUsage() = usageLogDao.observeHourlyUsage(TimeBuckets.startOfToday())
+    // --- Ukupno (sve aplikacije zbirno) ---
+
+    fun observeTodayHourlyUsage(): Flow<List<HourlyUsage>> {
+        val start = TimeBuckets.startOfToday()
+        val end = start + TimeUnit.DAYS.toMillis(1)
+        return usageLogDao.observeHourlyUsage(start, end)
+    }
+
+    /**
+     * Po satu za bilo koji izabrani dan (ne samo danas) — koristi se kad
+     * korisnik izabere prošli dan kroz DayPicker.
+     */
+    fun observeHourlyUsageForDay(dayStartTimestamp: Long): Flow<List<HourlyUsage>> {
+        val end = dayStartTimestamp + TimeUnit.DAYS.toMillis(1)
+        return usageLogDao.observeHourlyUsage(dayStartTimestamp, end)
+    }
+
     fun observeDailyTotals() = usageLogDao.observeTotalsSince(TimeBuckets.startOfToday())
     fun observeWeeklyTotals() = usageLogDao.observeTotalsSince(TimeBuckets.startOfWeek())
     fun observeMonthlyTotals() = usageLogDao.observeTotalsSince(TimeBuckets.startOfMonth())
+
+    /**
+     * Ukupno po danu za poslednjih 7 dana — glavni "Week" grafik.
+     */
+    fun observeWeeklyDailyBreakdown(): Flow<List<DailyUsage>> =
+        usageLogDao.observeDailyTotalsAllApps(TimeBuckets.startOfRollingWeek())
+
+    // --- Jedna aplikacija ---
+
+    /**
+     * Po satu za konkretnu aplikaciju, za izabrani dan — app detail ekran.
+     */
+    fun observeHourlyUsageForApp(packageName: String, dayStartTimestamp: Long): Flow<List<HourlyUsage>> {
+        val end = dayStartTimestamp + TimeUnit.DAYS.toMillis(1)
+        return usageLogDao.observeHourlyUsageForApp(dayStartTimestamp, end, packageName)
+    }
+
+    /**
+     * Po danu za konkretnu aplikaciju, poslednjih 7 dana — trend za tu app.
+     */
+    fun observeDailyUsageForApp(packageName: String): Flow<List<DailyUsage>> =
+        usageLogDao.observeDailyUsageForApp(TimeBuckets.startOfRollingWeek(), packageName)
+
+    // --- Sync i retencija ---
 
     suspend fun syncUsageEvents(now: Long = System.currentTimeMillis()) {
         val fallbackStart = TimeBuckets.startOfToday(now)
@@ -62,8 +104,13 @@ class UsageStatsRepository(
         return lastPackage
     }
 
+    /**
+     * Čuvamo samo poslednjih 7 dana za sada. Kada dodamo weekly/monthly
+     * rollup tabele, ova granica ostaje ista — rollup će čuvati sažete
+     * podatke nezavisno, a ovo briše samo sirove (raw) logove.
+     */
     suspend fun cleanupOldLogs(now: Long = System.currentTimeMillis()) {
-        usageLogDao.deleteOlderThan(now - TimeUnit.DAYS.toMillis(90))
+        usageLogDao.deleteOlderThan(now - TimeUnit.DAYS.toMillis(7))
     }
 
     private fun readForegroundSessions(from: Long, to: Long): List<AppUsageLog> {

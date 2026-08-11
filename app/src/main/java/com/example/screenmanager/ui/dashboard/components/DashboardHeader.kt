@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -22,9 +23,6 @@ import com.example.screenmanager.model.MockDayUsage
 import com.example.screenmanager.model.MockUsage
 import com.example.screenmanager.model.UsageRange
 
-/**
- * Gornji deo dashboard pregleda sa naslovom, vremenskim opsegom i izborom dana.
- */
 @Composable
 fun AppUsageHeader(modifier: Modifier = Modifier) {
     Box(
@@ -36,24 +34,21 @@ fun AppUsageHeader(modifier: Modifier = Modifier) {
                 .align(Alignment.CenterStart)
                 .size(32.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFEAF1F5))
-                .border(1.dp, Color(0xFFB8C6CF), CircleShape),
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text("S", color = Color(0xFF687884), fontWeight = FontWeight.Bold)
+            Text("S", color = Color.White, fontWeight = FontWeight.Bold)
         }
         Text(
             text = "App Usage",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF68727A)
+            color = Color.White
         )
     }
 }
 
-/**
- * Segmentirani prekidač za izbor dnevnog ili nedeljnog prikaza potrošnje.
- */
 @Composable
 fun RangeSegmentedControl(
     selected: UsageRange,
@@ -65,8 +60,12 @@ fun RangeSegmentedControl(
             .height(42.dp)
             .padding(horizontal = 34.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFFDDE8EF))
-            .border(1.dp, Color(0xFFC8D5DD), RoundedCornerShape(22.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))),
+                RoundedCornerShape(22.dp)
+            )
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -77,28 +76,35 @@ fun RangeSegmentedControl(
                     .weight(1f)
                     .fillMaxSize()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (active) Color.White else Color.Transparent)
+                    .background(
+                        if (active) Brush.linearGradient(listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0)))
+                        else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
                     .clickable { onSelected(range) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = range.label,
                     fontWeight = FontWeight.Bold,
-                    color = if (active) Color(0xFF269FE8) else Color(0xFF6D7882)
+                    color = if (active) Color.White else Color(0xFFA9A3C4)
                 )
             }
         }
     }
 }
 
-/**
- * Horizontalni izbor dana koji se prikazuje samo u dnevnom režimu.
- */
+data class DayUiModel(
+    val timestamp: Long,
+    val shortLabel: String,
+    val dateLabel: String
+)
+
 @Composable
 fun DayPicker(
     visible: Boolean,
-    selectedDay: MockDayUsage,
-    onSelectedDay: (MockDayUsage) -> Unit
+    selectedDayStart: Long,
+    days: List<DayUiModel>,
+    onSelectedDay: (Long) -> Unit
 ) {
     if (!visible) return
     Row(
@@ -107,31 +113,34 @@ fun DayPicker(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        MockUsage.days.forEach { day ->
-            val active = day == selectedDay
+        days.forEach { day ->
+            val active = day.timestamp == selectedDayStart
             Column(
                 modifier = Modifier
                     .width(64.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(if (active) Color(0xFF2EA7F0) else Color.White)
+                    .background(
+                        if (active) Brush.linearGradient(listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0)))
+                        else Brush.linearGradient(listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.06f)))
+                    )
                     .border(
                         width = 1.dp,
-                        color = if (active) Color(0xFF2EA7F0) else Color(0xFFDCE5EA),
+                        color = if (active) Color.White.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(18.dp)
                     )
-                    .clickable { onSelectedDay(day) }
+                    .clickable { onSelectedDay(day.timestamp) }
                     .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = day.shortLabel,
-                    color = if (active) Color.White else Color(0xFF7D8992),
+                    color = if (active) Color.White else Color(0xFFA9A3C4),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = day.dateLabel,
-                    color = if (active) Color.White else Color(0xFF4E5B65),
+                    color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )

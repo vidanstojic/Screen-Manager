@@ -14,7 +14,7 @@ import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
-
+import com.example.screenmanager.ui.FocusFlowHomeScreen
 
 /**
  * Glavni Compose router aplikacije.
@@ -32,6 +32,18 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     var addLimitApp by remember { mutableStateOf<MockAppUsage?>(null) }
 
     var showScheduledBlockScreen by remember { mutableStateOf(false) }
+
+    var showFocusFlowHome by remember { mutableStateOf(true) } // default ekran
+
+    if (showFocusFlowHome) {
+        FocusFlowHomeScreen(
+            onAppDetoxClick = {
+                showFocusFlowHome = false
+                selectedDestination = MainDestination.UsageStats
+            }
+        )
+        return
+    }
 
     if (showScheduledBlockScreen) {
         ScheduledBlockScreen(

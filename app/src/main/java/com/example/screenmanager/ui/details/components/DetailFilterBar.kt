@@ -15,8 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.screenmanager.model.MockDayUsage
-import com.example.screenmanager.model.MockUsage
+import com.example.screenmanager.model.DayUiModel
 import com.example.screenmanager.model.UsageRange
 import com.example.screenmanager.ui.theme.DetailCard
 import com.example.screenmanager.ui.theme.PurpleAccent
@@ -24,15 +23,16 @@ import com.example.screenmanager.ui.theme.PurpleAccent
 /**
  * Filter traka za detalje aplikacije.
  *
- * Pokriva izbor opsega, dana i dodatnih lokalnih filtera koji menjaju grafikone
- * i metrike u [AppDetailsScreen].
+ * days lista se prosleđuje spolja (generisana preko generateLastSevenDays()
+ * u AppDetailsScreen), umesto da se ovde direktno referencira mock podatak.
  */
 @Composable
 fun DetailFilterBar(
     selectedRange: UsageRange,
-    selectedDay: MockDayUsage,
+    selectedDay: DayUiModel,
+    days: List<DayUiModel>,
     onRangeSelected: (UsageRange) -> Unit,
-    onDaySelected: (MockDayUsage) -> Unit
+    onDaySelected: (DayUiModel) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -67,10 +67,10 @@ fun DetailFilterBar(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MockUsage.days.forEach { day ->
+                days.forEach { day ->
                     DarkPill(
                         text = day.shortLabel,
-                        active = selectedDay == day,
+                        active = selectedDay.timestamp == day.timestamp,
                         onClick = { onDaySelected(day) }
                     )
                 }
@@ -79,9 +79,6 @@ fun DetailFilterBar(
     }
 }
 
-/**
- * Tamni pill kontroler koji predstavlja jedan aktivni ili neaktivni filter.
- */
 @Composable
 private fun DarkPill(text: String, active: Boolean = false, onClick: () -> Unit = {}) {
     Box(

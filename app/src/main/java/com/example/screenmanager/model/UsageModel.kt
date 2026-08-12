@@ -29,29 +29,6 @@ enum class MainDestination(
         val bottomItems = listOf(UsageStats, UsageLimits, GeneralUsage, GeneralSettings, AddLimit)
     }
 }
-
-/**
- * Pojedinačni dan sa agregiranim podacima za grafike i listu aplikacija.
- */
-data class MockDayUsage(
-    val shortLabel: String,
-    val dateLabel: String,
-    val displayLabel: String,
-    val totalMinutes: Int,
-    val hourlyMinutes: List<Int>
-)
-
-/**
- * Jedna stavka potrošnje aplikacije na dashboardu ili u detaljima.
- */
-data class MockAppUsage(
-    val name: String,
-    val minutes: Int,
-    val iconText: String,
-    val iconColor: Color,
-    val category: String
-)
-
 /**
  * Sažetak metrika koje ekran detalja prikazuje u gridu kartica.
  */

@@ -19,8 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.screenmanager.model.MockDayUsage
-import com.example.screenmanager.model.MockUsage
+import com.example.screenmanager.model.DayUiModel
 import com.example.screenmanager.model.UsageRange
 
 @Composable
@@ -92,12 +91,6 @@ fun RangeSegmentedControl(
         }
     }
 }
-
-data class DayUiModel(
-    val timestamp: Long,
-    val shortLabel: String,
-    val dateLabel: String
-)
 
 @Composable
 fun DayPicker(

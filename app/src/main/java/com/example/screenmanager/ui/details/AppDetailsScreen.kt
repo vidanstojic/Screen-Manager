@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.screenmanager.domain.TimeBuckets
+import com.example.screenmanager.domain.generateLastSevenDays
 import com.example.screenmanager.domain.toHourlyMinutesList
 import com.example.screenmanager.model.*
 import com.example.screenmanager.ui.components.BottomNavBar
@@ -26,17 +26,9 @@ import com.example.screenmanager.ui.theme.PurpleAccent
 /**
  * Ekran detalja jedne aplikacije.
  *
- * Do njega se dolazi iz dashboard liste aplikacija. Grafici (satni/dnevni)
- * dolaze iz [AppDetailsViewModel], koji čita realne podatke iz baze preko
- * UsageStatsRepository — ne iz MockUsage.
- *
- * NAPOMENA: selectedDay i dalje koristi MockUsage.days (fiksni datumi,
- * ne stvarni "poslednjih 7 dana"). Ovo je poznat TODO — zajedničko sa
- * UsageStatsHomeScreen-om — rešavamo ga zajedno kasnije kroz novi
- * "RollingDay" model.
- *
- * Statistika u DetailStatsGrid (sesije/trend/prosek) je za sada
- * placeholder — repository trenutno ne izlaže broj sesija po danu.
+ * Grafici dolaze iz AppDetailsViewModel-a (stvarni podaci iz baze).
+ * DetailStatsGrid statistika (sesije/trend) je placeholder dok repository
+ * ne izloži broj sesija po danu — vidi napomenu kod `details` ispod.
  */
 @Composable
 fun AppDetailsScreen(
@@ -47,18 +39,16 @@ fun AppDetailsScreen(
     onAddLimit: () -> Unit,
     viewModel: AppDetailsViewModel = viewModel()
 ) {
+    val days = remember { generateLastSevenDays() }
     var selectedRange by remember { mutableStateOf(UsageRange.Day) }
-    var selectedDay by remember { mutableStateOf(MockUsage.days.last()) }
+    var selectedDay by remember { mutableStateOf(days.last()) }
     var chartRange by remember { mutableStateOf(UsageRange.Day) }
 
-    // Povezuje ViewModel sa trenutno prikazanom aplikacijom i danom.
     LaunchedEffect(app.packageName) {
         viewModel.selectPackage(app.packageName)
     }
     LaunchedEffect(selectedDay) {
-        // MockDayUsage nema stvarni timestamp, pa za sada koristimo
-        // startOfToday() kao aproksimaciju dok ne rešimo TODO iznad.
-        viewModel.selectDay(TimeBuckets.startOfToday())
+        viewModel.selectDay(selectedDay.timestamp)
     }
 
     val rawHourlyUsage by viewModel.hourlyUsage.collectAsState()
@@ -67,17 +57,10 @@ fun AppDetailsScreen(
     val hourlyPoints = remember(rawHourlyUsage) { rawHourlyUsage.toHourlyMinutesList() }
     val dailyPoints = remember(rawDailyUsage) {
         val byDay = rawDailyUsage.associateBy { it.day }
-        (0..6).map { day ->
-            val ms = byDay[day]?.durationMs ?: 0L
-            (ms / 60_000L).toInt()
-        }
+        (0..6).map { day -> ((byDay[day]?.durationMs ?: 0L) / 60_000L).toInt() }
     }
-    val dailyLabels = remember {
-        // Isti TODO kao gore — zameniti stvarnim datumima poslednjih 7 dana.
-        listOf("D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Danas")
-    }
+    val dailyLabels = remember(days) { days.map { it.shortLabel } }
 
-    // Placeholder statistika dok ne dodamo broj sesija u bazu.
     val details = remember(hourlyPoints, dailyPoints) {
         val totalToday = hourlyPoints.sum()
         val totalWeek = dailyPoints.sum()
@@ -125,6 +108,7 @@ fun AppDetailsScreen(
                 DetailFilterBar(
                     selectedRange = selectedRange,
                     selectedDay = selectedDay,
+                    days = days,
                     onRangeSelected = {
                         selectedRange = it
                         chartRange = it

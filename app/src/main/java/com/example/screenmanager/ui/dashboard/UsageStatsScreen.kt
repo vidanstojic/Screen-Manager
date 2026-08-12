@@ -17,7 +17,7 @@ import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.dashboard.components.*
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 import com.example.screenmanager.model.AppUsageSummary
-import com.example.screenmanager.ui.dashboard.components.DayUiModel
+import com.example.screenmanager.model.DayUiModel
 
 @Composable
 fun UsageStatsHomeScreen(

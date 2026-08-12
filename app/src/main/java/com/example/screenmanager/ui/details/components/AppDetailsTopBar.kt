@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.domain.AppIconLoader
 import com.example.screenmanager.model.AppUsageSummary
-import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.ui.theme.PurpleAccent
 
 /**

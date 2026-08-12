@@ -12,13 +12,13 @@ import com.example.screenmanager.model.UsageRange
 import com.example.screenmanager.ui.components.GeneralPlaceholderScreen
 import com.example.screenmanager.ui.dashboard.DashboardViewModel
 import com.example.screenmanager.ui.dashboard.UsageStatsHomeScreen
-import com.example.screenmanager.ui.dashboard.components.DayUiModel
+import com.example.screenmanager.model.DayUiModel
 import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
-import com.example.screenmanager.ui.FocusFlowHomeScreen
+import com.example.screenmanager.domain.generateLastSevenDays
 import java.text.SimpleDateFormat // NOVI IMPORT
 import java.util.Date // NOVI IMPORT
 import java.util.Locale // NOVI IMPORT
@@ -107,7 +107,7 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
             selectedDayStart = selectedDayStart, // PROMENJENO
             selectedDestination = selectedDestination,
             appsUsage = appsUsage, // NOVO: Prosleđujemo pravu mapiranu listu aplikacija
-            days = generateLast7DaysUiModels(), // NOVO: Generišemo poslednjih 7 dana
+            days = generateLastSevenDays(), // NOVO: Generišemo poslednjih 7 dana
 
             // NOVO: Podaci za grafikon prilagođeni pravim modelima
             chartTitle = if (selectedRange == UsageRange.Day) "Today's Usage" else "Last 7 Days",
@@ -150,32 +150,5 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
         )
 
         MainDestination.AddLimit -> Unit
-    }
-}
-
-// NOVO: Data klasa za UI prikaz dana u DayPicker-u
-data class DayUiModel(
-    val timestamp: Long,
-    val shortLabel: String,
-    val dateLabel: String
-)
-
-// NOVO: Funkcija za generisanje poslednjih 7 dana
-fun generateLast7DaysUiModels(): List<DayUiModel> {
-    val formatter = SimpleDateFormat("d", Locale.getDefault())
-    val shortFormatter = SimpleDateFormat("EEE", Locale.getDefault())
-    val now = System.currentTimeMillis()
-    val startOfToday = TimeBuckets.startOfToday(now)
-    val dayMs = TimeUnit.DAYS.toMillis(1)
-
-    // Generiše listu unazad od pre 6 dana do danas (ukupno 7 dana)
-    return (6 downTo 0).map { daysAgo ->
-        val timestamp = startOfToday - (daysAgo * dayMs)
-        val date = Date(timestamp)
-        DayUiModel(
-            timestamp = timestamp,
-            shortLabel = shortFormatter.format(date),
-            dateLabel = formatter.format(date)
-        )
     }
 }

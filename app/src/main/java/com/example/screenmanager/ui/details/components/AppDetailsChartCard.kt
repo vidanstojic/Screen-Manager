@@ -25,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.AppUsageSummary
-import com.example.screenmanager.model.MockAppUsage
 import com.example.screenmanager.model.MockDayUsage
 import com.example.screenmanager.model.MockUsage
 import com.example.screenmanager.model.UsageRange
@@ -42,18 +41,16 @@ import com.example.screenmanager.ui.theme.PurpleAccent
 fun AppDetailsChartCard(
     app: AppUsageSummary,
     selectedRange: UsageRange,
-    selectedDay: MockDayUsage,
+    hourlyPoints: List<Int>,
+    dailyPoints: List<Int>,
+    dailyLabels: List<String>,
     onToggleRange: () -> Unit
 ) {
-    val points = if (selectedRange == UsageRange.Day) {
-        MockUsage.hourlyForApp(app, selectedDay)
-    } else {
-        MockUsage.weeklyForApp(app)
-    }
+    val points = if (selectedRange == UsageRange.Day) hourlyPoints else dailyPoints
     val labels = if (selectedRange == UsageRange.Day) {
-        listOf("12am", "Noon", "3pm")
+        listOf("12am", "Noon", "11pm")
     } else {
-        MockUsage.days.map { it.shortLabel }
+        dailyLabels
     }
     val total = points.sum()
 
@@ -165,7 +162,7 @@ private fun DarkUsageChart(
  * Legenda sa kategorijama potrošnje unutar detalja aplikacije.
  */
 @Composable
-private fun DetailLegend(app: MockAppUsage, totalMinutes: Int) {
+private fun DetailLegend(app: AppUsageSummary, totalMinutes: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -176,7 +173,7 @@ private fun DetailLegend(app: MockAppUsage, totalMinutes: Int) {
         LegendItem(color = PurpleAccent, label = "Mobile App", value = "${totalMinutes}m")
         LegendItem(color = Color(0xFF9EC8FF), label = "Mobile Web", value = "0s")
         LegendItem(color = Color(0xFFCC5D77), label = "Desktop App", value = "0s")
-        LegendItem(color = app.iconColor, label = "Other", value = "0s")
+        LegendItem(color = Color(0xFF6E6877), label = "Other", value = "0s")
     }
 }
 

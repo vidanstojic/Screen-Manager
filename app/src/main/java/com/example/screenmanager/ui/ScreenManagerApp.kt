@@ -12,6 +12,7 @@ import com.example.screenmanager.model.UsageRange
 import com.example.screenmanager.ui.components.GeneralPlaceholderScreen
 import com.example.screenmanager.ui.dashboard.DashboardViewModel
 import com.example.screenmanager.ui.dashboard.UsageStatsHomeScreen
+import com.example.screenmanager.ui.dashboard.components.DayUiModel
 import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen

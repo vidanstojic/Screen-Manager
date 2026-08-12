@@ -11,13 +11,14 @@ import androidx.room.TypeConverters
         AppUsageLog::class,
         BlockConfig::class,
         AppInternalState::class,
+        AlarmEntity::class,
         AppLimitRuleEntity::class,
         ShortVideoConfigEntity::class,
         ScheduleRuleEntity::class,
         WakeUpConfigEntity::class,
         EmergencySessionConfigEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(LocalDateTimeConverter::class)
@@ -25,6 +26,7 @@ abstract class ScreenManagerDatabase : RoomDatabase() {
     abstract fun appUsageLogDao(): AppUsageLogDao
     abstract fun blockConfigDao(): BlockConfigDao
     abstract fun appInternalStateDao(): AppInternalStateDao
+    abstract fun alarmDao(): AlarmDao
     abstract fun appLimitRuleDao(): AppLimitRuleDao
     abstract fun shortVideoConfigDao(): ShortVideoConfigDao
     abstract fun scheduleRuleDao(): ScheduleRuleDao

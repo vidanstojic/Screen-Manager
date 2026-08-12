@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.screenmanager.data.repository.AlarmRepository
 import com.example.screenmanager.data.local.ScreenManagerDatabase
 import com.example.screenmanager.worker.UsageAggregationWorker
 import java.util.concurrent.TimeUnit
@@ -35,6 +36,15 @@ object ServiceLocator {
     fun blockRepository(context: Context): BlockRepository {
         val db = database(context)
         return BlockRepository(db.blockConfigDao(), db.appInternalStateDao())
+    }
+
+    fun alarmRepository(context: Context): AlarmRepository {
+        val db = database(context)
+        return AlarmRepository(db.alarmDao())
+    }
+
+    fun alarmScheduler(context: Context): AlarmScheduler {
+        return AlarmScheduler(context.applicationContext)
     }
 
     fun permissionStateChecker(context: Context) = PermissionStateChecker(context.applicationContext)

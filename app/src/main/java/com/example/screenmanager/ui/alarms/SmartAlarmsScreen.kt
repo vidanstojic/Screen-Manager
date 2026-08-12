@@ -39,8 +39,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,31 +53,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.model.AlarmRule
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmartAlarmsScreen(
+    viewModel: SmartAlarmsViewModel = viewModel(),
     onBack: () -> Unit
 ) {
-    val alarms = remember {
-        mutableStateListOf(
-            AlarmItem(
-                id = 1L,
-                hour = 7,
-                minute = 30,
-                label = "Morning alarm",
-                repeatDays = setOf("Mon", "Tue", "Wed", "Thu", "Fri"),
-                enabled = true
-            )
-        )
-    }
+    val alarms by viewModel.alarms.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     if (showAddDialog) {
         AddAlarmDialog(
             onDismiss = { showAddDialog = false },
             onSave = { alarm ->
-                alarms.add(alarm)
+                viewModel.saveAlarm(alarm)
                 showAddDialog = false
             }
         )
@@ -171,12 +163,9 @@ fun SmartAlarmsScreen(
                     items(alarms, key = { it.id }) { alarm ->
                         AlarmRow(
                             alarm = alarm,
-                            onToggle = { enabled ->
-                                val index = alarms.indexOfFirst { it.id == alarm.id }
-                                if (index >= 0) alarms[index] = alarms[index].copy(enabled = enabled)
-                            },
+                            onToggle = { enabled -> viewModel.toggleAlarm(alarm.id, enabled) },
                             onDelete = {
-                                alarms.removeAll { it.id == alarm.id }
+                                viewModel.deleteAlarm(alarm.id)
                             }
                         )
                     }
@@ -188,7 +177,7 @@ fun SmartAlarmsScreen(
 
 @Composable
 private fun AlarmRow(
-    alarm: AlarmItem,
+    alarm: AlarmRule,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -307,7 +296,7 @@ private fun RepeatChipsRow(
 @Composable
 private fun AddAlarmDialog(
     onDismiss: () -> Unit,
-    onSave: (AlarmItem) -> Unit
+    onSave: (AlarmRule) -> Unit
 ) {
     val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
@@ -381,7 +370,7 @@ private fun AddAlarmDialog(
             TextButton(
                 onClick = {
                     onSave(
-                        AlarmItem(
+                        AlarmRule(
                             id = System.currentTimeMillis(),
                             hour = hour.toInt(),
                             minute = minute.toInt(),
@@ -406,12 +395,3 @@ private fun AddAlarmDialog(
 private fun formatTime(hour: Int, minute: Int): String {
     return String.format("%02d:%02d", hour, minute)
 }
-
-private data class AlarmItem(
-    val id: Long,
-    val hour: Int,
-    val minute: Int,
-    val label: String,
-    val repeatDays: Set<String>,
-    val enabled: Boolean
-)

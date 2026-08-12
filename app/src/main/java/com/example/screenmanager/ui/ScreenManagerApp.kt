@@ -13,6 +13,7 @@ import com.example.screenmanager.ui.components.GeneralPlaceholderScreen
 import com.example.screenmanager.ui.dashboard.DashboardViewModel
 import com.example.screenmanager.ui.dashboard.UsageStatsHomeScreen
 import com.example.screenmanager.model.DayUiModel
+import com.example.screenmanager.ui.alarms.SmartAlarmsScreen
 import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen
@@ -54,14 +55,25 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     var addLimitApp by remember { mutableStateOf<AppUsageSummary?>(null) }
 
     var showScheduledBlockScreen by remember { mutableStateOf(false) }
+    var showSmartAlarmsScreen by remember { mutableStateOf(false) }
 
     var showFocusFlowHome by remember { mutableStateOf(true) } // default ekran
+
+    if (showSmartAlarmsScreen) {
+        SmartAlarmsScreen(
+            onBack = { showSmartAlarmsScreen = false }
+        )
+        return
+    }
 
     if (showFocusFlowHome) {
         FocusFlowHomeScreen(
             onAppDetoxClick = {
                 showFocusFlowHome = false
                 selectedDestination = MainDestination.UsageStats
+            },
+            onSmartAlarmsClick = {
+                showSmartAlarmsScreen = true
             }
         )
         return

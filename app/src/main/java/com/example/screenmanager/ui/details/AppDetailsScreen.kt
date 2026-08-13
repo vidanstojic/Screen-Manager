@@ -18,7 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.generateLastSevenDays
 import com.example.screenmanager.domain.toHourlyMinutesList
 import com.example.screenmanager.model.*
-import com.example.screenmanager.ui.components.BottomNavBar
+//import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.details.components.*
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
@@ -78,12 +78,12 @@ fun AppDetailsScreen(
 
     Scaffold(
         containerColor = DetailBackground,
-        bottomBar = {
-            BottomNavBar(
-                selected = selectedDestination,
-                onSelected = onDestinationSelected
-            )
-        },
+//        bottomBar = {
+//            BottomNavBar(
+//                selected = selectedDestination,
+//                onSelected = onDestinationSelected
+//            )
+//        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddLimit,

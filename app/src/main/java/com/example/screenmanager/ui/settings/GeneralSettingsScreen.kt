@@ -23,7 +23,7 @@ import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.MainDestination
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.WakeUpConfig
-import com.example.screenmanager.ui.components.BottomNavBar
+//import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.settings.components.AppLimitRulesSection
@@ -58,12 +58,12 @@ fun GeneralSettingsScreen(
     var editingAppLimitRule by remember { mutableStateOf<AppLimitRule?>(null) }
 
     Scaffold(
-        bottomBar = {
-            BottomNavBar(
-                selected = destination,
-                onSelected = onDestinationSelected
-            )
-        }
+//        bottomBar = {
+//            BottomNavBar(
+//                selected = destination,
+//                onSelected = onDestinationSelected
+//            )
+//        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier

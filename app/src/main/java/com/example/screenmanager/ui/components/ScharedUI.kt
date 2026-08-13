@@ -30,88 +30,88 @@ import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.MainDestination
 import com.example.screenmanager.ui.theme.DetailBackground
 import com.example.screenmanager.ui.theme.PurpleAccent
-
-@Composable
-fun BottomNavBar(
-    selected: MainDestination,
-    onSelected: (MainDestination) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF1A1233), Color(0xFF0E0B22))
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
-                ),
-                shape = RectangleShape
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        MainDestination.bottomItems.forEach { item ->
-            val active = selected == item
-            val isAction = item == MainDestination.AddLimit
-
-            val cornerRadius = if (isAction) 16.dp else 14.dp
-            val shape = RoundedCornerShape(cornerRadius)
-
-            val bgColor = when {
-                isAction -> PurpleAccent
-                active -> Color(0xFF3A334B)
-                else -> Color(0xFF2A2535)
-            }
-
-            val customBorderColor = if (active) PurpleAccent else Color(0xFF3A334B)
-
-            val iconColor = if (isAction) Color(0xFF1F1B29) else if (active) PurpleAccent else Color.White
-            val textColor = if (isAction) Color(0xFF1F1B29) else Color(0xFFE8E4EE)
-
-            val itemHeight = if (isAction) 48.dp else 44.dp
-            val itemWeight = if (isAction) 1.1f else 1f
-
-            Box(
-                modifier = Modifier
-                    .weight(itemWeight)
-                    .height(itemHeight)
-                    .clip(shape)
-                    .background(bgColor)
-                    .border(
-                        width = 1.dp,
-                        color = customBorderColor,
-                        shape = shape
-                    )
-                    .clickable { onSelected(item) }
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = item.icon,
-                        color = iconColor,
-                        fontSize = if (isAction) 22.sp else 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 20.sp
-                    )
-                    Text(
-                        text = item.navLabel,
-                        color = textColor,
-                        fontSize = 10.sp,
-                        lineHeight = 11.sp,
-                        maxLines = 2
-                    )
-                }
-            }
-        }
-    }
-}
+//
+//@Composable
+//fun BottomNavBar(
+//    selected: MainDestination,
+//    onSelected: (MainDestination) -> Unit
+//) {
+//    Row(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .height(72.dp)
+//            .background(
+//                Brush.verticalGradient(
+//                    listOf(Color(0xFF1A1233), Color(0xFF0E0B22))
+//                )
+//            )
+//            .border(
+//                width = 1.dp,
+//                brush = Brush.verticalGradient(
+//                    listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
+//                ),
+//                shape = RectangleShape
+//            )
+//            .padding(horizontal = 10.dp, vertical = 8.dp),
+//        horizontalArrangement = Arrangement.spacedBy(8.dp),
+//        verticalAlignment = Alignment.CenterVertically
+//    ) {
+//        MainDestination.bottomItems.forEach { item ->
+//            val active = selected == item
+//            val isAction = item == MainDestination.AddLimit
+//
+//            val cornerRadius = if (isAction) 16.dp else 14.dp
+//            val shape = RoundedCornerShape(cornerRadius)
+//
+//            val bgColor = when {
+//                isAction -> PurpleAccent
+//                active -> Color(0xFF3A334B)
+//                else -> Color(0xFF2A2535)
+//            }
+//
+//            val customBorderColor = if (active) PurpleAccent else Color(0xFF3A334B)
+//
+//            val iconColor = if (isAction) Color(0xFF1F1B29) else if (active) PurpleAccent else Color.White
+//            val textColor = if (isAction) Color(0xFF1F1B29) else Color(0xFFE8E4EE)
+//
+//            val itemHeight = if (isAction) 48.dp else 44.dp
+//            val itemWeight = if (isAction) 1.1f else 1f
+//
+//            Box(
+//                modifier = Modifier
+//                    .weight(itemWeight)
+//                    .height(itemHeight)
+//                    .clip(shape)
+//                    .background(bgColor)
+//                    .border(
+//                        width = 1.dp,
+//                        color = customBorderColor,
+//                        shape = shape
+//                    )
+//                    .clickable { onSelected(item) }
+//                    .padding(horizontal = 8.dp),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//                    Text(
+//                        text = item.icon,
+//                        color = iconColor,
+//                        fontSize = if (isAction) 22.sp else 19.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        lineHeight = 20.sp
+//                    )
+//                    Text(
+//                        text = item.navLabel,
+//                        color = textColor,
+//                        fontSize = 10.sp,
+//                        lineHeight = 11.sp,
+//                        maxLines = 2
+//                    )
+//                }
+//            }
+//        }
+//    }
+//}
 
 @Composable
 fun SectionCard(
@@ -260,12 +260,12 @@ fun GeneralPlaceholderScreen(
 ) {
     Scaffold(
         containerColor = DetailBackground,
-        bottomBar = {
-            BottomNavBar(
-                selected = destination,
-                onSelected = onDestinationSelected
-            )
-        }
+//        bottomBar = {
+//            BottomNavBar(
+//                selected = destination,
+//                onSelected = onDestinationSelected
+//            )
+//        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

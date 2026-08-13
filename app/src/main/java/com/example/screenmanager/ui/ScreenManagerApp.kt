@@ -1,166 +1,179 @@
 package com.example.screenmanager.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext // NOVI IMPORT
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.screenmanager.domain.TimeBuckets // NOVI IMPORT
-import com.example.screenmanager.domain.toAppUsageSummaries // NOVI IMPORT
-import com.example.screenmanager.domain.toHourlyMinutesList // NOVI IMPORT
-import com.example.screenmanager.model.AppUsageSummary // NOVI IMPORT
+import com.example.screenmanager.domain.TimeBuckets
+import com.example.screenmanager.domain.generateLastSevenDays
+import com.example.screenmanager.domain.toAppUsageSummaries
+import com.example.screenmanager.domain.toHourlyMinutesList
+import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.model.MainDestination
 import com.example.screenmanager.model.UsageRange
+import com.example.screenmanager.ui.alarms.SmartAlarmsScreen
 import com.example.screenmanager.ui.components.GeneralPlaceholderScreen
+import com.example.screenmanager.ui.components.SwipeBackContainer
 import com.example.screenmanager.ui.dashboard.DashboardViewModel
 import com.example.screenmanager.ui.dashboard.UsageStatsHomeScreen
-import com.example.screenmanager.model.DayUiModel
-import com.example.screenmanager.ui.alarms.SmartAlarmsScreen
 import com.example.screenmanager.ui.details.AppDetailsScreen
 import com.example.screenmanager.ui.limits.AddLimitScreen
 import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
-import com.example.screenmanager.domain.generateLastSevenDays
-import java.text.SimpleDateFormat // NOVI IMPORT
-import java.util.Date // NOVI IMPORT
-import java.util.Locale // NOVI IMPORT
-import java.util.concurrent.TimeUnit // NOVI IMPORT
 
 /**
- * Glavni Compose router aplikacije.
- *
- * Pošto [MainActivity] samo podiže temu i ovaj composable, ovde se dešava
- * ceo tok ulaska u UI: početni pregled, detalji aplikacije, limiti, editor
- * novog limita, scheduled blocking i settings pregled.
+ * Svi mogući "ekrani" u aplikaciji. Back-stack (List<Screen>) je JEDINI
+ * izvor istine za navigaciju - i sistemski back i swipe-back gest rade
+ * nad istim stack-om preko iste navigateBack() funkcije.
  */
+private sealed class Screen {
+    object FocusFlowHome : Screen()
+    object NavigationHub : Screen()
+    object ScheduledBlock : Screen()
+    object SmartAlarms : Screen()
+    data class Destination(val destination: MainDestination) : Screen()
+    data class AppDetails(val app: AppUsageSummary) : Screen()
+    data class AddLimit(val app: AppUsageSummary?) : Screen()
+}
+
 @Composable
 fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     val context = LocalContext.current
 
-    // --- SKUP PRAVIH PODATAKA IZ VIEWMODELA (NOVO) ---
     val dailyTotals by viewModel.dailyTotals.collectAsState()
     val hourlyUsage by viewModel.hourlyUsage.collectAsState()
 
-    // Mapiramo podatke iz baze u tvoj UI model za listu
     val appsUsage = remember(dailyTotals) {
         dailyTotals.toAppUsageSummaries(context).sortedByDescending { it.minutes }
     }
 
     var selectedRange by remember { mutableStateOf(UsageRange.Day) }
-    // PROMENJENO: Umesto MockUsage.days.last() sada koristimo pravi timestamp za danas
     var selectedDayStart by remember { mutableStateOf(TimeBuckets.startOfToday()) }
-    // PROMENJENO: Umesto MockAppUsage sada koristimo tvoj novi AppUsageSummary
-    var selectedApp by remember { mutableStateOf<AppUsageSummary?>(null) }
-    var selectedDestination by remember { mutableStateOf(MainDestination.UsageStats) }
-    // PROMENJENO: Umesto MockAppUsage sada koristimo tvoj novi AppUsageSummary
-    var addLimitApp by remember { mutableStateOf<AppUsageSummary?>(null) }
 
-    var showScheduledBlockScreen by remember { mutableStateOf(false) }
-    var showSmartAlarmsScreen by remember { mutableStateOf(false) }
+    // Koren stack-a je UVEK FocusFlowHome - to je jedini ekran sa kog
+    // back izlazi iz aplikacije.
+    val backStack = remember { mutableStateListOf<Screen>(Screen.FocusFlowHome) }
+    val currentScreen = backStack.last()
 
-    var showFocusFlowHome by remember { mutableStateOf(true) } // default ekran
-
-    if (showSmartAlarmsScreen) {
-        SmartAlarmsScreen(
-            onBack = { showSmartAlarmsScreen = false }
-        )
-        return
+    fun navigateTo(screen: Screen) {
+        backStack.add(screen)
     }
 
-    if (showFocusFlowHome) {
-        FocusFlowHomeScreen(
-            onAppDetoxClick = {
-                showFocusFlowHome = false
-                selectedDestination = MainDestination.UsageStats
-            },
-            onSmartAlarmsClick = {
-                showSmartAlarmsScreen = true
-            }
-        )
-        return
+    fun navigateBack() {
+        if (backStack.size > 1) {
+            backStack.removeAt(backStack.lastIndex)
+        }
+        // size == 1 znači da smo na FocusFlowHome - tu ne radimo ništa,
+        // BackHandler ispod je tada isključen pa sistem sam izađe iz app-a.
     }
 
-    if (showScheduledBlockScreen) {
-        ScheduledBlockScreen(
-            onBack = { showScheduledBlockScreen = false }
-        )
-        return
+    // Sistemski (hardverski/gesture) back taster telefona.
+    // Isključen SAMO na FocusFlowHome -> tamo Android sam izlazi iz aplikacije.
+    BackHandler(enabled = backStack.size > 1) {
+        navigateBack()
     }
 
-    if (selectedDestination == MainDestination.AddLimit) {
-        AddLimitScreen(
-            selectedApp = addLimitApp,
-            onBack = { selectedDestination = MainDestination.UsageLimits },
-            onCancel = { selectedDestination = MainDestination.UsageLimits },
-            onSave = { selectedDestination = MainDestination.UsageLimits }
-        )
-        return
-    }
+    val swipeBackEnabled = backStack.size > 1
 
-    if (selectedApp != null) {
-        AppDetailsScreen(
-            app = selectedApp!!,
-            selectedDestination = selectedDestination,
-            onDestinationSelected = {
-                selectedDestination = it
-                selectedApp = null
-            },
-            onBack = { selectedApp = null },
-            onAddLimit = {
-                addLimitApp = selectedApp
-                selectedDestination = MainDestination.AddLimit
-            }
-        )
-        return
-    }
+    when (val screen = currentScreen) {
 
-    when (selectedDestination) {
-        MainDestination.UsageStats -> UsageStatsHomeScreen(
-            selectedRange = selectedRange,
-            selectedDayStart = selectedDayStart, // PROMENJENO
-            selectedDestination = selectedDestination,
-            appsUsage = appsUsage, // NOVO: Prosleđujemo pravu mapiranu listu aplikacija
-            days = generateLastSevenDays(), // NOVO: Generišemo poslednjih 7 dana
-
-            // NOVO: Podaci za grafikon prilagođeni pravim modelima
-            chartTitle = if (selectedRange == UsageRange.Day) "Today's Usage" else "Last 7 Days",
-            chartHeadlineMinutes = appsUsage.sumOf { it.minutes }, // Ukupno minuta
-            chartPoints = hourlyUsage.toHourlyMinutesList(), // Koristimo maper iz UsageMappers.kt
-            chartLabels = listOf("12am", "6am", "Noon", "6pm", "11pm"),
-            chartAverage = hourlyUsage.toHourlyMinutesList().average().toFloat().takeIf { !it.isNaN() } ?: 0f,
-            chartBottomLabel = "Daily Average: ...",
-
-            onRangeSelected = { selectedRange = it },
-            onDaySelected = { selectedDayStart = it }, // PROMENJENO
-            onAppClick = { selectedApp = it },
-            onDestinationSelected = { selectedDestination = it }
-        )
-
-        MainDestination.UsageLimits -> UsageLimitsScreen(
-            selectedDestination = selectedDestination,
-            onDestinationSelected = { selectedDestination = it },
-            onAddLimit = {
-                addLimitApp = null
-                selectedDestination = MainDestination.AddLimit
-            },
-            onScheduledBlockClick = {
-                showScheduledBlockScreen = true
-            }
-        )
-
-        MainDestination.GeneralUsage -> {
-            GeneralSettingsScreen(
-                destination = selectedDestination,
-                onDestinationSelected = { selectedDestination = it }
+        Screen.FocusFlowHome -> {
+            FocusFlowHomeScreen(
+                onAppDetoxClick = { navigateTo(Screen.NavigationHub) },
+                onSmartAlarmsClick = { navigateTo(Screen.SmartAlarms) }
             )
         }
 
-        MainDestination.GeneralSettings -> GeneralPlaceholderScreen(
-            destination = selectedDestination,
-            title = "General Settings",
-            description = "Ovde ćemo kasnije prikazati globalne obrasce korišćenja, kategorije i dnevne rutine.",
-            onDestinationSelected = { selectedDestination = it }
-        )
+        Screen.NavigationHub -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                NavigationHubScreen(
+                    onUsageStatsClick = { navigateTo(Screen.Destination(MainDestination.UsageStats)) },
+                    onUsageLimitsClick = { navigateTo(Screen.Destination(MainDestination.UsageLimits)) },
+                    onGeneralUsageClick = { navigateTo(Screen.Destination(MainDestination.GeneralUsage)) },
+                    onGeneralSettingsClick = { navigateTo(Screen.Destination(MainDestination.GeneralSettings)) }
+                )
+            }
+        }
 
-        MainDestination.AddLimit -> Unit
+        Screen.SmartAlarms -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                SmartAlarmsScreen(onBack = ::navigateBack)
+            }
+        }
+
+        Screen.ScheduledBlock -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                ScheduledBlockScreen(onBack = ::navigateBack)
+            }
+        }
+
+        is Screen.AddLimit -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                AddLimitScreen(
+                    selectedApp = screen.app,
+                    onBack = ::navigateBack,
+                    onCancel = ::navigateBack,
+                    onSave = ::navigateBack
+                )
+            }
+        }
+
+        is Screen.AppDetails -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                AppDetailsScreen(
+                    app = screen.app,
+                    selectedDestination = MainDestination.UsageStats,
+                    onDestinationSelected = { navigateTo(Screen.Destination(it)) },
+                    onBack = ::navigateBack,
+                    onAddLimit = { navigateTo(Screen.AddLimit(screen.app)) }
+                )
+            }
+        }
+
+        is Screen.Destination -> {
+            SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
+                when (screen.destination) {
+                    MainDestination.UsageStats -> UsageStatsHomeScreen(
+                        selectedRange = selectedRange,
+                        selectedDayStart = selectedDayStart,
+                        selectedDestination = screen.destination,
+                        appsUsage = appsUsage,
+                        days = generateLastSevenDays(),
+                        chartTitle = if (selectedRange == UsageRange.Day) "Today's Usage" else "Last 7 Days",
+                        chartHeadlineMinutes = appsUsage.sumOf { it.minutes },
+                        chartPoints = hourlyUsage.toHourlyMinutesList(),
+                        chartLabels = listOf("12am", "6am", "Noon", "6pm", "11pm"),
+                        chartAverage = hourlyUsage.toHourlyMinutesList().average().toFloat().takeIf { !it.isNaN() } ?: 0f,
+                        chartBottomLabel = "Daily Average: ...",
+                        onRangeSelected = { selectedRange = it },
+                        onDaySelected = { selectedDayStart = it },
+                        onAppClick = { navigateTo(Screen.AppDetails(it)) },
+                        onDestinationSelected = { navigateTo(Screen.Destination(it)) }
+                    )
+
+                    MainDestination.UsageLimits -> UsageLimitsScreen(
+                        selectedDestination = screen.destination,
+                        onDestinationSelected = { navigateTo(Screen.Destination(it)) },
+                        onAddLimit = { navigateTo(Screen.AddLimit(null)) },
+                        onScheduledBlockClick = { navigateTo(Screen.ScheduledBlock) }
+                    )
+
+                    MainDestination.GeneralUsage -> GeneralSettingsScreen(
+                        destination = screen.destination,
+                        onDestinationSelected = { navigateTo(Screen.Destination(it)) }
+                    )
+
+                    MainDestination.GeneralSettings -> GeneralPlaceholderScreen(
+                        destination = screen.destination,
+                        title = "General Settings",
+                        description = "Ovde ćemo kasnije prikazati globalne obrasce korišćenja, kategorije i dnevne rutine.",
+                        onDestinationSelected = { navigateTo(Screen.Destination(it)) }
+                    )
+
+                    MainDestination.AddLimit -> Unit
+                }
+            }
+        }
     }
 }

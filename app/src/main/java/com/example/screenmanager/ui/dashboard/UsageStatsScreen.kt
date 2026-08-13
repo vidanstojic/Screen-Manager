@@ -13,7 +13,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.*
-import com.example.screenmanager.ui.components.BottomNavBar
+//import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.dashboard.components.*
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 import com.example.screenmanager.model.AppUsageSummary
@@ -50,12 +50,12 @@ fun UsageStatsHomeScreen(
                 )
             ),
         containerColor = Color.Transparent,
-        bottomBar = {
-            BottomNavBar(
-                selected = selectedDestination,
-                onSelected = onDestinationSelected
-            )
-        }
+//        bottomBar = {
+//            BottomNavBar(
+//                selected = selectedDestination,
+//                onSelected = onDestinationSelected
+//            )
+//        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier

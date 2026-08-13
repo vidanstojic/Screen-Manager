@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.MainDestination
-import com.example.screenmanager.ui.components.BottomNavBar
+//import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.StatusChip
 import com.example.screenmanager.ui.theme.DetailBackground
@@ -49,12 +49,12 @@ fun UsageLimitsScreen(
 ) {
     Scaffold(
         containerColor = DetailBackground,
-        bottomBar = {
-            BottomNavBar(
-                selected = selectedDestination,
-                onSelected = onDestinationSelected
-            )
-        },
+//        bottomBar = {
+//            BottomNavBar(
+//                selected = selectedDestination,
+//                onSelected = onDestinationSelected
+//            )
+//        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddLimit,

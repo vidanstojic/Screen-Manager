@@ -6,6 +6,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.screenmanager.data.repository.AlarmRepository
 import com.example.screenmanager.data.local.ScreenManagerDatabase
+import com.example.screenmanager.data.repository.BlockRepository
 import com.example.screenmanager.worker.UsageAggregationWorker
 import java.util.concurrent.TimeUnit
 

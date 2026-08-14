@@ -292,13 +292,13 @@ private fun AddAlarmBottomSheet(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize() // Preko celog ekrana
+                .fillMaxSize()
                 .background(Color(0xFF0B0A1F))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .navigationBarsPadding() // Sprečava da dugmići potonu na dno preko sistemske navigacije
+                    .navigationBarsPadding()
                     .padding(24.dp)
             ) {
                 Spacer(modifier = Modifier.height(20.dp))
@@ -374,19 +374,27 @@ private fun AddAlarmBottomSheet(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Dugmići: Cancel i Save za oba slučaja (i kreiranje i izmena)
+                // Odvojena Cancel i Save dugmad po uzoru na Android alarm sa dodatim donjim padding-om da ne budu slepljeni
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     TextButton(
                         onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(50))
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFF221A3B))
                     ) {
-                        Text("Cancel", color = Color.White, fontSize = 16.sp)
+                        Text(
+                            "Cancel",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
                     TextButton(
@@ -404,14 +412,20 @@ private fun AddAlarmBottomSheet(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
-                            .background(Color(0xFFB13BFF), RoundedCornerShape(50))
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFFB13BFF))
                     ) {
-                        Text("Save", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Save",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

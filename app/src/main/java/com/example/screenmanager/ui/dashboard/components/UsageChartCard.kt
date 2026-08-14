@@ -3,7 +3,12 @@ package com.example.screenmanager.ui.dashboard.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,17 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.screenmanager.model.UsageRange
-import com.example.screenmanager.utils.formatCompactMinutes
+import com.example.screenmanager.ui.theme.GlassTheme
 import com.example.screenmanager.utils.formatHeadline
 import com.example.screenmanager.utils.formatSentenceMinutes
 
@@ -39,18 +43,18 @@ fun UsageChartCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(GlassTheme.colors.surface)
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))),
+                GlassTheme.colors.borderGradient,
                 RoundedCornerShape(18.dp)
             )
             .padding(14.dp)
     ) {
-        Text(title, color = Color(0xFFA9A3C4), fontSize = 16.sp)
+        Text(title, color = GlassTheme.colors.textSecondary, fontSize = 16.sp)
         Text(
             text = formatHeadline(headlineMinutes),
-            color = Color(0xFFB13BFF),
+            color = GlassTheme.colors.accentPrimary,
             fontSize = 30.sp,
             fontWeight = FontWeight.ExtraBold,
             lineHeight = 34.sp
@@ -66,7 +70,7 @@ fun UsageChartCard(
         )
         Text(
             text = bottomLabel,
-            color = Color(0xFFFF9A5C),
+            color = GlassTheme.colors.accentSecondary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 8.dp)
@@ -80,18 +84,19 @@ fun UsageChartCard(
         ) {
             Text(
                 text = "Total Usage: ${formatSentenceMinutes(headlineMinutes)}",
-                color = Color(0xFFA9A3C4),
+                color = GlassTheme.colors.textSecondary,
                 fontSize = 14.sp
             )
             Text(
                 text = "More  >",
-                color = Color(0xFFB13BFF),
+                color = GlassTheme.colors.accentPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
         }
     }
 }
+
 @Composable
 private fun UsageLineChart(
     points: List<Int>,
@@ -99,8 +104,11 @@ private fun UsageLineChart(
     average: Float,
     modifier: Modifier = Modifier
 ) {
-    val purple = Color(0xFFB13BFF)
-    val orange = Color(0xFFFF9A5C)
+    val accentColor = GlassTheme.colors.accentPrimary
+    val secondaryAccent = GlassTheme.colors.accentSecondary
+    val gridLineColor = GlassTheme.colors.borderEnd
+    val textSecondaryColor = GlassTheme.colors.textSecondary
+
     Canvas(modifier = modifier) {
         val left = 22.dp.toPx()
         val right = 8.dp.toPx()
@@ -124,7 +132,7 @@ private fun UsageLineChart(
         for (i in 0..4) {
             val y = top + chartHeight * (i / 4f)
             drawLine(
-                color = Color.White.copy(alpha = 0.08f),
+                color = gridLineColor,
                 start = Offset(left, y),
                 end = Offset(size.width - right, y),
                 strokeWidth = 1.dp.toPx()
@@ -134,7 +142,7 @@ private fun UsageLineChart(
         labels.forEachIndexed { index, label ->
             val x = left + chartWidth * (index.toFloat() / (labels.lastIndex).coerceAtLeast(1).toFloat())
             drawLine(
-                color = Color.White.copy(alpha = 0.08f),
+                color = gridLineColor,
                 start = Offset(x, top),
                 end = Offset(x, top + chartHeight),
                 strokeWidth = 1.dp.toPx()
@@ -144,7 +152,7 @@ private fun UsageLineChart(
                 x - 12.dp.toPx(),
                 size.height - 5.dp.toPx(),
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.argb(180, 169, 163, 196)
+                    color = textSecondaryColor.toArgb()
                     textSize = 10.sp.toPx()
                     isAntiAlias = true
                 }
@@ -153,7 +161,7 @@ private fun UsageLineChart(
 
         val averageY = yFor(average)
         drawLine(
-            color = orange,
+            color = secondaryAccent,
             start = Offset(left, averageY),
             end = Offset(size.width - right, averageY),
             strokeWidth = 1.5.dp.toPx(),
@@ -180,21 +188,21 @@ private fun UsageLineChart(
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(Color(0x55B13BFF), Color(0x05B13BFF)),
+                colors = listOf(accentColor.copy(alpha = 0.35f), accentColor.copy(alpha = 0.03f)),
                 startY = top,
                 endY = top + chartHeight
             )
         )
         drawPath(
             path = linePath,
-            color = purple,
+            color = accentColor,
             style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
         )
         points.forEachIndexed { index, value ->
             val point = Offset(xFor(index), yFor(value.toFloat()))
-            drawCircle(Color(0xFF1A1233), radius = 5.dp.toPx(), center = point)
+            drawCircle(gridLineColor, radius = 5.dp.toPx(), center = point)
             drawCircle(
-                color = if (index == points.lastIndex) Color(0xFFFF5CA8) else purple,
+                color = if (index == points.lastIndex) secondaryAccent else accentColor,
                 radius = 4.dp.toPx(),
                 center = point
             )

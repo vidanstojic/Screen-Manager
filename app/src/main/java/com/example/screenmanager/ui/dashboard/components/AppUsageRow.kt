@@ -1,11 +1,19 @@
 package com.example.screenmanager.ui.dashboard.components
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -18,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.domain.AppIconLoader
 import com.example.screenmanager.model.AppUsageSummary
+import com.example.screenmanager.ui.theme.GlassTheme
 
 @Composable
 fun AppUsageRow(
@@ -52,7 +60,7 @@ fun AppUsageRow(
             modifier = Modifier
                 .size(34.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .background(GlassTheme.colors.surfaceElevated),
             contentAlignment = Alignment.Center
         ) {
             val currentIcon = icon
@@ -63,10 +71,9 @@ fun AppUsageRow(
                     modifier = Modifier.size(28.dp)
                 )
             } else {
-                // Fallback dok se ikonica učitava ili ako nije pronađena
                 Text(
                     text = app.name.take(1).uppercase(),
-                    color = Color.White,
+                    color = GlassTheme.colors.textPrimary,
                     fontWeight = FontWeight.Black,
                     fontSize = 13.sp
                 )
@@ -81,7 +88,7 @@ fun AppUsageRow(
             ) {
                 Text(
                     text = app.name,
-                    color = Color.White,
+                    color = GlassTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -89,7 +96,7 @@ fun AppUsageRow(
                 )
                 Text(
                     text = "${app.minutes}m",
-                    color = Color(0xFFA9A3C4),
+                    color = GlassTheme.colors.textSecondary,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
@@ -97,10 +104,10 @@ fun AppUsageRow(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                        .border(1.dp, GlassTheme.colors.borderEnd, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(">", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(">", color = GlassTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
@@ -109,14 +116,14 @@ fun AppUsageRow(
                     .fillMaxWidth()
                     .height(7.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.1f))
+                    .background(GlassTheme.colors.surfaceElevated)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth((app.minutes / maxMinutes.toFloat()).coerceIn(0.04f, 1f))
                         .height(7.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFFB13BFF))
+                        .background(GlassTheme.colors.accentPrimary)
                 )
             }
         }

@@ -1,5 +1,6 @@
 package com.example.screenmanager.ui.settings.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,12 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,14 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.screenmanager.domain.getInstalledApps
 import com.example.screenmanager.model.AppOption
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Dijalog za izbor aplikacija koje će pravilo obuhvatiti.
- *
- * Otvara se iz više settings i limit ekrana i vraća listu selektovanih ID-jeva.
- */
 @Composable
 fun AppPickerDialog(
     availableApps: List<AppOption>,
@@ -52,39 +51,49 @@ fun AppPickerDialog(
         } else {
             availableApps.filter {
                 it.name.contains(query, ignoreCase = true) ||
-                    it.category.contains(query, ignoreCase = true)
+                        it.category.contains(query, ignoreCase = true)
             }
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = "Choose apps", fontWeight = FontWeight.Bold) },
+        containerColor = GlassTheme.colors.surface,
+        shape = RoundedCornerShape(18.dp),
+        title = { Text(text = "Choose apps", fontWeight = FontWeight.Bold, color = GlassTheme.colors.textPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search apps") },
-                    singleLine = true
+                    label = { Text("Search apps", color = GlassTheme.colors.textSecondary) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GlassTheme.colors.accentPrimary,
+                        unfocusedBorderColor = GlassTheme.colors.borderEnd,
+                        focusedLabelColor = GlassTheme.colors.accentPrimary,
+                        unfocusedLabelColor = GlassTheme.colors.textSecondary,
+                        focusedTextColor = GlassTheme.colors.textPrimary,
+                        unfocusedTextColor = GlassTheme.colors.textPrimary
+                    )
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistChip(
                         onClick = { query = "" },
-                        label = { Text("All") },
-                        colors = AssistChipDefaults.assistChipColors()
+                        label = { Text("All", color = GlassTheme.colors.textPrimary) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = GlassTheme.colors.surfaceElevated)
                     )
                     AssistChip(
                         onClick = { query = "YouTube" },
-                        label = { Text("Video") },
-                        colors = AssistChipDefaults.assistChipColors()
+                        label = { Text("Video", color = GlassTheme.colors.textPrimary) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = GlassTheme.colors.surfaceElevated)
                     )
                     AssistChip(
                         onClick = { query = "Instagram" },
-                        label = { Text("Social") },
-                        colors = AssistChipDefaults.assistChipColors()
+                        label = { Text("Social", color = GlassTheme.colors.textPrimary) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = GlassTheme.colors.surfaceElevated)
                     )
                 }
 
@@ -112,12 +121,16 @@ fun AppPickerDialog(
                             ) {
                                 Checkbox(
                                     checked = selectedIds.contains(app.id),
-                                    onCheckedChange = null
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = GlassTheme.colors.accentPrimary,
+                                        uncheckedColor = GlassTheme.colors.textSecondary
+                                    )
                                 )
                             }
                             Column(modifier = Modifier.padding(start = 8.dp)) {
-                                Text(app.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text(app.category, style = MaterialTheme.typography.bodySmall)
+                                Text(app.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = GlassTheme.colors.textPrimary)
+                                Text(app.category, style = MaterialTheme.typography.bodySmall, color = GlassTheme.colors.textSecondary)
                             }
                         }
                     }
@@ -126,12 +139,12 @@ fun AppPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(selectedIds.toList()) }) {
-                Text("Save")
+                Text("Save", color = GlassTheme.colors.accentPrimary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = GlassTheme.colors.textSecondary)
             }
         }
     )

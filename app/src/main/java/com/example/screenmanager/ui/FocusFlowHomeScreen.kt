@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.screenmanager.ui.theme.GlassBackground
+import com.example.screenmanager.ui.theme.GlassTheme
 
 @Composable
 fun FocusFlowHomeScreen(
@@ -33,34 +35,27 @@ fun FocusFlowHomeScreen(
     onSettingsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF0B0A1F), Color(0xFF1A1233), Color(0xFF0E0B22))
-                )
-            )
-    ) {
+    // Koristimo tvoj helper iz teme za centralizovanu pozadinu
+    GlassBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxWidth = this.maxWidth
 
             GlowOrb(
-                colors = listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0)),
+                colors = GlassTheme.colors.glowPrimary,
                 size = maxWidth * 0.55f,
                 alignment = Alignment.TopEnd,
                 offsetX = maxWidth * 0.1f,
                 offsetY = (-50).dp
             )
             GlowOrb(
-                colors = listOf(Color(0xFF3BC8FF), Color(0xFF4C6CE0)),
+                colors = GlassTheme.colors.glowSecondary,
                 size = maxWidth * 0.4f,
                 alignment = Alignment.CenterStart,
                 offsetX = -(maxWidth * 0.15f),
                 offsetY = 40.dp
             )
             GlowOrb(
-                colors = listOf(Color(0xFFFF5CA8), Color(0xFFB13BFF)),
+                colors = GlassTheme.colors.glowTertiary,
                 size = maxWidth * 0.35f,
                 alignment = Alignment.BottomEnd,
                 offsetX = maxWidth * 0.08f,
@@ -102,11 +97,13 @@ fun FocusFlowHomeScreen(
 
                 GlassActionCard(
                     icon = Icons.Filled.CheckCircle,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFF3BFFA0), Color(0xFF1FBF7A))),
+                    iconBackground = Brush.linearGradient(
+                        listOf(GlassTheme.colors.success, GlassTheme.colors.success.copy(alpha = 0.6f))
+                    ),
                     title = "App Detox",
                     description = "Schedule limits and block distracting apps to reclaim your focus.",
                     badgeText = "3 SESSIONS ACTIVE",
-                    badgeColor = Color(0xFF3BFFA0),
+                    badgeColor = GlassTheme.colors.success,
                     onClick = onAppDetoxClick
                 )
 
@@ -114,11 +111,13 @@ fun FocusFlowHomeScreen(
 
                 GlassActionCard(
                     icon = Icons.Filled.Notifications,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFFFF9A5C), Color(0xFFFF5C8A))),
+                    iconBackground = Brush.linearGradient(
+                        listOf(GlassTheme.colors.warning, GlassTheme.colors.warning.copy(alpha = 0.6f))
+                    ),
                     title = "Smart Alarms",
                     description = "Set intelligent wake-up calls and focus reminders with custom sounds.",
                     badgeText = "NEXT: 07:30 AM",
-                    badgeColor = Color(0xFFFF9A5C),
+                    badgeColor = GlassTheme.colors.warning,
                     onClick = onSmartAlarmsClick
                 )
 
@@ -128,7 +127,7 @@ fun FocusFlowHomeScreen(
                     text = "Quick Insights",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = GlassTheme.colors.textPrimary
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -140,14 +139,14 @@ fun FocusFlowHomeScreen(
                     InsightGlassCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Filled.Star,
-                        iconTint = Color(0xFFB13BFF),
+                        iconTint = GlassTheme.colors.accentPrimary,
                         label = "FOCUS SCORE",
                         value = "82%"
                     )
                     InsightGlassCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Filled.Info,
-                        iconTint = Color(0xFF3BC8FF),
+                        iconTint = GlassTheme.colors.info,
                         label = "SLEEP QUALITY",
                         value = "Good"
                     )
@@ -190,24 +189,20 @@ private fun HomeHeader() {
                 text = "FocusFlow",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = GlassTheme.colors.textPrimary
             )
             Text(
                 text = "Ready to focus?",
                 fontSize = 14.sp,
-                color = Color(0xFFA9A3C4)
+                color = GlassTheme.colors.textSecondary
             )
         }
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFFFF5CA8), Color(0xFFB13BFF))
-                    )
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+                .background(GlassTheme.colors.accentGradient)
+                .border(1.dp, GlassTheme.colors.borderStart, CircleShape)
         )
     }
 }
@@ -220,21 +215,20 @@ private fun ScreenTimeCard() {
             .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.linearGradient(
-                    listOf(Color(0xFF6C4CE0).copy(alpha = 0.55f), Color(0xFFB13BFF).copy(alpha = 0.35f))
+                    listOf(
+                        GlassTheme.colors.accentSecondary.copy(alpha = 0.55f),
+                        GlassTheme.colors.accentPrimary.copy(alpha = 0.35f)
+                    )
                 )
             )
-            .border(
-                1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.5f), Color.White.copy(alpha = 0.05f))),
-                RoundedCornerShape(24.dp)
-            )
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(24.dp))
             .padding(20.dp)
     ) {
         Column {
             Text(
                 text = "TOTAL SCREEN TIME TODAY",
                 fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.7f),
+                color = GlassTheme.colors.textPrimary.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Medium
             )
             Spacer(Modifier.height(6.dp))
@@ -242,20 +236,20 @@ private fun ScreenTimeCard() {
                 text = "4h 12m",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = GlassTheme.colors.textPrimary
             )
             Spacer(Modifier.height(10.dp))
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(Color.White.copy(alpha = 0.15f))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(50))
+                    .background(GlassTheme.colors.surfaceElevated)
+                    .border(1.dp, GlassTheme.colors.borderStart, RoundedCornerShape(50))
                     .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
                 Text(
                     text = "↘ 12% less than yesterday",
                     fontSize = 12.sp,
-                    color = Color.White
+                    color = GlassTheme.colors.textPrimary
                 )
             }
         }
@@ -276,12 +270,8 @@ private fun GlassActionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(
-                1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.35f), Color.White.copy(alpha = 0.05f))),
-                RoundedCornerShape(20.dp)
-            )
+            .background(GlassTheme.colors.surface)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(20.dp))
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.Top
@@ -299,9 +289,9 @@ private fun GlassActionCard(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = GlassTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text(description, fontSize = 13.sp, color = Color(0xFFA9A3C4))
+            Text(description, fontSize = 13.sp, color = GlassTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
@@ -316,7 +306,7 @@ private fun GlassActionCard(
         Icon(
             Icons.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = Color(0xFF6C647F)
+            tint = GlassTheme.colors.textMuted
         )
     }
 }
@@ -332,19 +322,15 @@ private fun InsightGlassCard(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(
-                1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))),
-                RoundedCornerShape(18.dp)
-            )
+            .background(GlassTheme.colors.surface)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
         Icon(icon, contentDescription = label, tint = iconTint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.height(8.dp))
-        Text(label, fontSize = 10.sp, color = Color(0xFFA9A3C4))
+        Text(label, fontSize = 10.sp, color = GlassTheme.colors.textSecondary)
         Spacer(Modifier.height(2.dp))
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = GlassTheme.colors.textPrimary)
     }
 }
 
@@ -360,12 +346,8 @@ private fun FocusFlowBottomNav(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .border(
-                1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))),
-                RoundedCornerShape(28.dp)
-            )
+            .background(GlassTheme.colors.surfaceElevated)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(28.dp))
             .padding(horizontal = 24.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -387,6 +369,6 @@ private fun NavIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable { onClick() }
     ) {
-        Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = label, tint = GlassTheme.colors.textPrimary, modifier = Modifier.size(20.dp))
     }
 }

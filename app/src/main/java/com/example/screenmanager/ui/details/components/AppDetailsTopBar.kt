@@ -6,6 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,11 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.domain.AppIconLoader
 import com.example.screenmanager.model.AppUsageSummary
-import com.example.screenmanager.ui.theme.PurpleAccent
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Gornja traka ekrana detalja sa povratkom, ikoncom aplikacije i menijem.
- */
 @Composable
 fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -45,20 +45,22 @@ fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
             .padding(top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "<",
-            color = Color(0xFFD7D3E4),
-            fontSize = 28.sp,
+        Box(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
+                .background(GlassTheme.colors.surface)
                 .clickable(onClick = onBack),
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = GlassTheme.colors.textPrimary)
+        }
+        Spacer(Modifier.width(10.dp))
         Box(
             modifier = Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .background(GlassTheme.colors.surfaceElevated),
             contentAlignment = Alignment.Center
         ) {
             val currentIcon = icon
@@ -69,10 +71,9 @@ fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
                     modifier = Modifier.size(28.dp)
                 )
             } else {
-                // Fallback dok se ikonica učitava ili ako nije pronađena
                 Text(
                     text = app.name.take(1).uppercase(),
-                    color = Color.White,
+                    color = GlassTheme.colors.textPrimary,
                     fontWeight = FontWeight.Black,
                     fontSize = 13.sp
                 )
@@ -80,7 +81,7 @@ fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
         }
         Text(
             text = app.name,
-            color = Color.White,
+            color = GlassTheme.colors.textPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
@@ -89,13 +90,10 @@ fun AppDetailsTopBar(app: AppUsageSummary, onBack: () -> Unit) {
                 .weight(1f)
                 .padding(horizontal = 10.dp)
         )
-        Text("⋮", color = Color.White, fontSize = 28.sp)
+        Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = GlassTheme.colors.textSecondary)
     }
 }
 
-/**
- * Tab sekcija u detaljima koja vizuelno razlikuje Stats i Settings.
- */
 @Composable
 fun AppDetailsTabs() {
     Row(modifier = Modifier.fillMaxWidth()) {
@@ -104,9 +102,6 @@ fun AppDetailsTabs() {
     }
 }
 
-/**
- * Jedan tab u detaljima, koristi se samo za vizuelno označavanje aktivnog taba.
- */
 @Composable
 private fun DetailTab(label: String, active: Boolean, modifier: Modifier = Modifier) {
     Column(
@@ -116,7 +111,7 @@ private fun DetailTab(label: String, active: Boolean, modifier: Modifier = Modif
     ) {
         Text(
             text = label,
-            color = if (active) PurpleAccent else Color(0xFFD4CFDD),
+            color = if (active) GlassTheme.colors.accentPrimary else GlassTheme.colors.textSecondary,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(top = 8.dp)
@@ -125,7 +120,7 @@ private fun DetailTab(label: String, active: Boolean, modifier: Modifier = Modif
             modifier = Modifier
                 .fillMaxWidth()
                 .height(if (active) 3.dp else 1.dp)
-                .background(if (active) PurpleAccent else Color(0xFF353140))
+                .background(if (active) GlassTheme.colors.accentPrimary else GlassTheme.colors.borderEnd)
         )
     }
 }

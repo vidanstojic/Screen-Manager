@@ -1,6 +1,7 @@
 package com.example.screenmanager.ui.limits
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -28,17 +31,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.MainDestination
-//import com.example.screenmanager.ui.components.BottomNavBar
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.StatusChip
-import com.example.screenmanager.ui.theme.DetailBackground
-import com.example.screenmanager.ui.theme.PurpleAccent
+import com.example.screenmanager.ui.theme.GlassBackground
+import com.example.screenmanager.ui.theme.GlassTheme
 
 /**
  * Glavni pregled limit funkcija aplikacije.
- *
- * Do ovog ekrana se dolazi iz donje navigacije i on služi kao ulaz u
- * app limits, shorts/reels, scheduled blocking, wake-up blocking i emergency.
  */
 @Composable
 fun UsageLimitsScreen(
@@ -47,63 +46,61 @@ fun UsageLimitsScreen(
     onAddLimit: () -> Unit,
     onScheduledBlockClick: () -> Unit = {}
 ) {
-    Scaffold(
-        containerColor = DetailBackground,
-//        bottomBar = {
-//            BottomNavBar(
-//                selected = selectedDestination,
-//                onSelected = onDestinationSelected
-//            )
-//        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddLimit,
-                containerColor = PurpleAccent,
-                contentColor = Color(0xFF1F1B29)
+    GlassBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = onAddLimit,
+                    containerColor = GlassTheme.colors.accentPrimary,
+                    contentColor = GlassTheme.colors.textPrimary,
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add limit")
+                }
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add limit")
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            InfoBanner(
-                title = "Limit control center",
-                description = "Create app limits, shorts penalties, schedules, and wake-up blocks from one place."
-            )
+                InfoBanner(
+                    title = "Limit control center",
+                    description = "Create app limits, shorts penalties, schedules, and wake-up blocks from one place."
+                )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusChip(text = "App limits", isActive = true)
-                StatusChip(text = "Shorts/Reels", isActive = true)
-                StatusChip(text = "Schedules", isActive = true)
-            }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusChip(text = "App limits", isActive = true)
+                    StatusChip(text = "Shorts/Reels", isActive = true)
+                    StatusChip(text = "Schedules", isActive = true)
+                }
 
-            LimitTile(
-                title = "App limits",
-                description = "Block any app after the configured daily usage window."
-            )
-            LimitTile(
-                title = "Shorts and Reels",
-                description = "Add an extra penalty block after short-form content expires."
-            )
-            LimitTile(
-                title = "Scheduled blocking",
-                description = "Use time windows to enforce focus during work or sleep.",
-                onClick = onScheduledBlockClick // Povezan klik
-            )
-            LimitTile(
-                title = "Wake-up blocking",
-                description = "Block selected apps after the phone has been inactive long enough."
-            )
-            LimitTile(
-                title = "Emergency sessions",
-                description = "Temporarily bypass every block when you need a safe exception."
-            )
+                LimitTile(
+                    title = "App limits",
+                    description = "Block any app after the configured daily usage window."
+                )
+                LimitTile(
+                    title = "Shorts and Reels",
+                    description = "Add an extra penalty block after short-form content expires."
+                )
+                LimitTile(
+                    title = "Scheduled blocking",
+                    description = "Use time windows to enforce focus during work or sleep.",
+                    onClick = onScheduledBlockClick
+                )
+                LimitTile(
+                    title = "Wake-up blocking",
+                    description = "Block selected apps after the phone has been inactive long enough."
+                )
+                LimitTile(
+                    title = "Emergency sessions",
+                    description = "Temporarily bypass every block when you need a safe exception."
+                )
+            }
         }
     }
 }
@@ -120,9 +117,10 @@ private fun LimitTile(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = GlassTheme.colors.surface)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -130,17 +128,22 @@ private fun LimitTile(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, color = Color(0xFF25313A))
-                Text(description, fontSize = 13.sp, color = Color(0xFF66747E), modifier = Modifier.padding(top = 4.dp))
+                Text(title, fontWeight = FontWeight.Bold, color = GlassTheme.colors.textPrimary)
+                Text(
+                    description,
+                    fontSize = 13.sp,
+                    color = GlassTheme.colors.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF2EAFE)),
+                    .background(GlassTheme.colors.surfaceElevated),
                 contentAlignment = Alignment.Center
             ) {
-                Text(">", color = PurpleAccent, fontWeight = FontWeight.Bold)
+                Text(">", color = GlassTheme.colors.accentPrimary, fontWeight = FontWeight.Bold)
             }
         }
     }

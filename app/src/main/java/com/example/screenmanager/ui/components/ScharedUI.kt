@@ -112,6 +112,11 @@ import com.example.screenmanager.ui.theme.PurpleAccent
 //        }
 //    }
 //}
+/**
+ * Deljene "glass" komponente - u istom vizuelnom stilu kao
+ * FocusFlowHomeScreen / NavigationHubScreen (dark navy-purple gradient,
+ * frosted glass kartice, glow akcenti).
+ */
 
 @Composable
 fun SectionCard(
@@ -124,17 +129,19 @@ fun SectionCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White)
+            .background(Color.White.copy(alpha = 0.06f))
             .border(
                 width = 1.dp,
-                color = Color(0xFFE5E9EF),
+                brush = Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.05f))
+                ),
                 shape = RoundedCornerShape(20.dp)
             )
             .padding(16.dp)
     ) {
         Text(
             text = title,
-            color = Color(0xFF24323C),
+            color = Color.White,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -142,7 +149,7 @@ fun SectionCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
-                color = Color(0xFF6A7883),
+                color = Color(0xFFA9A3C4),
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
@@ -164,22 +171,24 @@ fun InfoBanner(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFEAF4FF))
+            .background(Color(0xFF3BC8FF).copy(alpha = 0.12f))
             .border(
                 width = 1.dp,
-                color = Color(0xFFD4E9FF),
+                brush = Brush.linearGradient(
+                    listOf(Color(0xFF3BC8FF).copy(alpha = 0.4f), Color(0xFF3BC8FF).copy(alpha = 0.05f))
+                ),
                 shape = RoundedCornerShape(18.dp)
             )
             .padding(16.dp)
     ) {
-        Text(title, color = Color(0xFF176FBA), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(title, color = Color(0xFF7ED8FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(description, color = Color(0xFF4E6477), fontSize = 13.sp, lineHeight = 18.sp)
+        Text(description, color = Color(0xFFA9A3C4), fontSize = 13.sp, lineHeight = 18.sp)
         if (!actionLabel.isNullOrBlank() && onActionClick != null) {
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = actionLabel,
-                color = Color(0xFF176FBA),
+                color = Color(0xFF7ED8FF),
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable(onClick = onActionClick)
             )
@@ -194,18 +203,26 @@ fun ToggleChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (selected) PurpleAccent else Color(0xFFF1F4F8)
-    val customBorderColor = if (selected) PurpleAccent else Color(0xFFD5DCE3)
     val chipShape = RoundedCornerShape(12.dp)
+    val backgroundModifier = if (selected) {
+        Modifier.background(Brush.linearGradient(listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0))))
+    } else {
+        Modifier.background(Color.White.copy(alpha = 0.06f))
+    }
 
     Box(
         modifier = modifier
             .height(36.dp)
             .clip(chipShape)
-            .background(bgColor)
+            .then(backgroundModifier)
             .border(
                 width = 1.dp,
-                color = customBorderColor,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color.White.copy(alpha = if (selected) 0.4f else 0.2f),
+                        Color.White.copy(alpha = 0.05f)
+                    )
+                ),
                 shape = chipShape
             )
             .clickable(onClick = onClick)
@@ -214,7 +231,7 @@ fun ToggleChip(
     ) {
         Text(
             text = text,
-            color = if (selected) Color(0xFF1F1B29) else Color(0xFF54616C),
+            color = if (selected) Color.White else Color(0xFFA9A3C4),
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp
         )
@@ -227,8 +244,9 @@ fun StatusChip(
     isActive: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (isActive) Color(0xFFE6F5EC) else Color(0xFFF3F4F7)
-    val customBorderColor = if (isActive) Color(0xFF76C893) else Color(0xFFDCE1E7)
+    val activeColor = Color(0xFF3BFFA0)
+    val bgColor = if (isActive) activeColor.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.06f)
+    val customBorderColor = if (isActive) activeColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.15f)
     val chipShape = RoundedCornerShape(999.dp)
 
     Box(
@@ -244,7 +262,7 @@ fun StatusChip(
     ) {
         Text(
             text = text,
-            color = if (isActive) Color(0xFF1E7A4E) else Color(0xFF64707A),
+            color = if (isActive) activeColor else Color(0xFFA9A3C4),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -258,31 +276,33 @@ fun GeneralPlaceholderScreen(
     description: String,
     onDestinationSelected: (MainDestination) -> Unit
 ) {
-    Scaffold(
-        containerColor = DetailBackground,
-//        bottomBar = {
-//            BottomNavBar(
-//                selected = destination,
-//                onSelected = onDestinationSelected
-//            )
-//        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(22.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = description,
-                color = Color(0xFFC4BEC9),
-                fontSize = 15.sp,
-                lineHeight = 22.sp,
-                modifier = Modifier.padding(top = 12.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0B0A1F), Color(0xFF1A1233), Color(0xFF0E0B22))
+                )
             )
+    ) {
+        Scaffold(containerColor = Color.Transparent) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = description,
+                    color = Color(0xFFA9A3C4),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
         }
     }
 }

@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,10 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Sekcija za Shorts/Reels ograničenje i dodatni penalty block.
- */
 @Composable
 fun ShortVideoSection(
     config: ShortVideoConfig,
@@ -32,10 +32,14 @@ fun ShortVideoSection(
         subtitle = "Limit short-form content for YouTube and Instagram, then block the app for the configured cooldown."
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Enabled")
+            Text("Enabled", color = GlassTheme.colors.textPrimary)
             Switch(
                 checked = config.isEnabled,
-                onCheckedChange = { onConfigChange(config.copy(isEnabled = it)) }
+                onCheckedChange = { onConfigChange(config.copy(isEnabled = it)) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = GlassTheme.colors.textPrimary,
+                    checkedTrackColor = GlassTheme.colors.accentPrimary
+                )
             )
         }
 
@@ -47,35 +51,47 @@ fun ShortVideoSection(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Short-form limit")
+        Text("Short-form limit", color = GlassTheme.colors.textSecondary)
         Slider(
             value = config.maxReelsWatchMinutes.toFloat(),
             onValueChange = { onConfigChange(config.copy(maxReelsWatchMinutes = it.toInt())) },
             valueRange = 5f..60f,
-            steps = 11
+            steps = 11,
+            colors = SliderDefaults.colors(
+                thumbColor = GlassTheme.colors.accentPrimary,
+                activeTrackColor = GlassTheme.colors.accentPrimary,
+                inactiveTrackColor = GlassTheme.colors.surfaceElevated
+            )
         )
 
-        Text("Penalty block")
+        Text("Penalty block", color = GlassTheme.colors.textSecondary)
         Slider(
             value = config.fullAppBlockMinutes.toFloat(),
             onValueChange = { onConfigChange(config.copy(fullAppBlockMinutes = it.toInt())) },
             valueRange = 15f..120f,
-            steps = 7
+            steps = 7,
+            colors = SliderDefaults.colors(
+                thumbColor = GlassTheme.colors.accentPrimary,
+                activeTrackColor = GlassTheme.colors.accentPrimary,
+                inactiveTrackColor = GlassTheme.colors.surfaceElevated
+            )
         )
 
         Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider()
+        HorizontalDivider(color = GlassTheme.colors.borderEnd)
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = if (config.selectedAppIds.isEmpty()) "No apps selected yet." else "Selected apps: ${config.selectedAppIds.joinToString()}",
+            color = GlassTheme.colors.textSecondary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "YouTube and Instagram are preselected, but you can choose more apps if needed."
+            text = "YouTube and Instagram are preselected, but you can choose more apps if needed.",
+            color = GlassTheme.colors.textSecondary
         )
         TextButton(onClick = onSelectAppsClick) {
-            Text("Select apps")
+            Text("Select apps", color = GlassTheme.colors.accentPrimary)
         }
     }
 }

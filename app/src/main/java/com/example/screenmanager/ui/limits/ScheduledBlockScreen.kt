@@ -1,6 +1,7 @@
 package com.example.screenmanager.ui.limits
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -11,11 +12,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.screenmanager.domain.getInstalledApps
 import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.ui.settings.components.ScheduledBlockSection
-import com.example.screenmanager.ui.theme.DetailBackground
-import com.example.screenmanager.ui.theme.PurpleAccent
-import com.example.screenmanager.domain.getInstalledApps
+import com.example.screenmanager.ui.theme.GlassBackground
+import com.example.screenmanager.ui.theme.GlassTheme
 
 /**
  * Poseban ekran za upravljanje vremenskim blok pravilima.
@@ -23,6 +24,7 @@ import com.example.screenmanager.domain.getInstalledApps
  * Do njega se dolazi iz [UsageLimitsScreen] i ovde korisnik pravi nova
  * scheduled pravila kroz lokalni dialog.
  */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduledBlockScreen(
@@ -46,48 +48,53 @@ fun ScheduledBlockScreen(
         )
     }
 
-    Scaffold(
-        containerColor = DetailBackground,
-        topBar = {
-            TopAppBar(
-                title = { Text("Scheduled Blocking", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DetailBackground,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+    GlassBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Scheduled Blocking", fontWeight = FontWeight.Bold, color = GlassTheme.colors.textPrimary) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = GlassTheme.colors.textPrimary
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    )
                 )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = PurpleAccent,
-                contentColor = Color(0xFF1F1B29)
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Schedule")
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = GlassTheme.colors.accentPrimary,
+                    contentColor = GlassTheme.colors.textPrimary,
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Add Schedule")
+                }
             }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            ScheduledBlockSection(
-                rules = rules,
-                onToggleRule = { ruleId, isEnabled ->
-                    rules = rules.map {
-                        if (it.id == ruleId) it.copy(isEnabled = isEnabled) else it
-                    }
-                },
-                onAddScheduleClick = { showAddDialog = true }
-            )
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp)
+            ) {
+                ScheduledBlockSection(
+                    rules = rules,
+                    onToggleRule = { ruleId, isEnabled ->
+                        rules = rules.map {
+                            if (it.id == ruleId) it.copy(isEnabled = isEnabled) else it
+                        }
+                    },
+                    onAddScheduleClick = { showAddDialog = true }
+                )
+            }
         }
     }
 }

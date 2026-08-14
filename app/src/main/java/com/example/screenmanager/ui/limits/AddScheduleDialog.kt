@@ -12,16 +12,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.screenmanager.domain.getInstalledApps
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.ui.settings.components.AppPickerDialog
-import com.example.screenmanager.ui.theme.PurpleAccent
+import com.example.screenmanager.ui.theme.GlassTheme
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.util.UUID
@@ -73,7 +71,10 @@ fun AddScheduleDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Scheduled Block", fontWeight = FontWeight.Bold) },
+        containerColor = GlassTheme.colors.surfaceElevated,
+        titleContentColor = GlassTheme.colors.textPrimary,
+        textContentColor = GlassTheme.colors.textPrimary,
+        title = { Text("New Scheduled Block", fontWeight = FontWeight.Bold, color = GlassTheme.colors.textPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
@@ -81,10 +82,18 @@ fun AddScheduleDialog(
                     onValueChange = { ruleName = it },
                     label = { Text("Rule Name (e.g. Work Focus)") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = GlassTheme.colors.textPrimary,
+                        unfocusedTextColor = GlassTheme.colors.textPrimary,
+                        focusedBorderColor = GlassTheme.colors.accentPrimary,
+                        unfocusedBorderColor = GlassTheme.colors.borderEnd,
+                        focusedLabelColor = GlassTheme.colors.accentPrimary,
+                        unfocusedLabelColor = GlassTheme.colors.textSecondary
+                    )
                 )
 
-                Text("Time Interval", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Time Interval", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = GlassTheme.colors.textPrimary)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -95,7 +104,7 @@ fun AddScheduleDialog(
                         timeStr = String.format("%02d:%02d", startHour, startMinute),
                         onClick = { pickTime(startHour, startMinute) { h, m -> startHour = h; startMinute = m } }
                     )
-                    Text("-", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text("-", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GlassTheme.colors.textSecondary)
                     TimeBox(
                         label = "To",
                         timeStr = String.format("%02d:%02d", endHour, endMinute),
@@ -103,7 +112,7 @@ fun AddScheduleDialog(
                     )
                 }
 
-                Text("Days of Week", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Days of Week", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = GlassTheme.colors.textPrimary)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -124,7 +133,7 @@ fun AddScheduleDialog(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isSelected) PurpleAccent else Color(0xFFF0F0F0))
+                                .background(if (isSelected) GlassTheme.colors.accentPrimary else GlassTheme.colors.surface)
                                 .clickable {
                                     selectedDays = if (isSelected) selectedDays - day else selectedDays + day
                                 },
@@ -132,7 +141,7 @@ fun AddScheduleDialog(
                         ) {
                             Text(
                                 text = label,
-                                color = if (isSelected) Color.White else Color.Black,
+                                color = if (isSelected) GlassTheme.colors.textPrimary else GlassTheme.colors.textSecondary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
@@ -146,16 +155,19 @@ fun AddScheduleDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Blocked Apps", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Blocked Apps", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = GlassTheme.colors.textPrimary)
                         Text(
                             text = if (selectedAppIds.isEmpty()) "No apps selected" else "${selectedAppIds.size} apps selected",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = GlassTheme.colors.textSecondary
                         )
                     }
                     Button(
                         onClick = { showAppPicker = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = PurpleAccent)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GlassTheme.colors.accentPrimary,
+                            contentColor = GlassTheme.colors.textPrimary
+                        )
                     ) {
                         Text("Select Apps")
                     }
@@ -176,14 +188,18 @@ fun AddScheduleDialog(
                     )
                     onSaveRule(newRule)
                 },
-                enabled = selectedAppIds.isNotEmpty() && selectedDays.isNotEmpty()
+                enabled = selectedAppIds.isNotEmpty() && selectedDays.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GlassTheme.colors.accentPrimary,
+                    contentColor = GlassTheme.colors.textPrimary
+                )
             ) {
                 Text("Save Rule")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Cancel", color = GlassTheme.colors.textSecondary)
             }
         }
     )
@@ -195,16 +211,17 @@ fun AddScheduleDialog(
 @Composable
 private fun TimeBox(label: String, timeStr: String, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 12.sp, color = Color.Gray)
+        Text(label, fontSize = 12.sp, color = GlassTheme.colors.textSecondary)
         Box(
             modifier = Modifier
                 .padding(top = 4.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .border(1.dp, Color.LightGray, RoundedCornerShape(10.dp))
+                .background(GlassTheme.colors.surface)
+                .border(1.dp, GlassTheme.colors.borderEnd, RoundedCornerShape(10.dp))
                 .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text(timeStr, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(timeStr, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GlassTheme.colors.textPrimary)
         }
     }
 }

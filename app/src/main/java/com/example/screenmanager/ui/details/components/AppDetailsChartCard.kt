@@ -2,14 +2,13 @@ package com.example.screenmanager.ui.details.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,20 +20,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.model.UsageRange
-import com.example.screenmanager.ui.theme.DetailBackground
-import com.example.screenmanager.ui.theme.DetailCard
-import com.example.screenmanager.ui.theme.PurpleAccent
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Grafička kartica za detalje jedne aplikacije.
- *
- * Menja prikaz između satnog i dnevnog toka i prikazuje ukupnu potrošnju.
- */
 @Composable
 fun AppDetailsChartCard(
     app: AppUsageSummary,
@@ -52,59 +45,65 @@ fun AppDetailsChartCard(
     }
     val total = points.sum()
 
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggleRange),
-        shape = RoundedCornerShape(9.dp),
-        colors = CardDefaults.cardColors(containerColor = DetailCard)
+            .clip(RoundedCornerShape(18.dp))
+            .background(GlassTheme.colors.surface)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(18.dp))
+            .clickable(onClick = onToggleRange)
+            .padding(14.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = if (selectedRange == UsageRange.Day) "Usage by Hour" else "Usage by Day",
+                color = GlassTheme.colors.textSecondary,
+                fontWeight = FontWeight.Bold
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(GlassTheme.colors.accentGradient)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
                 Text(
-                    text = if (selectedRange == UsageRange.Day) "Usage by Hour" else "Usage by Day",
-                    color = Color(0xFFD8D2E0),
+                    text = if (selectedRange == UsageRange.Day) "▥⌁" else "⌁▥",
+                    color = GlassTheme.colors.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(PurpleAccent)
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(if (selectedRange == UsageRange.Day) "▥⌁" else "⌁▥", color = DetailBackground, fontWeight = FontWeight.Bold)
-                }
             }
-            DarkUsageChart(
-                points = points,
-                labels = labels,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2.15f)
-                    .padding(top = 8.dp)
-            )
-            DetailLegend(app = app, totalMinutes = total)
-            Text(
-                text = "Total Usage: ${total}m",
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 14.dp)
-            )
         }
+        DarkUsageChart(
+            points = points,
+            labels = labels,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2.15f)
+                .padding(top = 8.dp)
+        )
+        DetailLegend(app = app, totalMinutes = total)
+        Text(
+            text = "Total Usage: ${total}m",
+            color = GlassTheme.colors.textPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 14.dp)
+        )
     }
 }
 
-/**
- * Tamni grafikon koji crta trend potrošnje za detalje aplikacije.
- */
 @Composable
 private fun DarkUsageChart(
     points: List<Int>,
     labels: List<String>,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = GlassTheme.colors.accentPrimary
+    val gridColor = GlassTheme.colors.borderStart.copy(alpha = 0.2f)
+    val labelColorArgb = GlassTheme.colors.textSecondary.toArgb()
+    val circleBgColor = GlassTheme.colors.surface
+
     Canvas(modifier = modifier) {
         val left = 16.dp.toPx()
         val right = 8.dp.toPx()
@@ -126,9 +125,14 @@ private fun DarkUsageChart(
 
         for (i in 0..2) {
             val x = left + chartWidth * (i / 2f)
-            drawLine(Color(0xFF6E6877), Offset(x, top), Offset(x, top + chartHeight), 1.dp.toPx())
+            drawLine(gridColor, Offset(x, top), Offset(x, top + chartHeight), 1.dp.toPx())
         }
-        drawLine(Color(0xFF6E6877), Offset(left, top + chartHeight), Offset(size.width - right, top + chartHeight), 1.dp.toPx())
+        drawLine(
+            gridColor,
+            Offset(left, top + chartHeight),
+            Offset(size.width - right, top + chartHeight),
+            1.dp.toPx()
+        )
 
         labels.forEachIndexed { index, label ->
             val x = left + chartWidth * (index.toFloat() / labels.lastIndex.coerceAtLeast(1).toFloat())
@@ -137,7 +141,7 @@ private fun DarkUsageChart(
                 x - 11.dp.toPx(),
                 size.height - 5.dp.toPx(),
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.rgb(199, 193, 210)
+                    color = labelColorArgb
                     textSize = 10.sp.toPx()
                     isAntiAlias = true
                 }
@@ -149,16 +153,14 @@ private fun DarkUsageChart(
             val point = Offset(xFor(index), yFor(value))
             if (index == 0) linePath.moveTo(point.x, point.y) else linePath.lineTo(point.x, point.y)
         }
-        drawPath(linePath, PurpleAccent, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(linePath, accentColor, style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round))
         points.forEachIndexed { index, value ->
-            drawCircle(PurpleAccent, 3.dp.toPx(), Offset(xFor(index), yFor(value)))
+            drawCircle(circleBgColor, radius = 4.dp.toPx(), center = Offset(xFor(index), yFor(value)))
+            drawCircle(accentColor, radius = 3.dp.toPx(), center = Offset(xFor(index), yFor(value)))
         }
     }
 }
 
-/**
- * Legenda sa kategorijama potrošnje unutar detalja aplikacije.
- */
 @Composable
 private fun DetailLegend(app: AppUsageSummary, totalMinutes: Int) {
     Row(
@@ -168,16 +170,13 @@ private fun DetailLegend(app: AppUsageSummary, totalMinutes: Int) {
             .padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        LegendItem(color = PurpleAccent, label = "Mobile App", value = "${totalMinutes}m")
-        LegendItem(color = Color(0xFF9EC8FF), label = "Mobile Web", value = "0s")
-        LegendItem(color = Color(0xFFCC5D77), label = "Desktop App", value = "0s")
-        LegendItem(color = Color(0xFF6E6877), label = "Other", value = "0s")
+        LegendItem(color = GlassTheme.colors.accentPrimary, label = "Mobile App", value = "${totalMinutes}m")
+        LegendItem(color = GlassTheme.colors.info, label = "Mobile Web", value = "0s")
+        LegendItem(color = GlassTheme.colors.danger, label = "Desktop App", value = "0s")
+        LegendItem(color = GlassTheme.colors.textMuted, label = "Other", value = "0s")
     }
 }
 
-/**
- * Jedan element legende za grafikone detalja.
- */
 @Composable
 private fun LegendItem(color: Color, label: String, value: String) {
     Column {
@@ -188,8 +187,8 @@ private fun LegendItem(color: Color, label: String, value: String) {
                     .clip(CircleShape)
                     .background(color)
             )
-            Text(label, color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+            Text(label, color = GlassTheme.colors.textPrimary, fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
         }
-        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp))
+        Text(value, color = GlassTheme.colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp))
     }
 }

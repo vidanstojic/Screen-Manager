@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,13 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.example.screenmanager.model.WakeUpConfig
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Sekcija za wake-up blocking pravilo.
- *
- * Ovo je deo settings ekrana koji korisniku daje kontrolu nad inaktivnošću
- * uređaja i izborom aplikacija koje treba blokirati.
- */
 @Composable
 fun WakeUpSection(
     config: WakeUpConfig,
@@ -35,10 +32,14 @@ fun WakeUpSection(
         subtitle = "After the phone stays inactive for the chosen time, configured apps are blocked when the user wakes it up."
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Enabled")
+            Text("Enabled", color = GlassTheme.colors.textPrimary)
             Switch(
                 checked = config.isEnabled,
-                onCheckedChange = { onConfigChange(config.copy(isEnabled = it)) }
+                onCheckedChange = { onConfigChange(config.copy(isEnabled = it)) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = GlassTheme.colors.textPrimary,
+                    checkedTrackColor = GlassTheme.colors.accentPrimary
+                )
             )
         }
 
@@ -50,35 +51,47 @@ fun WakeUpSection(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Inactivity threshold")
+        Text("Inactivity threshold", color = GlassTheme.colors.textSecondary)
         Slider(
             value = config.inactivityHours.toFloat(),
             onValueChange = { onConfigChange(config.copy(inactivityHours = it.toInt())) },
             valueRange = 1f..12f,
-            steps = 11
+            steps = 11,
+            colors = SliderDefaults.colors(
+                thumbColor = GlassTheme.colors.accentPrimary,
+                activeTrackColor = GlassTheme.colors.accentPrimary,
+                inactiveTrackColor = GlassTheme.colors.surfaceElevated
+            )
         )
 
-        Text("Block duration")
+        Text("Block duration", color = GlassTheme.colors.textSecondary)
         Slider(
             value = config.blockDurationMinutes.toFloat(),
             onValueChange = { onConfigChange(config.copy(blockDurationMinutes = it.toInt())) },
             valueRange = 5f..120f,
-            steps = 23
+            steps = 23,
+            colors = SliderDefaults.colors(
+                thumbColor = GlassTheme.colors.accentPrimary,
+                activeTrackColor = GlassTheme.colors.accentPrimary,
+                inactiveTrackColor = GlassTheme.colors.surfaceElevated
+            )
         )
 
         Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider()
+        HorizontalDivider(color = GlassTheme.colors.borderEnd)
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = if (config.selectedAppIds.isEmpty()) "No apps selected yet." else "Selected apps: ${config.selectedAppIds.joinToString()}",
+            color = GlassTheme.colors.textSecondary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "Choose the apps that should react to wake-up blocking."
+            text = "Choose the apps that should react to wake-up blocking.",
+            color = GlassTheme.colors.textSecondary
         )
         TextButton(onClick = onSelectAppsClick) {
-            Text("Select apps")
+            Text("Select apps", color = GlassTheme.colors.accentPrimary)
         }
     }
 }

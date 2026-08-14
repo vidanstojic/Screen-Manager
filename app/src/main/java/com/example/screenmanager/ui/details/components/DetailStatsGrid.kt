@@ -1,71 +1,73 @@
 package com.example.screenmanager.ui.details.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.screenmanager.model.AppDetailStats
-import com.example.screenmanager.ui.theme.DetailCard
-import com.example.screenmanager.ui.theme.PurpleAccent
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * Grid kartica sa ključnim metrikama za izabranu aplikaciju.
- *
- * Ovaj deo prikazuje usage, sesije, trend, baznu liniju i status limita.
- */
 @Composable
 fun DetailStatsGrid(details: AppDetailStats) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(9.dp),
-        colors = CardDefaults.cardColors(containerColor = DetailCard)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(GlassTheme.colors.surface)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(18.dp))
     ) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                DetailStatCell("Usage", "${details.usageMinutes}m", Modifier.weight(1f))
-                DetailStatCell("Sessions", details.sessions.toString(), Modifier.weight(1f), alignEnd = true)
-            }
-            Row(modifier = Modifier.fillMaxWidth()) {
-                DetailStatCell("Average in 7 Days", "${details.averageMinutes}m", Modifier.weight(1f))
-                DetailStatCell("Trend vs Previous Week", details.trendLabel, Modifier.weight(1f), alignEnd = true, valueColor = details.trendColor)
-            }
-            Row(modifier = Modifier.fillMaxWidth()) {
-                DetailStatCell("7 Day Baseline", "${details.previousAverageMinutes}m", Modifier.weight(1f), valueColor = PurpleAccent)
-                DetailStatCell("Limit Status", details.limitStatus, Modifier.weight(1f), alignEnd = true)
-            }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            DetailStatCell("Usage", "${details.usageMinutes}m", Modifier.weight(1f))
+            DetailStatCell("Sessions", details.sessions.toString(), Modifier.weight(1f), alignEnd = true)
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            DetailStatCell("Average in 7 Days", "${details.averageMinutes}m", Modifier.weight(1f))
+            DetailStatCell(
+                "Trend vs Previous Week",
+                details.trendLabel,
+                Modifier.weight(1f),
+                alignEnd = true,
+                valueColor = details.trendColor
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            DetailStatCell(
+                "7 Day Baseline",
+                "${details.previousAverageMinutes}m",
+                Modifier.weight(1f),
+                valueColor = GlassTheme.colors.accentPrimary
+            )
+            DetailStatCell("Limit Status", details.limitStatus, Modifier.weight(1f), alignEnd = true)
         }
     }
 }
 
-/**
- * Jedna ćelija unutar statističkog grida.
- */
 @Composable
 private fun DetailStatCell(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
     alignEnd: Boolean = false,
-    valueColor: Color = Color.White
+    valueColor: Color = GlassTheme.colors.textPrimary
 ) {
     Column(
         modifier = modifier
             .height(72.dp)
-            .border(0.5.dp, Color(0xFF292632))
+            .border(0.5.dp, GlassTheme.colors.borderEnd)
             .padding(12.dp),
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = Color(0xFFD1CBD8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = GlassTheme.colors.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         Text(value, color = valueColor, fontSize = 21.sp, fontWeight = FontWeight.Bold)
     }
 }

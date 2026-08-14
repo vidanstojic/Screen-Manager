@@ -25,12 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.screenmanager.ui.theme.GlassBackground
+import com.example.screenmanager.ui.theme.GlassTheme
 
-/**
- * "Hub" stranica - zamena za stari BottomNavBar. Stilski identična
- * FocusFlowHomeScreen-u (isti gradient, glow orbovi, glass kartice),
- * sadrži po jednu karticu za svaku bivšu navbar destinaciju.
- */
 @Composable
 fun NavigationHubScreen(
     onUsageStatsClick: () -> Unit,
@@ -38,34 +35,26 @@ fun NavigationHubScreen(
     onGeneralUsageClick: () -> Unit,
     onGeneralSettingsClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF0B0A1F), Color(0xFF1A1233), Color(0xFF0E0B22))
-                )
-            )
-    ) {
+    GlassBackground {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxWidth = this.maxWidth
 
             HubGlowOrb(
-                colors = listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0)),
+                colors = GlassTheme.colors.glowPrimary,
                 size = maxWidth * 0.55f,
                 alignment = Alignment.TopEnd,
                 offsetX = maxWidth * 0.1f,
                 offsetY = (-50).dp
             )
             HubGlowOrb(
-                colors = listOf(Color(0xFF3BC8FF), Color(0xFF4C6CE0)),
+                colors = GlassTheme.colors.glowSecondary,
                 size = maxWidth * 0.4f,
                 alignment = Alignment.CenterStart,
                 offsetX = -(maxWidth * 0.15f),
                 offsetY = 40.dp
             )
             HubGlowOrb(
-                colors = listOf(Color(0xFFFF5CA8), Color(0xFFB13BFF)),
+                colors = GlassTheme.colors.glowTertiary,
                 size = maxWidth * 0.35f,
                 alignment = Alignment.BottomEnd,
                 offsetX = maxWidth * 0.08f,
@@ -86,23 +75,25 @@ fun NavigationHubScreen(
                     text = "Menu",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = GlassTheme.colors.textPrimary
                 )
                 Text(
                     text = "What would you like to check?",
                     fontSize = 14.sp,
-                    color = Color(0xFFA9A3C4)
+                    color = GlassTheme.colors.textSecondary
                 )
 
                 Spacer(Modifier.height(24.dp))
 
                 HubActionCard(
                     icon = Icons.Filled.BarChart,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFF3BC8FF), Color(0xFF4C6CE0))),
+                    iconBackground = Brush.linearGradient(
+                        listOf(GlassTheme.colors.info, GlassTheme.colors.info.copy(alpha = 0.6f))
+                    ),
                     title = "Usage Stats",
                     description = "Pregled dnevnog i nedeljnog korišćenja aplikacija.",
                     badgeText = "DAILY OVERVIEW",
-                    badgeColor = Color(0xFF3BC8FF),
+                    badgeColor = GlassTheme.colors.info,
                     onClick = onUsageStatsClick
                 )
 
@@ -110,11 +101,13 @@ fun NavigationHubScreen(
 
                 HubActionCard(
                     icon = Icons.Filled.Shield,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFF3BFFA0), Color(0xFF1FBF7A))),
+                    iconBackground = Brush.linearGradient(
+                        listOf(GlassTheme.colors.success, GlassTheme.colors.success.copy(alpha = 0.6f))
+                    ),
                     title = "Usage Limits",
                     description = "Postavi i upravljaj limitima za aplikacije.",
                     badgeText = "STAY ON TRACK",
-                    badgeColor = Color(0xFF3BFFA0),
+                    badgeColor = GlassTheme.colors.success,
                     onClick = onUsageLimitsClick
                 )
 
@@ -122,11 +115,11 @@ fun NavigationHubScreen(
 
                 HubActionCard(
                     icon = Icons.Filled.Timeline,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFFB13BFF), Color(0xFF6C4CE0))),
+                    iconBackground = GlassTheme.colors.accentGradient,
                     title = "General Usage",
                     description = "Ukupni obrasci korišćenja i trendovi.",
                     badgeText = "TRENDS & PATTERNS",
-                    badgeColor = Color(0xFFB13BFF),
+                    badgeColor = GlassTheme.colors.accentPrimary,
                     onClick = onGeneralUsageClick
                 )
 
@@ -134,11 +127,13 @@ fun NavigationHubScreen(
 
                 HubActionCard(
                     icon = Icons.Filled.Tune,
-                    iconBackground = Brush.linearGradient(listOf(Color(0xFFFF9A5C), Color(0xFFFF5C8A))),
+                    iconBackground = Brush.linearGradient(
+                        listOf(GlassTheme.colors.warning, GlassTheme.colors.warning.copy(alpha = 0.6f))
+                    ),
                     title = "Settings",
                     description = "Globalna podešavanja aplikacije.",
                     badgeText = "CUSTOMIZE",
-                    badgeColor = Color(0xFFFF9A5C),
+                    badgeColor = GlassTheme.colors.warning,
                     onClick = onGeneralSettingsClick
                 )
             }
@@ -179,12 +174,8 @@ private fun HubActionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(
-                1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.35f), Color.White.copy(alpha = 0.05f))),
-                RoundedCornerShape(20.dp)
-            )
+            .background(GlassTheme.colors.surface)
+            .border(1.dp, GlassTheme.colors.borderGradient, RoundedCornerShape(20.dp))
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.Top
@@ -202,9 +193,9 @@ private fun HubActionCard(
         Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = GlassTheme.colors.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text(description, fontSize = 13.sp, color = Color(0xFFA9A3C4))
+            Text(description, fontSize = 13.sp, color = GlassTheme.colors.textSecondary)
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
@@ -216,6 +207,6 @@ private fun HubActionCard(
             }
         }
 
-        Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = Color(0xFF6C647F))
+        Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = GlassTheme.colors.textMuted)
     }
 }

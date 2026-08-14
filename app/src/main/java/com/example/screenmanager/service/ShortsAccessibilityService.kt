@@ -4,7 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.util.Log
-import com.example.screenmanager.domain.BlockRepository
+import com.example.screenmanager.data.repository.BlockRepository
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
 import kotlinx.coroutines.CoroutineScope

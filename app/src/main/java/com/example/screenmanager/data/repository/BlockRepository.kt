@@ -1,9 +1,11 @@
-package com.example.screenmanager.domain
+package com.example.screenmanager.data.repository
 
 import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.data.local.AppInternalStateDao
 import com.example.screenmanager.data.local.BlockConfig
 import com.example.screenmanager.data.local.BlockConfigDao
+import com.example.screenmanager.domain.AppStateKeys
+import com.example.screenmanager.domain.BlockDecision
 import kotlinx.coroutines.flow.Flow
 
 class BlockRepository(
@@ -18,10 +20,26 @@ class BlockRepository(
         if (blockConfigDao.wakeupBlockedPackages().isNotEmpty()) return
         blockConfigDao.upsertAll(
             listOf(
-                BlockConfig("com.instagram.android", isBlockedDuringWakeup = true, maxDailyAllowedMinutes = 30),
-                BlockConfig("com.google.android.youtube", isBlockedDuringWakeup = true, maxDailyAllowedMinutes = 45),
-                BlockConfig("com.zhiliaoapp.musically", isBlockedDuringWakeup = true, maxDailyAllowedMinutes = 20),
-                BlockConfig("com.twitter.android", isBlockedDuringWakeup = true, maxDailyAllowedMinutes = 20)
+                BlockConfig(
+                    "com.instagram.android",
+                    isBlockedDuringWakeup = true,
+                    maxDailyAllowedMinutes = 30
+                ),
+                BlockConfig(
+                    "com.google.android.youtube",
+                    isBlockedDuringWakeup = true,
+                    maxDailyAllowedMinutes = 45
+                ),
+                BlockConfig(
+                    "com.zhiliaoapp.musically",
+                    isBlockedDuringWakeup = true,
+                    maxDailyAllowedMinutes = 20
+                ),
+                BlockConfig(
+                    "com.twitter.android",
+                    isBlockedDuringWakeup = true,
+                    maxDailyAllowedMinutes = 20
+                )
             )
         )
     }

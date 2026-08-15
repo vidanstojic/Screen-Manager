@@ -1,6 +1,8 @@
 package com.example.screenmanager.model
 
+import android.os.Parcelable
 import androidx.compose.ui.graphics.Color
+import kotlinx.parcelize.Parcelize
 
 /**
  * Presek svih UI režima pregleda potrošnje.
@@ -15,10 +17,11 @@ enum class UsageRange(val label: String) {
 /**
  * Donje navigacione destinacije kroz koje korisnik prolazi iz glavnog UI-a.
  */
+@Parcelize
 enum class MainDestination(
     val navLabel: String,
     val icon: String
-) {
+) : Parcelable {
     UsageStats("Usage\nStats", "▥"),
     UsageLimits("Usage\nLimits", "◴"),
     GeneralUsage("General\nUsage", "▦"),
@@ -48,9 +51,10 @@ data class AppDetailStats(
  * Ime i ikonica se učitavaju iz PackageManager-a preko [AppIconLoader],
  * pa ovaj model čuva samo packageName kao referencu, a ne samu sliku.
  */
+@Parcelize
 data class AppUsageSummary(
     val packageName: String,
     val name: String,
     val minutes: Int,
     val category: String = "App"
-)
+) : Parcelable

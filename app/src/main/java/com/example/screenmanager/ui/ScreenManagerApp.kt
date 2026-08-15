@@ -2,6 +2,7 @@ package com.example.screenmanager.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.TimeBuckets
@@ -22,21 +23,37 @@ import com.example.screenmanager.ui.limits.ScheduledBlockScreen
 import com.example.screenmanager.ui.limits.UsageLimitsScreen
 import com.example.screenmanager.ui.settings.GeneralSettingsScreen
 import com.example.screenmanager.ui.theme.ScreenManagerGlassTheme
+import kotlinx.parcelize.Parcelize
+import android.os.Parcelable
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 
 /**
  * Svi mogući "ekrani" u aplikaciji. Back-stack (List<Screen>) je JEDINI
  * izvor istine za navigaciju - i sistemski back i swipe-back gest rade
  * nad istim stack-om preko iste navigateBack() funkcije.
  */
-private sealed class Screen {
-    object FocusFlowHome : Screen()
-    object NavigationHub : Screen()
-    object ScheduledBlock : Screen()
-    object SmartAlarms : Screen()
-    data class Destination(val destination: MainDestination) : Screen()
-    data class AppDetails(val app: AppUsageSummary) : Screen()
-    data class AddLimit(val app: AppUsageSummary?) : Screen()
+private sealed class Screen : Parcelable {
+    @Parcelize object FocusFlowHome : Screen()
+    @Parcelize object NavigationHub : Screen()
+    @Parcelize object ScheduledBlock : Screen()
+    @Parcelize object SmartAlarms : Screen()
+    @Parcelize data class Destination(val destination: MainDestination) : Screen()
+    @Parcelize data class AppDetails(val app: AppUsageSummary) : Screen()
+    @Parcelize data class AddLimit(val app: AppUsageSummary?) : Screen()
 }
+
+/**
+ * Saver koji SnapshotStateList<Screen> pretvara u običnu List<Screen> za čuvanje
+ * (svaki Screen je već Parcelable, pa se lista bez problema upakuje u Bundle),
+ * i nazad u SnapshotStateList pri obnavljanju (npr. posle rotacije ekrana).
+ */
+private fun screenBackStackSaver(): Saver<SnapshotStateList<Screen>, *> = listSaver(
+    save = { stateList -> stateList.toList() },
+    restore = { savedList -> savedList.toMutableStateList() }
+)
 
 @Composable
 fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
@@ -55,7 +72,9 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
 
         // Koren stack-a je UVEK FocusFlowHome - to je jedini ekran sa kog
         // back izlazi iz aplikacije.
-        val backStack = remember { mutableStateListOf<Screen>(Screen.FocusFlowHome) }
+        val backStack = rememberSaveable(saver = screenBackStackSaver()) {
+            mutableStateListOf<Screen>(Screen.FocusFlowHome)
+        }
         val currentScreen = backStack.last()
 
         fun navigateTo(screen: Screen) {

@@ -9,6 +9,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -42,7 +43,7 @@ fun AppDetailsScreen(
 ) {
     val days = remember { generateLastSevenDays() }
     var selectedRange by remember { mutableStateOf(UsageRange.Day) }
-    var selectedDay by remember { mutableStateOf(days.last()) }
+    var selectedDay by rememberSaveable { mutableStateOf(days.last()) }
     var chartRange by remember { mutableStateOf(UsageRange.Day) }
 
     LaunchedEffect(app.packageName) {

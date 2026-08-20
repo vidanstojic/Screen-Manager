@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
+import com.example.screenmanager.domain.toDailyMinutesList
 
 /**
  * Svi mogući "ekrani" u aplikaciji. Back-stack (List<Screen>) je JEDINI
@@ -61,15 +62,15 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
         val context = LocalContext.current
 
         val dailyTotals by viewModel.dailyTotals.collectAsState()
-        val hourlyUsage by viewModel.hourlyUsage.collectAsState()
+        val hourlyUsageForSelectedDay by viewModel.hourlyUsageForSelectedDay.collectAsState()
+        val weeklyDailyBreakdown by viewModel.weeklyDailyBreakdown.collectAsState()
+        val selectedDayStart by viewModel.selectedDayStart.collectAsState()
 
         val appsUsage = remember(dailyTotals) {
             dailyTotals.toAppUsageSummaries(context).sortedByDescending { it.minutes }
         }
 
         var selectedRange by remember { mutableStateOf(UsageRange.Day) }
-        var selectedDayStart by remember { mutableStateOf(TimeBuckets.startOfToday()) }
-
         // Koren stack-a je UVEK FocusFlowHome - to je jedini ekran sa kog
         // back izlazi iz aplikacije.
         val backStack = rememberSaveable(saver = screenBackStackSaver()) {
@@ -155,24 +156,36 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
             is Screen.Destination -> {
                 SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
                     when (screen.destination) {
-                        MainDestination.UsageStats -> UsageStatsHomeScreen(
-                            selectedRange = selectedRange,
-                            selectedDayStart = selectedDayStart,
-                            selectedDestination = screen.destination,
-                            appsUsage = appsUsage,
-                            days = generateLastSevenDays(),
-                            chartTitle = if (selectedRange == UsageRange.Day) "Today's Usage" else "Last 7 Days",
-                            chartHeadlineMinutes = appsUsage.sumOf { it.minutes },
-                            chartPoints = hourlyUsage.toHourlyMinutesList(),
-                            chartLabels = listOf("12am", "6am", "Noon", "6pm", "11pm"),
-                            chartAverage = hourlyUsage.toHourlyMinutesList().average().toFloat()
-                                .takeIf { !it.isNaN() } ?: 0f,
-                            chartBottomLabel = "Daily Average: ...",
-                            onRangeSelected = { selectedRange = it },
-                            onDaySelected = { selectedDayStart = it },
-                            onAppClick = { navigateTo(Screen.AppDetails(it)) },
-                            onDestinationSelected = { navigateTo(Screen.Destination(it)) }
-                        )
+                        MainDestination.UsageStats -> {
+                            val isDayMode = selectedRange == UsageRange.Day
+                            val dayChartPoints = hourlyUsageForSelectedDay.toHourlyMinutesList()
+                            val weekChartPoints = weeklyDailyBreakdown.toDailyMinutesList()
+                            val chartPoints = if (isDayMode) dayChartPoints else weekChartPoints
+                            val chartLabels = if (isDayMode) {
+                                listOf("12am", "6am", "Noon", "6pm", "11pm")
+                            } else {
+                                generateLastSevenDays().map { it.shortLabel }
+                            }
+
+                            UsageStatsHomeScreen(
+                                selectedRange = selectedRange,
+                                selectedDayStart = selectedDayStart,
+                                selectedDestination = screen.destination,
+                                appsUsage = appsUsage,
+                                days = generateLastSevenDays(),
+                                chartTitle = if (isDayMode) "Today's Usage" else "Last 7 Days",
+                                chartHeadlineMinutes = chartPoints.sum(),
+                                chartPoints = chartPoints,
+                                chartLabels = chartLabels,
+                                chartAverage = chartPoints.average().toFloat()
+                                    .takeIf { !it.isNaN() } ?: 0f,
+                                chartBottomLabel = "Daily Average: ...",
+                                onRangeSelected = { selectedRange = it },
+                                onDaySelected = { viewModel.selectDay(it) },
+                                onAppClick = { navigateTo(Screen.AppDetails(it)) },
+                                onDestinationSelected = { navigateTo(Screen.Destination(it)) }
+                            )
+                        }
 
                         MainDestination.UsageLimits -> UsageLimitsScreen(
                             selectedDestination = screen.destination,

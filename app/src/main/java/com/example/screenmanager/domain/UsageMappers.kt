@@ -1,6 +1,7 @@
 package com.example.screenmanager.domain
 
 import android.content.Context
+import com.example.screenmanager.data.local.DailyUsage
 import com.example.screenmanager.data.local.HourlyUsage
 import com.example.screenmanager.data.local.UsageSummary
 import com.example.screenmanager.model.AppUsageSummary
@@ -31,6 +32,13 @@ fun List<HourlyUsage>.toHourlyMinutesList(): List<Int> {
     val byHour = associateBy { it.hour }
     return (0..23).map { hour ->
         val ms = byHour[hour]?.durationMs ?: 0L
+        TimeUnit.MILLISECONDS.toMinutes(ms).toInt()
+    }
+}
+fun List<DailyUsage>.toDailyMinutesList(): List<Int> {
+    val byDay = associateBy { it.day }
+    return (0..6).map { day ->
+        val ms = byDay[day]?.durationMs ?: 0L
         TimeUnit.MILLISECONDS.toMinutes(ms).toInt()
     }
 }

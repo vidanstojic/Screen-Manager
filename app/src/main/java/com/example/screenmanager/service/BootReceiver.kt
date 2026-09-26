@@ -10,17 +10,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Reaktivira periodično održavanje kada se uređaj podigne.
- *
- * Nakon boot-a ponovo zakazuje usage maintenance da bi UI imao ažurne podatke
- * i blok logika ostala dosledna.
+ * Posle boot-a (ili ažuriranja aplikacije) vraća sve pozadinske mehanizme:
+ * monitoring servis (ranije se nikad nije pokretao — B2), periodični
+ * maintenance i zakazane alarme.
  */
 class BootReceiver : BroadcastReceiver() {
-    /**
-     * Na boot_completed ponovo zakazuje pozadinsko održavanje.
-     */
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
+            return
+        }
+
+        FocusMonitorService.start(context)
         ServiceLocator.scheduleDailyMaintenance(context)
 
         val pendingResult = goAsync()

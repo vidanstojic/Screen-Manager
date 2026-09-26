@@ -3,13 +3,8 @@ package com.example.screenmanager
 import android.app.Application
 import android.util.Log
 import com.example.screenmanager.data.DefaultRulesData
-import com.example.screenmanager.data.local.ScreenManagerDatabase
-import com.example.screenmanager.data.repository.AppLimitRulesRepository
-import com.example.screenmanager.data.repository.EmergencySessionConfigRepository
-import com.example.screenmanager.data.repository.ScheduleRulesRepository
 import com.example.screenmanager.data.repository.SettingsRepository
-import com.example.screenmanager.data.repository.ShortVideoConfigRepository
-import com.example.screenmanager.data.repository.WakeUpConfigRepository
+import com.example.screenmanager.domain.ServiceLocator
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,46 +15,16 @@ import kotlinx.coroutines.launch
 /**
  * Globalni Application sloj.
  *
- * Kreira bazu, repozitorijume i podrazumevane konfiguracije pre nego što UI
- * dobije podatke. Odavde se dolazi indirektno kroz [MainActivity] i kroz
- * Compose/VM sloj koji koristi [settingsRepository].
+ * Asinhrono (bez blokiranja main thread-a) seed-uje podrazumevana pravila
+ * ako baza još nema zapise. Zavisnosti se dobijaju preko [ServiceLocator],
+ * pa UI, servisi i workeri dele iste instance.
  */
 class ScreenManagerApplication : Application() {
 
-    private val database by lazy { ScreenManagerDatabase.getInstance(this) }
+    val settingsRepository: SettingsRepository
+        get() = ServiceLocator.settingsRepository(this)
 
-    private val appLimitRulesRepository by lazy {
-        AppLimitRulesRepository(database.appLimitRuleDao())
-    }
-
-    private val shortVideoConfigRepository by lazy {
-        ShortVideoConfigRepository(database.shortVideoConfigDao())
-    }
-
-    private val scheduleRulesRepository by lazy {
-        ScheduleRulesRepository(database.scheduleRuleDao())
-    }
-
-    private val wakeUpConfigRepository by lazy {
-        WakeUpConfigRepository(database.wakeUpConfigDao())
-    }
-
-    private val emergencySessionConfigRepository by lazy {
-        EmergencySessionConfigRepository(database.emergencySessionConfigDao())
-    }
-
-    val settingsRepository by lazy {
-        SettingsRepository(
-            appLimitRulesRepository,
-            shortVideoConfigRepository,
-            scheduleRulesRepository,
-            wakeUpConfigRepository,
-            emergencySessionConfigRepository
-        )
-    }
-
-    // Scope vezan za životni ciklus cele aplikacije.
-    // SupervisorJob osigurava da pad jednog launch-a ne obori ostale.
+    // SupervisorJob: pad jednog seed-a ne obara ostale.
     private val applicationScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
             Log.e("ScreenManagerApp", "Greška pri inicijalizaciji podrazumevanih podataka", throwable)
@@ -72,63 +37,49 @@ class ScreenManagerApplication : Application() {
         fun getInstance(): ScreenManagerApplication = instance
     }
 
-    /**
-     * Pamti globalnu instancu i pokreće inicijalno popunjavanje podataka.
-     */
     override fun onCreate() {
         super.onCreate()
         instance = this
-
         initializeDefaultData()
     }
 
-    /**
-     * Dodaje default konfiguracije ako baza još nema zapise za UI ekrane.
-     */
     private fun initializeDefaultData() {
+        val database = ServiceLocator.database(this)
 
         applicationScope.launch {
-            val scheduleDao = database.scheduleRuleDao()
-            val scheduleRules = scheduleDao.observeAll().first()
-            if (scheduleRules.isEmpty()) {
-                DefaultRulesData.getDefaultScheduleRules().forEach {
-                    scheduleDao.upsert(it)
-                }
+            val dao = database.scheduleRuleDao()
+            if (dao.observeAll().first().isEmpty()) {
+                DefaultRulesData.getDefaultScheduleRules().forEach { dao.upsert(it) }
             }
         }
 
         applicationScope.launch {
-            val appLimitDao = database.appLimitRuleDao()
-            val appLimitRules = appLimitDao.observeAll().first()
-            if (appLimitRules.isEmpty()) {
-                DefaultRulesData.getDefaultAppLimitRules().forEach {
-                    appLimitDao.upsert(it)
-                }
+            val dao = database.appLimitRuleDao()
+            if (dao.observeAll().first().isEmpty()) {
+                DefaultRulesData.getDefaultAppLimitRules().forEach { dao.upsert(it) }
             }
         }
 
         applicationScope.launch {
-            val shortVideoDao = database.shortVideoConfigDao()
-            val shortVideoConfig = shortVideoDao.get()
-            if (shortVideoConfig == null) {
-                shortVideoDao.upsert(DefaultRulesData.getDefaultShortVideoConfig())
+            val dao = database.sessionLimitDao()
+            if (dao.countRules() == 0) {
+                DefaultRulesData.getDefaultSessionLimitRules().forEach { dao.upsertRule(it) }
             }
         }
 
         applicationScope.launch {
-            val wakeUpDao = database.wakeUpConfigDao()
-            val wakeUpConfig = wakeUpDao.get()
-            if (wakeUpConfig == null) {
-                wakeUpDao.upsert(DefaultRulesData.getDefaultWakeUpConfig())
-            }
+            val dao = database.shortVideoConfigDao()
+            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultShortVideoConfig())
         }
 
         applicationScope.launch {
-            val emergencySessionDao = database.emergencySessionConfigDao()
-            val emergencySessionConfig = emergencySessionDao.get()
-            if (emergencySessionConfig == null) {
-                emergencySessionDao.upsert(DefaultRulesData.getDefaultEmergencySessionConfig())
-            }
+            val dao = database.wakeUpConfigDao()
+            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultWakeUpConfig())
+        }
+
+        applicationScope.launch {
+            val dao = database.emergencySessionConfigDao()
+            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultEmergencySessionConfig())
         }
     }
 }

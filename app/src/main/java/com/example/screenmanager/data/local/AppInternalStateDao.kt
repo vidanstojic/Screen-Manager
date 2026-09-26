@@ -16,6 +16,12 @@ interface AppInternalStateDao {
     @Query("SELECT stateValueLong FROM app_internal_state WHERE stateKey = :key LIMIT 1")
     fun observeLong(key: String): Flow<Long?>
 
+    @Query("SELECT * FROM app_internal_state WHERE stateKey LIKE :prefix || '%'")
+    suspend fun getWithPrefix(prefix: String): List<AppInternalState>
+
+    @Query("SELECT * FROM app_internal_state WHERE stateKey LIKE :prefix || '%'")
+    fun observeWithPrefix(prefix: String): Flow<List<AppInternalState>>
+
     @Query("DELETE FROM app_internal_state WHERE stateKey = :key")
     suspend fun delete(key: String)
 }

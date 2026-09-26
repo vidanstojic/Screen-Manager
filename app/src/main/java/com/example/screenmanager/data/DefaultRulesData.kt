@@ -3,6 +3,7 @@ package com.example.screenmanager.data
 import com.example.screenmanager.data.local.AppLimitRuleEntity
 import com.example.screenmanager.data.local.EmergencySessionConfigEntity
 import com.example.screenmanager.data.local.ScheduleRuleEntity
+import com.example.screenmanager.data.local.SessionLimitRuleEntity
 import com.example.screenmanager.data.local.ShortVideoConfigEntity
 import com.example.screenmanager.data.local.WakeUpConfigEntity
 import java.time.DayOfWeek
@@ -44,7 +45,7 @@ object DefaultRulesData {
                 dailyLimitMinutes = 45,
                 blockDurationMinutes = 45,
                 isEnabled = true,
-                description = "Blocks YouTube for the same period after the limit expires."
+                description = "Blocks YouTube until midnight once the daily cap is used."
             ),
             AppLimitRuleEntity(
                 id = "limit_2",
@@ -53,7 +54,7 @@ object DefaultRulesData {
                 dailyLimitMinutes = 30,
                 blockDurationMinutes = 30,
                 isEnabled = true,
-                description = "Blocks Instagram and its short-form surfaces."
+                description = "Blocks Instagram until midnight once the daily cap is used."
             )
         )
     }
@@ -83,9 +84,23 @@ object DefaultRulesData {
         return EmergencySessionConfigEntity(
             id = "emergency_global",
             defaultDurationMinutes = 15,
-            activeUntilLabel = null,
-            manualEndEnabled = true,
-            isActive = false
+            activeUntilMillis = null,
+            manualEndEnabled = true
+        )
+    }
+
+    /** Primer interval pravila (isključen): 5 sesija po 5 min, 15 min pauze. */
+    fun getDefaultSessionLimitRules(): List<SessionLimitRuleEntity> {
+        return listOf(
+            SessionLimitRuleEntity(
+                id = "session_1",
+                name = "Instagram intervals",
+                selectedAppIds = "com.instagram.android",
+                sessionLengthMinutes = 5,
+                maxSessions = 5,
+                cooldownMinutes = 15,
+                isEnabled = false
+            )
         )
     }
 }

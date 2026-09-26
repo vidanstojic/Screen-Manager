@@ -7,6 +7,7 @@ import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.ScheduleRule
+import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.WakeUpConfig
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,9 @@ class SettingsViewModel(
     val appLimitRules: StateFlow<List<AppLimitRule>> = 
         settingsRepository.observeAppLimitRules().stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, emptyList())
 
+    val sessionLimitRules: StateFlow<List<SessionLimitRule>> =
+        settingsRepository.observeSessionLimitRules().stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, emptyList())
+
     val emergencySession: StateFlow<EmergencySessionConfig?> = 
         settingsRepository.observeEmergencySessionConfig().stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Lazily, EmergencySessionConfig())
 
@@ -70,6 +74,73 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.updateEmergencySessionConfig(config)
         }
+    }
+
+    /**
+     * Pokreće emergency sesiju od SADA na podrazumevano trajanje.
+     * Čuva se apsolutni trenutak isteka (radi i preko ponoći).
+     */
+    fun activateEmergencySession() {
+        viewModelScope.launch {
+            val config = settingsRepository.getEmergencySessionConfig() ?: EmergencySessionConfig()
+            settingsRepository.updateEmergencySessionConfig(config.activated(System.currentTimeMillis()))
+        }
+    }
+
+    fun endEmergencySession() {
+        viewModelScope.launch {
+            val config = settingsRepository.getEmergencySessionConfig() ?: EmergencySessionConfig()
+            settingsRepository.updateEmergencySessionConfig(config.ended())
+        }
+    }
+
+    /**
+     * Menja globalno Shorts/Reels pravilo čitajući AKTUELNU vrednost iz baze
+     * (StateFlow.value može biti još početna vrednost dok niko ne kolektuje).
+     */
+    fun mergeShortVideoConfig(maxReelsWatchMinutes: Int, fullAppBlockMinutes: Int, additionalAppIds: List<String>) {
+        viewModelScope.launch {
+            val current = settingsRepository.getShortVideoConfig() ?: ShortVideoConfig()
+            settingsRepository.updateShortVideoConfig(
+                current.copy(
+                    maxReelsWatchMinutes = maxReelsWatchMinutes,
+                    fullAppBlockMinutes = fullAppBlockMinutes,
+                    selectedAppIds = (current.selectedAppIds + additionalAppIds).distinct(),
+                    isEnabled = true
+                )
+            )
+        }
+    }
+
+    // --- Interval (session) pravila ---
+
+    fun upsertSessionLimitRule(rule: SessionLimitRule) {
+        viewModelScope.launch { settingsRepository.upsertSessionLimitRule(rule) }
+    }
+
+    fun addSessionLimitRule(selectedAppIds: List<String> = listOf("com.instagram.android")) {
+        upsertSessionLimitRule(
+            SessionLimitRule(
+                id = UUID.randomUUID().toString(),
+                name = "Interval rule",
+                selectedAppIds = selectedAppIds,
+                sessionLengthMinutes = 5,
+                maxSessions = 5,
+                cooldownMinutes = 15
+            )
+        )
+    }
+
+    fun removeSessionLimitRule(ruleId: String) {
+        viewModelScope.launch { settingsRepository.deleteSessionLimitRuleById(ruleId) }
+    }
+
+    /**
+     * Čuva zakazano pravilo napravljeno u AddScheduleDialog-u
+     * (ranije je ScheduledBlockScreen držao pravila samo u lokalnom state-u).
+     */
+    fun saveScheduleRule(rule: ScheduleRule) {
+        viewModelScope.launch { settingsRepository.addScheduleRule(rule) }
     }
 
     /**

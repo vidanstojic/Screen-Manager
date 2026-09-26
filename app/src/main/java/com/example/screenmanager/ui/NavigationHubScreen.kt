@@ -25,11 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.screenmanager.domain.PermissionState
+import com.example.screenmanager.ui.components.PermissionsCard
 import com.example.screenmanager.ui.theme.GlassBackground
 import com.example.screenmanager.ui.theme.GlassTheme
 
 @Composable
 fun NavigationHubScreen(
+    permissionState: PermissionState? = null,
     onUsageStatsClick: () -> Unit,
     onUsageLimitsClick: () -> Unit,
     onGeneralUsageClick: () -> Unit,
@@ -84,6 +87,11 @@ fun NavigationHubScreen(
                 )
 
                 Spacer(Modifier.height(24.dp))
+
+                if (permissionState != null && !permissionState.allCriticalGranted) {
+                    PermissionsCard(state = permissionState)
+                    Spacer(Modifier.height(16.dp))
+                }
 
                 HubActionCard(
                     icon = Icons.Filled.BarChart,

@@ -1,8 +1,19 @@
 package com.example.screenmanager.model
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
+/**
+ * Jutarnja blokada (TRS 2.5).
+ *
+ * Heuristika: ekran je bio ugašen najmanje [inactivityHours], korisnik je
+ * posle paljenja aktivan duže od [triggerDelayMinutes] → aplikacije iz
+ * [selectedAppIds] su blokirane [blockDurationMinutes] minuta.
+ * Isti lockout može da okine i Smart Alarm (vidi WakeUpLockoutTrigger).
+ */
 data class WakeUpConfig(
     val inactivityHours: Int = 7,
     val triggerDelayMinutes: Int = 2,
@@ -11,10 +22,18 @@ data class WakeUpConfig(
     val isEnabled: Boolean = true
 )
 
+/**
+ * Shorts/Reels ograničenje (TRS 2.3).
+ *
+ * [maxReelsWatchMinutes] je DNEVNI budžet gledanja short-form sadržaja po
+ * aplikaciji. Kada se potroši, cela aplikacija se blokira
+ * [fullAppBlockMinutes] minuta, a Shorts/Reels površina ostaje zaključana
+ * (automatski BACK) do kraja dana.
+ */
 data class ShortVideoConfig(
     val maxReelsWatchMinutes: Int = 15,
     val fullAppBlockMinutes: Int = 60,
-    val selectedAppIds: List<String> = listOf("instagram", "youtube"),
+    val selectedAppIds: List<String> = listOf("com.instagram.android", "com.google.android.youtube"),
     val isEnabled: Boolean = true
 )
 
@@ -28,6 +47,12 @@ data class ScheduleRule(
     val isEnabled: Boolean = true
 )
 
+/**
+ * Dnevni limit za GRUPU aplikacija: zbir potrošnje svih [selectedAppIds]
+ * se poredi sa [dailyLimitMinutes]. Po prekoračenju grupa je blokirana do
+ * ponoći. [blockDurationMinutes] je zadržan radi kompatibilnosti UI-a, ali
+ * ga engine trenutno ne koristi (vidi izveštaj refaktora).
+ */
 data class AppLimitRule(
     val id: String,
     val name: String,
@@ -38,12 +63,56 @@ data class AppLimitRule(
     val description: String = ""
 )
 
+/**
+ * Interval mod (TRS 2.4) za grupu aplikacija.
+ *
+ * - [sessionLengthMinutes] (M): maksimalno aktivno vreme jedne sesije.
+ * - [maxSessions] (N): broj sesija dnevno; posle N-te sesije grupa je
+ *   zaključana do ponoći (hard lockout).
+ * - [cooldownMinutes] (K): obavezna pauza posle svake završene sesije
+ *   (istekla M ili korisnik napustio aplikaciju).
+ */
+data class SessionLimitRule(
+    val id: String,
+    val name: String,
+    val selectedAppIds: List<String>,
+    val sessionLengthMinutes: Int,
+    val maxSessions: Int,
+    val cooldownMinutes: Int,
+    val isEnabled: Boolean = true
+)
+
+/**
+ * Emergency sesija — privremeno gasi SVA pravila.
+ *
+ * Aktivnost se izvodi iz apsolutnog trenutka [activeUntilMillis], pa istek
+ * radi ispravno i preko ponoći (ranije se poredila "HH:mm" labela).
+ */
 data class EmergencySessionConfig(
     val defaultDurationMinutes: Int = 15,
-    val activeUntilLabel: String? = null,
-    val manualEndEnabled: Boolean = true,
-    val isActive: Boolean = false
-)
+    val activeUntilMillis: Long? = null,
+    val manualEndEnabled: Boolean = true
+) {
+    fun isActiveAt(now: Long): Boolean = activeUntilMillis != null && activeUntilMillis > now
+
+    /** Pogodno za UI; engine uvek koristi [isActiveAt] sa eksplicitnim `now`. */
+    val isActive: Boolean
+        get() = isActiveAt(System.currentTimeMillis())
+
+    val activeUntilLabel: String?
+        get() = activeUntilMillis
+            ?.takeIf { isActive }
+            ?.let { LABEL_FORMAT.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) }
+
+    fun activated(now: Long, durationMinutes: Int = defaultDurationMinutes): EmergencySessionConfig =
+        copy(activeUntilMillis = now + durationMinutes * 60_000L)
+
+    fun ended(): EmergencySessionConfig = copy(activeUntilMillis = null)
+
+    private companion object {
+        val LABEL_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    }
+}
 
 data class AppOption(
     val id: String,

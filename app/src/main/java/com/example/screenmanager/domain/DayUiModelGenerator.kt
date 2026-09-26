@@ -11,12 +11,13 @@ import java.util.Locale
  * koriste TimeBuckets.startOfRollingWeek() kao referentnu tačku.
  */
 fun generateLastSevenDays(now: Long = System.currentTimeMillis()): List<DayUiModel> {
-    val todayStart = TimeBuckets.startOfToday(now)
+    val today = TimeBuckets.epochDay(now)
     val shortFormat = SimpleDateFormat("EEE", Locale.getDefault())
     val dateFormat = SimpleDateFormat("d", Locale.getDefault())
 
     return (6 downTo 0).map { daysAgo ->
-        val timestamp = todayStart - daysAgo * 24 * 60 * 60 * 1000L
+        // Preko kalendara, ne "- n * 24h": dani oko DST prelaza nemaju 24h.
+        val timestamp = TimeBuckets.startOfDay(today - daysAgo)
         DayUiModel(
             timestamp = timestamp,
             shortLabel = shortFormat.format(timestamp),

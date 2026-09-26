@@ -1,68 +1,87 @@
 package com.example.screenmanager.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.util.Log
-import com.example.screenmanager.data.repository.BlockRepository
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
+import com.example.screenmanager.model.ShortVideoConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * Shorts/Reels blocker (TRS 2.3).
+ *
+ * Performanse (B8): `onAccessibilityEvent` (main thread) samo zakazuje skeniranje;
+ * obilazak stabla radi na jednom serijskom pozadinskom dispatcher-u, sa
+ * debounce-om, a manifest config već filtrira događaje na 2 paketa.
+ *
+ * Tačnost (B7): detekcija preko [ShortsDetector] (ID plejera + veličina),
+ * ne preko teksta "Shorts" koji postoji i u navigacionom tabu.
+ *
+ * Pravila dolaze iz korisnikovog [ShortVideoConfig]: dnevni budžet po
+ * aplikaciji → posle toga kazna za celu aplikaciju (sprovodi je
+ * FocusMonitorService preko RulesEngine-a) i automatski BACK iz
+ * Shorts/Reels površine do kraja dana.
+ */
 class ShortsAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val blockRepository by lazy { ServiceLocator.blockRepository(this) }
-    private var sessionStartedAt = 0L
-    private var lastDetectedAt = 0L
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val scanDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+    private val runtimeRepository by lazy { ServiceLocator.runtimeStateRepository(this) }
+    private val settingsRepository by lazy { ServiceLocator.settingsRepository(this) }
+    private val isDebuggable by lazy { applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
+
+    @Volatile
+    private var shortsConfig: StateFlow<ShortVideoConfig?> = MutableStateFlow(null)
+
+    private val scanScheduled = AtomicBoolean(false)
+    @Volatile private var lastEventPackage: String? = null
+    @Volatile private var lastInteractionWriteAt = 0L
+
+    // Sledeće promenljive menja isključivo scanDispatcher (serijski).
+    private var followUpJob: Job? = null
+    private var visiblePackage: String? = null
+    private var lastVisibleAt = 0L
+    private var pendingWatchMs = 0L
+    private var lastFlushAt = 0L
+    private var cachedDay = -1L
+    private val storedWatchMs = HashMap<String, Long>()
     private var lastDumpAt = 0L
-    private var lastScanAt = 0L
-    private val SCAN_INTERVAL_MS = 300L // Skeniraj ekran max jednom u 300ms
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        shortsConfig = settingsRepository.observeShortVideoConfig()
+            .stateIn(serviceScope, SharingStarted.Eagerly, null)
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
-
-        // 1. Proveravamo da li nas ovaj paket uopšte zanima
-        if (packageName !in BlockRepository.shortsPackages) return
-
-        // 2. Slušamo samo promene stanja i sadržaja prozora
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-        ) {
-            return
-        }
+        if (packageName !in ShortsDetector.supportedPackages) return
 
         val now = System.currentTimeMillis()
-
-        // markInteraction ostavljamo iznad throttling-a jer je poziv asinhron (u korutini),
-        // jako je brz i želimo da precizno beležimo svaku aktivnost korisnika
-        serviceScope.launch { blockRepository.markInteraction(now) }
-
-        // --- DEBOUNCE MEHANIZAM ---
-        // Prekidamo izvršavanje ako je prošlo premalo vremena od prošlog skeniranja
-        if (now - lastScanAt < SCAN_INTERVAL_MS) {
-            return
-        }
-        lastScanAt = now
-        // --------------------------
-
-        // 3. Uzimamo koren UI stabla tek kada smo sigurni da želimo da skeniramo
-        val root = rootInActiveWindow ?: return
-
-        // 4. Debug dump (zadržan tvoj postojeći interval)
-        if (now - lastDumpAt > DEBUG_DUMP_INTERVAL_MS) {
-            lastDumpAt = now
-            dumpNodeTree(root)
+        if (now - lastInteractionWriteAt > INTERACTION_WRITE_INTERVAL_MS) {
+            lastInteractionWriteAt = now
+            serviceScope.launch { runtimeRepository.markInteraction(now) }
         }
 
-        // 5. Pokrećemo optimizovanu proveru nad stablom
-        val shortsOrReelsVisible = containsShortsOrReelsSurface(root, packageName)
-
-        // 6. Upravljanje tajmerom i eventualno blokiranje
-        handleShortsTimer(shortsOrReelsVisible, now)
+        lastEventPackage = packageName
+        scheduleScan(SCAN_DEBOUNCE_MS)
     }
 
     override fun onInterrupt() = Unit
@@ -72,88 +91,125 @@ class ShortsAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    private fun handleShortsTimer(visible: Boolean, now: Long) {
-        if (!visible) {
-            if (lastDetectedAt > 0L && now - lastDetectedAt > TimeBuckets.shortsGraceMs) {
-                sessionStartedAt = 0L
-                lastDetectedAt = 0L
-            }
+    private fun scheduleScan(delayMs: Long) {
+        if (!scanScheduled.compareAndSet(false, true)) return
+        serviceScope.launch(scanDispatcher) {
+            delay(delayMs)
+            scanScheduled.set(false)
+            runCatching { scan() }.onFailure { Log.w(TAG, "Shorts scan failed", it) }
+        }
+    }
+
+    private suspend fun scan() {
+        val config = shortsConfig.value ?: return
+        val root = rootInActiveWindow
+        val packageName = root?.packageName?.toString() ?: lastEventPackage
+        val now = System.currentTimeMillis()
+
+        if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds) {
+            onShortsHidden(now)
             return
         }
 
-        serviceScope.launch {
-            val blockedUntil = blockRepository.getShortsBlockedUntil()
-            if (blockedUntil > now) {
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                return@launch
-            }
+        maybeDumpTree(root, now)
 
-            if (sessionStartedAt == 0L) {
-                sessionStartedAt = now
-            }
-            lastDetectedAt = now
-
-            if (now - sessionStartedAt >= TimeBuckets.shortsLimitMs) {
-                blockRepository.punishShorts(now + TimeBuckets.shortsPenaltyMs)
-                sessionStartedAt = 0L
-                lastDetectedAt = 0L
-                performGlobalAction(GLOBAL_ACTION_BACK)
-            }
+        if (ShortsDetector.isShortFormVisible(root, packageName)) {
+            onShortsVisible(packageName, config, now)
+        } else {
+            onShortsHidden(now)
         }
     }
 
-    private fun containsShortsOrReelsSurface(
-        node: AccessibilityNodeInfo?,
-        packageName: String
-    ): Boolean {
-        if (node == null) return false
-
-        // Izbegavamo pravljenje novih stringova! Čitamo direktno.
-        val viewId = node.viewIdResourceName
-        val contentDesc = node.contentDescription
-        val text = node.text
-
-        val directMatch = when (packageName) {
-            "com.google.android.youtube" -> {
-                (viewId != null && (viewId.contains("shorts", true) || viewId.contains("reel_watch_sequence", true) || viewId.contains("shorts_shelf", true))) ||
-                        (contentDesc != null && (contentDesc.contains("shorts", true) || contentDesc.contains("reel_watch_sequence", true))) ||
-                        (text != null && text.contains("shorts", true))
-            }
-            "com.instagram.android" -> {
-                (viewId != null && (viewId.contains("reels", true) || viewId.contains("clips", true) || viewId.contains("reel", true))) ||
-                        (contentDesc != null && (contentDesc.contains("reels", true) || contentDesc.contains("clips", true) || contentDesc.contains("reel", true)))
-            }
-            else -> false
+    private suspend fun onShortsVisible(packageName: String, config: ShortVideoConfig, now: Long) {
+        val day = TimeBuckets.epochDay(now)
+        if (day != cachedDay) {
+            storedWatchMs.clear()
+            pendingWatchMs = 0L
+            cachedDay = day
         }
 
-        if (directMatch) return true
-
-        // Rekurzivni prolazak
-        for (index in 0 until node.childCount) {
-            if (containsShortsOrReelsSurface(node.getChild(index), packageName)) {
-                return true
-            }
+        if (visiblePackage != null && visiblePackage != packageName) flush(now)
+        if (visiblePackage == packageName && now - lastVisibleAt <= VISIBILITY_GRACE_MS) {
+            pendingWatchMs += now - lastVisibleAt
         }
-        return false
+        visiblePackage = packageName
+        lastVisibleAt = now
+
+        val stored = storedWatchMs.getOrPut(packageName) { runtimeRepository.shortsWatchedMs(packageName, day) }
+        val limitMs = config.maxReelsWatchMinutes.coerceAtLeast(0) * TimeBuckets.MINUTE_MS
+        val total = stored + pendingWatchMs
+
+        if (total >= limitMs) {
+            if (stored < limitMs) {
+                // Upravo prešli budžet → kazna za celu aplikaciju.
+                flush(now)
+                runtimeRepository.setShortsPenalty(
+                    packageName,
+                    now + config.fullAppBlockMinutes.coerceAtLeast(1) * TimeBuckets.MINUTE_MS
+                )
+            }
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            visiblePackage = null
+            return
+        }
+
+        if (now - lastFlushAt >= FLUSH_INTERVAL_MS) flush(now)
+        scheduleFollowUp()
     }
 
-    private fun dumpNodeTree(root: AccessibilityNodeInfo) {
-        fun visit(node: AccessibilityNodeInfo, depth: Int) {
-            val indent = "  ".repeat(depth.coerceAtMost(12))
-            Log.d(
-                TAG,
-                "$indent id=${node.viewIdResourceName} class=${node.className} text=${node.text} desc=${node.contentDescription}"
-            )
+    private suspend fun onShortsHidden(now: Long) {
+        if (visiblePackage != null) flush(now)
+        visiblePackage = null
+        followUpJob?.cancel()
+    }
+
+    /**
+     * Pasivno gledanje jednog Short-a ne mora da generiše događaje, pa dok je
+     * plejer vidljiv ponovo skeniramo na [FOLLOW_UP_SCAN_MS].
+     */
+    private fun scheduleFollowUp() {
+        if (followUpJob?.isActive == true) return
+        followUpJob = serviceScope.launch(scanDispatcher) {
+            delay(FOLLOW_UP_SCAN_MS)
+            followUpJob = null // da bi scan() mogao da zakaže sledeći follow-up
+            runCatching { scan() }.onFailure { Log.w(TAG, "Shorts follow-up scan failed", it) }
+        }
+    }
+
+    private suspend fun flush(now: Long) {
+        val packageName = visiblePackage ?: return
+        lastFlushAt = now
+        if (pendingWatchMs <= 0L) return
+        val total = runtimeRepository.addShortsWatchedMs(packageName, cachedDay, pendingWatchMs)
+        storedWatchMs[packageName] = total
+        pendingWatchMs = 0L
+    }
+
+    /** Samo u debug build-u: pomaže da se kalibrišu ID-jevi u [ShortsDetector]. */
+    private fun maybeDumpTree(root: AccessibilityNodeInfo, now: Long) {
+        if (!isDebuggable || now - lastDumpAt < DEBUG_DUMP_INTERVAL_MS) return
+        lastDumpAt = now
+        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+        queue.addLast(root to 0)
+        var visited = 0
+        while (queue.isNotEmpty() && visited < DEBUG_DUMP_MAX_NODES) {
+            val (node, depth) = queue.removeFirst()
+            visited++
+            node.viewIdResourceName?.let { Log.d(TAG, "${"  ".repeat(depth.coerceAtMost(12))}id=$it class=${node.className}") }
             for (index in 0 until node.childCount) {
-                val child = node.getChild(index) ?: continue
-                visit(child, depth + 1)
+                node.getChild(index)?.let { queue.addLast(it to depth + 1) }
             }
         }
-        visit(root, 0)
     }
 
     companion object {
         private const val TAG = "ShortsAccessibility"
-        private const val DEBUG_DUMP_INTERVAL_MS = 2_000L
+        private const val SCAN_DEBOUNCE_MS = 250L
+        private const val FOLLOW_UP_SCAN_MS = 2_000L
+        private const val VISIBILITY_GRACE_MS = 4_000L
+        private const val FLUSH_INTERVAL_MS = 5_000L
+        private const val INTERACTION_WRITE_INTERVAL_MS = 5_000L
+        private const val DEBUG_DUMP_INTERVAL_MS = 10_000L
+        private const val DEBUG_DUMP_MAX_NODES = 400
     }
 }

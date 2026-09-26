@@ -41,7 +41,7 @@ fun AppLimitRulesSection(
 ) {
     SectionCard(
         title = "App limits",
-        subtitle = "Set a daily limit for any app, then block it for the same duration once the limit expires."
+        subtitle = "Daily cap for a group of apps (their usage is summed). Once it is used up, the whole group is blocked until midnight."
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Rules", color = GlassTheme.colors.textPrimary)
@@ -71,7 +71,7 @@ fun AppLimitRulesSection(
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(rule.name, color = GlassTheme.colors.textPrimary)
-                                    Text("${rule.dailyLimitMinutes}m limit • ${rule.blockDurationMinutes}m block", color = GlassTheme.colors.textSecondary)
+                                    Text("${rule.dailyLimitMinutes}m daily cap • blocked until midnight", color = GlassTheme.colors.textSecondary)
                                 }
                                 Switch(
                                     checked = rule.isEnabled,

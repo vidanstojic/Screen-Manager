@@ -11,12 +11,17 @@ import androidx.core.app.NotificationCompat
 import com.example.screenmanager.MainActivity
 import com.example.screenmanager.R
 import com.example.screenmanager.domain.ServiceLocator
+import com.example.screenmanager.domain.wakeup.WakeUpSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_DISMISS_ALARM) {
+            onAlarmDismissed(context, intent)
+            return
+        }
         if (intent.action != ACTION_FIRE_ALARM) return
 
         val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1L)
@@ -57,6 +62,27 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * Phase 2 veza sa screen-time engine-om (TRS 2.5): gašenje alarma pali
+     * jutarnju blokadu preko [com.example.screenmanager.domain.wakeup.WakeUpLockoutTrigger].
+     */
+    private fun onAlarmDismissed(context: Context, intent: Intent) {
+        val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1L)
+        if (alarmId > 0L) {
+            context.getSystemService(NotificationManager::class.java).cancel(alarmId.toInt())
+        }
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                ServiceLocator.wakeUpLockoutTrigger(context).trigger(WakeUpSource.ALARM_DISMISSED)
+            } catch (error: IllegalStateException) {
+                Log.e(TAG, "Wake-up lockout after alarm failed", error)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
     private fun showNotification(context: Context, alarmId: Long, label: String) {
         val channelId = CHANNEL_ID
         val notificationManager = context.getSystemService(NotificationManager::class.java)
@@ -77,6 +103,16 @@ class AlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val dismissIntent = PendingIntent.getBroadcast(
+            context,
+            alarmId.toInt(),
+            Intent(context, AlarmReceiver::class.java).apply {
+                action = ACTION_DISMISS_ALARM
+                putExtra(EXTRA_ALARM_ID, alarmId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(label)
@@ -84,6 +120,7 @@ class AlarmReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(openIntent)
+            .addAction(0, "Dismiss", dismissIntent)
             .build()
 
         notificationManager.notify(alarmId.toInt(), notification)
@@ -91,6 +128,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_FIRE_ALARM = "com.example.screenmanager.action.FIRE_ALARM"
+        const val ACTION_DISMISS_ALARM = "com.example.screenmanager.action.DISMISS_ALARM"
         const val EXTRA_ALARM_ID = "extra_alarm_id"
         const val EXTRA_ALARM_LABEL = "extra_alarm_label"
         private const val CHANNEL_ID = "smart_alarms_channel"

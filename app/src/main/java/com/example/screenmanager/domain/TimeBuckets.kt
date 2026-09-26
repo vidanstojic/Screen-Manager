@@ -1,59 +1,63 @@
 package com.example.screenmanager.domain
 
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 
+/**
+ * Kalendarske granice u lokalnoj zoni.
+ *
+ * Sve se računa preko java.time + [ZoneId], a ne dodavanjem 24h u
+ * milisekundama — dani oko DST prelaza imaju 23 ili 25 sati (B6).
+ */
 object TimeBuckets {
-    fun startOfToday(now: Long = System.currentTimeMillis()): Long {
-        return Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+    fun zone(): ZoneId = ZoneId.systemDefault()
+
+    fun epochDay(millis: Long, zone: ZoneId = zone()): Long =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
+
+    fun startOfDay(epochDay: Long, zone: ZoneId = zone()): Long =
+        LocalDate.ofEpochDay(epochDay).atStartOfDay(zone).toInstant().toEpochMilli()
+
+    fun startOfToday(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
+        startOfDay(epochDay(now, zone), zone)
+
+    fun startOfNextDay(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
+        startOfDay(epochDay(now, zone) + 1, zone)
+
+    fun startOfWeek(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long {
+        val monday = LocalDate.ofEpochDay(epochDay(now, zone))
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return monday.atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
-    fun startOfWeek(now: Long = System.currentTimeMillis()): Long {
-        return Calendar.getInstance().apply {
-            timeInMillis = now
-            firstDayOfWeek = Calendar.MONDAY
-            set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-
-    fun startOfMonth(now: Long = System.currentTimeMillis()): Long {
-        return Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.DAY_OF_MONTH, 1)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+    fun startOfMonth(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long {
+        val first = LocalDate.ofEpochDay(epochDay(now, zone)).withDayOfMonth(1)
+        return first.atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
     /**
-     * Početak "klizećeg" prozora od poslednjih 7 dana (danas uključen),
-     * normalizovano na ponoć — ne prati kalendarsku nedelju kao [startOfWeek].
-     *
-     * Koristi se za retenciju logova i za "poslednjih 7 dana" grafike
-     * (weekly daily breakdown), jer korisnik uvek treba da vidi tačno
-     * 7 tačaka, bez obzira koji je dan danas.
+     * Početak "klizećeg" prozora od poslednjih 7 dana (danas uključen).
+     * Indeks dana 0..6 u grafiku odgovara `epochDay - rollingWeekStartDay`.
      */
-    fun startOfRollingWeek(now: Long = System.currentTimeMillis()): Long {
-        val todayStart = startOfToday(now)
-        return todayStart - TimeUnit.DAYS.toMillis(6)
-    }
+    fun startOfRollingWeek(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
+        startOfDay(rollingWeekStartDay(now, zone), zone)
 
-    val sevenHoursMs: Long = TimeUnit.HOURS.toMillis(7)
-    val wakeupEvaluationWindowMs: Long = TimeUnit.MINUTES.toMillis(2)
-    val defaultWakeupBlockMs: Long = TimeUnit.MINUTES.toMillis(60)
-    val shortsLimitMs: Long = TimeUnit.MINUTES.toMillis(5)
-    val shortsPenaltyMs: Long = TimeUnit.MINUTES.toMillis(30)
-    val shortsGraceMs: Long = TimeUnit.SECONDS.toMillis(10)
+    fun rollingWeekStartDay(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
+        epochDay(now, zone) - 6
+
+    const val MINUTE_MS: Long = 60_000L
+    const val HOUR_MS: Long = 60 * MINUTE_MS
+    const val DAY_MS: Long = 24 * HOUR_MS
+
+    /** Koliko dana unazad sync sme da ide (UsageStats čuva događaje ~7-10 dana). */
+    const val SYNC_LOOKBACK_DAYS: Long = 7
+
+    /** Retencija sirovih sesija; rollup-ovi se čuvaju duže (vidi [ROLLUP_RETENTION_DAYS]). */
+    const val RAW_LOG_RETENTION_DAYS: Long = 10
+
+    /** Satni rollup-ovi — omogućavaju mesečni prikaz (TRS 2.1, B10). */
+    const val ROLLUP_RETENTION_DAYS: Long = 400
 }

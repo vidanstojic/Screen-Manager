@@ -1,5 +1,10 @@
 package com.example.screenmanager.ui.limits
 
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.ScreenManagerApplication
+import com.example.screenmanager.ui.settings.SettingsViewModel
+import com.example.screenmanager.ui.settings.SettingsViewModelFactory
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,13 +33,18 @@ import com.example.screenmanager.ui.theme.GlassTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduledBlockScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(ScreenManagerApplication.getInstance().settingsRepository)
+    )
 ) {
     val context = LocalContext.current
 
     val realApps = remember { getInstalledApps(context) }
 
-    var rules by remember { mutableStateOf<List<ScheduleRule>>(emptyList()) }
+    // Pravila dolaze iz baze — ranije su živela samo u lokalnom state-u i
+    // nestajala izlaskom sa ekrana (a servis ih nikad nije video).
+    val rules by viewModel.scheduleRules.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
     if (showAddDialog) {
@@ -42,7 +52,7 @@ fun ScheduledBlockScreen(
             availableApps = realApps,
             onDismiss = { showAddDialog = false },
             onSaveRule = { newRule ->
-                rules = rules + newRule
+                viewModel.saveScheduleRule(newRule)
                 showAddDialog = false
             }
         )
@@ -87,11 +97,7 @@ fun ScheduledBlockScreen(
             ) {
                 ScheduledBlockSection(
                     rules = rules,
-                    onToggleRule = { ruleId, isEnabled ->
-                        rules = rules.map {
-                            if (it.id == ruleId) it.copy(isEnabled = isEnabled) else it
-                        }
-                    },
+                    onToggleRule = { ruleId, isEnabled -> viewModel.toggleScheduleRule(ruleId, isEnabled) },
                     onAddScheduleClick = { showAddDialog = true }
                 )
             }

@@ -2,6 +2,7 @@ package com.example.screenmanager.ui.limits
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +20,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,58 +30,109 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.ScreenManagerApplication
+import com.example.screenmanager.domain.getInstalledApps
+import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.AppUsageSummary
+import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
 import com.example.screenmanager.ui.components.ToggleChip
+import com.example.screenmanager.ui.settings.SettingsViewModel
+import com.example.screenmanager.ui.settings.SettingsViewModelFactory
 import com.example.screenmanager.ui.settings.components.AppPickerDialog
 import com.example.screenmanager.ui.theme.GlassBackground
 import com.example.screenmanager.ui.theme.GlassTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.UUID
+import kotlin.math.roundToInt
+
+private enum class RuleType(val label: String) {
+    APP_LIMIT("App limit"),
+    SESSIONS("Sessions"),
+    SHORTS("Shorts/Reels")
+}
 
 /**
- * Ekran za kreiranje i uređivanje limita aplikacije.
+ * Ekran za kreiranje pravila.
  *
- * Do njega se dolazi iz detalja aplikacije ili iz limits pregleda i ovde
- * korisnik bira aplikacije, tip pravila i trajanje blokade.
+ * Do njega se dolazi iz detalja aplikacije ili iz limits pregleda. "Save"
+ * sada zaista upisuje pravilo u bazu (ranije je samo zatvarao ekran), a
+ * izbor aplikacije koristi packageName (ranije `name.lowercase()`).
  */
 @Composable
 fun AddLimitScreen(
     selectedApp: AppUsageSummary?,
     onBack: () -> Unit,
     onCancel: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(ScreenManagerApplication.getInstance().settingsRepository)
+    )
 ) {
+    val context = LocalContext.current
+
+    var ruleType by remember { mutableStateOf(RuleType.APP_LIMIT) }
     var limitName by remember { mutableStateOf(selectedApp?.name?.let { "$it limit" } ?: "New limit") }
     var dailyLimitMinutes by remember { mutableStateOf(60) }
-    var blockDurationMinutes by remember { mutableStateOf(60) }
-    var allowEmergencySession by remember { mutableStateOf(true) }
-    var selectedRuleType by remember { mutableStateOf("App limit") }
+    var shortsBudgetMinutes by remember { mutableStateOf(15) }
+    var shortsPenaltyMinutes by remember { mutableStateOf(60) }
+    var sessionLengthMinutes by remember { mutableStateOf(5) }
+    var maxSessions by remember { mutableStateOf(5) }
+    var cooldownMinutes by remember { mutableStateOf(15) }
     var showPicker by remember { mutableStateOf(false) }
     var selectedAppIds by remember {
-        mutableStateOf(
-            selectedApp?.let { listOf(it.name.lowercase()) } ?: listOf("com.google.android.youtube")
-        )
+        mutableStateOf(selectedApp?.let { listOf(it.packageName) } ?: emptyList())
+    }
+    var availableApps by remember { mutableStateOf<List<AppOption>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        availableApps = withContext(Dispatchers.IO) { getInstalledApps(context) }
     }
 
-    val availableApps = remember {
-        listOf(
-            AppOption("com.google.android.youtube", "YouTube", "Video", "YT"),
-            AppOption("com.instagram.android", "Instagram", "Social", "IG"),
-            AppOption("com.zhiliaoapp.musically", "TikTok", "Short video", "TT"),
-            AppOption("com.android.chrome", "Chrome", "Browser", "CH"),
-            AppOption("com.whatsapp", "WhatsApp", "Messaging", "WA")
-        )
+    fun save() {
+        when (ruleType) {
+            RuleType.APP_LIMIT -> viewModel.updateAppLimitRule(
+                AppLimitRule(
+                    id = UUID.randomUUID().toString(),
+                    name = limitName.ifBlank { "Daily limit" },
+                    selectedAppIds = selectedAppIds,
+                    dailyLimitMinutes = dailyLimitMinutes,
+                    blockDurationMinutes = 0,
+                    description = "Blocked until midnight once the daily cap is used."
+                )
+            )
+
+            RuleType.SESSIONS -> viewModel.upsertSessionLimitRule(
+                SessionLimitRule(
+                    id = UUID.randomUUID().toString(),
+                    name = limitName.ifBlank { "Interval rule" },
+                    selectedAppIds = selectedAppIds,
+                    sessionLengthMinutes = sessionLengthMinutes,
+                    maxSessions = maxSessions,
+                    cooldownMinutes = cooldownMinutes
+                )
+            )
+
+            RuleType.SHORTS -> viewModel.mergeShortVideoConfig(
+                maxReelsWatchMinutes = shortsBudgetMinutes,
+                fullAppBlockMinutes = shortsPenaltyMinutes,
+                additionalAppIds = selectedAppIds
+            )
+        }
+        onSave()
     }
 
     GlassBackground {
-        Scaffold(
-            containerColor = Color.Transparent
-        ) { innerPadding ->
+        Scaffold(containerColor = Color.Transparent) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -106,7 +157,7 @@ fun AddLimitScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Create one rule that can block the app, add a penalty, and support emergency bypass.",
+                            text = "Create a rule that blocks apps by daily usage, by short sessions, or limits Shorts/Reels.",
                             color = GlassTheme.colors.textSecondary,
                             fontSize = 12.sp
                         )
@@ -114,23 +165,18 @@ fun AddLimitScreen(
                 }
 
                 InfoBanner(
-                    title = "Designed for all block types",
-                    description = "Use this editor for daily app limits, shorts/reels penalties, or future scheduled blocking templates."
+                    title = "Scheduled blocks",
+                    description = "Time-window blocking (e.g. 22:00–07:00) lives on the Scheduled Blocking screen."
                 )
 
-                SectionCard(title = "Target apps", subtitle = "Pick one or more apps for this limit.") {
+                SectionCard(title = "Target apps", subtitle = "Pick one or more apps for this rule.") {
                     if (selectedApp != null) {
                         Text("Starting from ${selectedApp.name}", color = GlassTheme.colors.textPrimary)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusChip(text = "${selectedAppIds.size} selected", isActive = selectedAppIds.isNotEmpty())
-                        StatusChip(
-                            text = if (allowEmergencySession) "Emergency allowed" else "Emergency disabled",
-                            isActive = allowEmergencySession
-                        )
-                    }
+                    StatusChip(text = "${selectedAppIds.size} selected", isActive = selectedAppIds.isNotEmpty())
                     Button(
                         onClick = { showPicker = true },
+                        enabled = availableApps.isNotEmpty(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = GlassTheme.colors.accentPrimary,
                             contentColor = GlassTheme.colors.textPrimary
@@ -142,76 +188,64 @@ fun AddLimitScreen(
 
                 SectionCard(title = "Rule type", subtitle = "Choose how the rule behaves.") {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ToggleChip(text = "App limit", selected = selectedRuleType == "App limit", onClick = { selectedRuleType = "App limit" })
-                        ToggleChip(text = "Shorts/Reels", selected = selectedRuleType == "Shorts/Reels", onClick = { selectedRuleType = "Shorts/Reels" })
-                        ToggleChip(text = "Scheduled", selected = selectedRuleType == "Scheduled", onClick = { selectedRuleType = "Scheduled" })
+                        RuleType.entries.forEach { type ->
+                            ToggleChip(text = type.label, selected = ruleType == type, onClick = { ruleType = type })
+                        }
                     }
                 }
 
-                SectionCard(title = "Limit values", subtitle = "Tune the daily usage cap and the penalty block.") {
-                    OutlinedTextField(
-                        value = limitName,
-                        onValueChange = { limitName = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Limit name") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GlassTheme.colors.textPrimary,
-                            unfocusedTextColor = GlassTheme.colors.textPrimary,
-                            focusedBorderColor = GlassTheme.colors.accentPrimary,
-                            unfocusedBorderColor = GlassTheme.colors.borderEnd,
-                            focusedLabelColor = GlassTheme.colors.accentPrimary,
-                            unfocusedLabelColor = GlassTheme.colors.textSecondary
-                        )
-                    )
-                    Text("Daily limit: ${dailyLimitMinutes}m", color = GlassTheme.colors.textPrimary)
-                    Slider(
-                        value = dailyLimitMinutes.toFloat(),
-                        onValueChange = { dailyLimitMinutes = it.toInt() },
-                        valueRange = 5f..480f,
-                        steps = 94,
-                        colors = SliderDefaults.colors(
-                            thumbColor = GlassTheme.colors.accentPrimary,
-                            activeTrackColor = GlassTheme.colors.accentPrimary,
-                            inactiveTrackColor = GlassTheme.colors.borderEnd
-                        )
-                    )
-                    Text("Penalty block: ${blockDurationMinutes}m", color = GlassTheme.colors.textPrimary)
-                    Slider(
-                        value = blockDurationMinutes.toFloat(),
-                        onValueChange = { blockDurationMinutes = it.toInt() },
-                        valueRange = 5f..240f,
-                        steps = 46,
-                        colors = SliderDefaults.colors(
-                            thumbColor = GlassTheme.colors.accentPrimary,
-                            activeTrackColor = GlassTheme.colors.accentPrimary,
-                            inactiveTrackColor = GlassTheme.colors.borderEnd
-                        )
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Allow emergency session", color = GlassTheme.colors.textPrimary)
-                        Switch(
-                            checked = allowEmergencySession,
-                            onCheckedChange = { allowEmergencySession = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = GlassTheme.colors.textPrimary,
-                                checkedTrackColor = GlassTheme.colors.accentPrimary,
-                                uncheckedThumbColor = GlassTheme.colors.textSecondary,
-                                uncheckedTrackColor = GlassTheme.colors.surface
+                SectionCard(title = "Limit values", subtitle = null) {
+                    if (ruleType != RuleType.SHORTS) {
+                        OutlinedTextField(
+                            value = limitName,
+                            onValueChange = { limitName = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Rule name") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = GlassTheme.colors.textPrimary,
+                                unfocusedTextColor = GlassTheme.colors.textPrimary,
+                                focusedBorderColor = GlassTheme.colors.accentPrimary,
+                                unfocusedBorderColor = GlassTheme.colors.borderEnd,
+                                focusedLabelColor = GlassTheme.colors.accentPrimary,
+                                unfocusedLabelColor = GlassTheme.colors.textSecondary
                             )
                         )
+                    }
+                    when (ruleType) {
+                        RuleType.APP_LIMIT -> {
+                            LabeledSlider("Daily cap (all selected apps together)", dailyLimitMinutes, "m", 5..480, 5) {
+                                dailyLimitMinutes = it
+                            }
+                            Text("When the cap is used up, the apps stay blocked until midnight.", color = GlassTheme.colors.textSecondary, fontSize = 12.sp)
+                        }
+
+                        RuleType.SESSIONS -> {
+                            LabeledSlider("Session length (M)", sessionLengthMinutes, "m", 1..60, 1) { sessionLengthMinutes = it }
+                            LabeledSlider("Sessions per day (N)", maxSessions, "", 1..30, 1) { maxSessions = it }
+                            LabeledSlider("Cool-down between sessions (K)", cooldownMinutes, "m", 0..180, 5) { cooldownMinutes = it }
+                        }
+
+                        RuleType.SHORTS -> {
+                            LabeledSlider("Daily Shorts/Reels budget", shortsBudgetMinutes, "m", 0..120, 5) { shortsBudgetMinutes = it }
+                            LabeledSlider("Full app block after budget", shortsPenaltyMinutes, "m", 5..240, 5) { shortsPenaltyMinutes = it }
+                            Text("Applies to the global Shorts/Reels rule; selected apps are added to it.", color = GlassTheme.colors.textSecondary, fontSize = 12.sp)
+                        }
                     }
                 }
 
                 SectionCard(title = "Summary", subtitle = null) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Rule: $selectedRuleType", color = GlassTheme.colors.textPrimary)
-                        Text("Apps: ${selectedAppIds.joinToString()}", color = GlassTheme.colors.textSecondary)
-                        Text("Daily cap: ${dailyLimitMinutes}m", color = GlassTheme.colors.textPrimary)
-                        Text("Penalty block: ${blockDurationMinutes}m", color = GlassTheme.colors.textPrimary)
+                        Text("Rule: ${ruleType.label}", color = GlassTheme.colors.textPrimary)
+                        Text(
+                            "Apps: ${selectedAppIds.joinToString { id -> availableApps.firstOrNull { it.id == id }?.name ?: id }}",
+                            color = GlassTheme.colors.textSecondary
+                        )
+                        val detail = when (ruleType) {
+                            RuleType.APP_LIMIT -> "Daily cap: ${dailyLimitMinutes}m, then blocked until midnight"
+                            RuleType.SESSIONS -> "$maxSessions × ${sessionLengthMinutes}m, ${cooldownMinutes}m cool-down"
+                            RuleType.SHORTS -> "${shortsBudgetMinutes}m Shorts/day, then ${shortsPenaltyMinutes}m app block"
+                        }
+                        Text(detail, color = GlassTheme.colors.textPrimary)
                     }
                 }
 
@@ -227,7 +261,8 @@ fun AddLimitScreen(
                         Text("Cancel")
                     }
                     Button(
-                        onClick = onSave,
+                        onClick = ::save,
+                        enabled = selectedAppIds.isNotEmpty(),
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = GlassTheme.colors.accentPrimary,
@@ -252,4 +287,27 @@ fun AddLimitScreen(
             }
         )
     }
+}
+
+@Composable
+private fun ColumnScope.LabeledSlider(
+    label: String,
+    value: Int,
+    unit: String,
+    range: IntRange,
+    step: Int,
+    onChange: (Int) -> Unit
+) {
+    Text("$label: $value$unit", color = GlassTheme.colors.textPrimary)
+    Slider(
+        value = value.toFloat(),
+        onValueChange = { raw -> onChange(((raw / step).roundToInt() * step).coerceIn(range)) },
+        valueRange = range.first.toFloat()..range.last.toFloat(),
+        steps = ((range.last - range.first) / step - 1).coerceAtLeast(0),
+        colors = SliderDefaults.colors(
+            thumbColor = GlassTheme.colors.accentPrimary,
+            activeTrackColor = GlassTheme.colors.accentPrimary,
+            inactiveTrackColor = GlassTheme.colors.borderEnd
+        )
+    )
 }

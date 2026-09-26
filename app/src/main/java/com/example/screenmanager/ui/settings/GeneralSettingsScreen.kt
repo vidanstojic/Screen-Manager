@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,13 +17,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.ScreenManagerApplication
+import com.example.screenmanager.domain.getInstalledApps
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.MainDestination
+import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.WakeUpConfig
 import com.example.screenmanager.ui.components.InfoBanner
@@ -31,10 +35,13 @@ import com.example.screenmanager.ui.settings.components.AppLimitRulesSection
 import com.example.screenmanager.ui.settings.components.AppPickerDialog
 import com.example.screenmanager.ui.settings.components.EmergencySessionSection
 import com.example.screenmanager.ui.settings.components.ScheduledBlockSection
+import com.example.screenmanager.ui.settings.components.SessionLimitRulesSection
 import com.example.screenmanager.ui.settings.components.ShortVideoSection
 import com.example.screenmanager.ui.settings.components.WakeUpSection
 import com.example.screenmanager.ui.theme.GlassBackground
 import com.example.screenmanager.ui.theme.GlassTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Glavni settings ekran za zaštitna pravila aplikacije.
@@ -53,9 +60,18 @@ fun GeneralSettingsScreen(
     val appLimitRules by viewModel.appLimitRules.collectAsState()
     val emergencySession by viewModel.emergencySession.collectAsState()
     val availableApps by viewModel.availableApps.collectAsState()
+    val sessionLimitRules by viewModel.sessionLimitRules.collectAsState()
 
     var activeDialogTarget by remember { mutableStateOf(AppPickerTarget.NONE) }
     var editingAppLimitRule by remember { mutableStateOf<AppLimitRule?>(null) }
+    var editingSessionRule by remember { mutableStateOf<SessionLimitRule?>(null) }
+
+    // Picker nudi stvarno instalirane aplikacije (učitavanje van main thread-a).
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val installed = withContext(Dispatchers.IO) { getInstalledApps(context) }
+        if (installed.isNotEmpty()) viewModel.replaceAvailableApps(installed)
+    }
 
     GlassBackground {
         Scaffold(
@@ -91,6 +107,19 @@ fun GeneralSettingsScreen(
                 }
 
                 item {
+                    SessionLimitRulesSection(
+                        rules = sessionLimitRules,
+                        onRuleChange = { viewModel.upsertSessionLimitRule(it) },
+                        onAddRule = { viewModel.addSessionLimitRule() },
+                        onEditApps = { rule ->
+                            editingSessionRule = rule
+                            activeDialogTarget = AppPickerTarget.SESSION_LIMIT
+                        },
+                        onRemoveRule = { viewModel.removeSessionLimitRule(it) }
+                    )
+                }
+
+                item {
                     ShortVideoSection(
                         config = shortVideoConfig ?: ShortVideoConfig(),
                         onConfigChange = { viewModel.updateShortVideoConfig(it) },
@@ -118,20 +147,8 @@ fun GeneralSettingsScreen(
                     EmergencySessionSection(
                         config = emergencySession ?: EmergencySessionConfig(),
                         onConfigChange = { viewModel.updateEmergencySession(it) },
-                        onActivateSession = {
-                            val cfg = emergencySession ?: EmergencySessionConfig()
-                            val next = cfg.copy(
-                                isActive = true,
-                                activeUntilLabel = "${cfg.defaultDurationMinutes}m from now"
-                            )
-                            viewModel.updateEmergencySession(next)
-                        },
-                        onEndSession = {
-                            val cfg = emergencySession ?: EmergencySessionConfig()
-                            viewModel.updateEmergencySession(
-                                cfg.copy(isActive = false, activeUntilLabel = null)
-                            )
-                        }
+                        onActivateSession = { viewModel.activateEmergencySession() },
+                        onEndSession = { viewModel.endEmergencySession() }
                     )
                 }
 
@@ -141,8 +158,14 @@ fun GeneralSettingsScreen(
                         subtitle = "These are the app targets the UI is prepared to manage."
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            availableApps.forEach { app ->
+                            availableApps.take(MAX_APPS_PREVIEW).forEach { app ->
                                 AppOptionRow(app = app)
+                            }
+                            if (availableApps.size > MAX_APPS_PREVIEW) {
+                                Text(
+                                    text = "+ ${availableApps.size - MAX_APPS_PREVIEW} more (use \"Apps\" on a rule to pick)",
+                                    color = GlassTheme.colors.textSecondary
+                                )
                             }
                         }
                     }
@@ -154,6 +177,7 @@ fun GeneralSettingsScreen(
                     AppPickerTarget.WAKE_UP -> (wakeUpConfig ?: WakeUpConfig()).selectedAppIds
                     AppPickerTarget.SHORT_VIDEO -> (shortVideoConfig ?: ShortVideoConfig()).selectedAppIds
                     AppPickerTarget.APP_LIMIT -> editingAppLimitRule?.selectedAppIds ?: emptyList()
+                    AppPickerTarget.SESSION_LIMIT -> editingSessionRule?.selectedAppIds ?: emptyList()
                     else -> emptyList()
                 }
 
@@ -163,6 +187,7 @@ fun GeneralSettingsScreen(
                     onDismiss = {
                         activeDialogTarget = AppPickerTarget.NONE
                         editingAppLimitRule = null
+                        editingSessionRule = null
                     },
                     onConfirm = { selectedApps ->
                         when (activeDialogTarget) {
@@ -181,10 +206,16 @@ fun GeneralSettingsScreen(
                                     viewModel.updateAppLimitRule(rule.copy(selectedAppIds = selectedApps))
                                 }
                             }
+                            AppPickerTarget.SESSION_LIMIT -> {
+                                editingSessionRule?.let { rule ->
+                                    viewModel.upsertSessionLimitRule(rule.copy(selectedAppIds = selectedApps))
+                                }
+                            }
                             else -> Unit
                         }
                         activeDialogTarget = AppPickerTarget.NONE
                         editingAppLimitRule = null
+                        editingSessionRule = null
                     }
                 )
             }
@@ -200,6 +231,8 @@ private fun AppOptionRow(app: AppOption) {
     }
 }
 
+private const val MAX_APPS_PREVIEW = 8
+
 private enum class AppPickerTarget {
-    NONE, WAKE_UP, SHORT_VIDEO, APP_LIMIT
+    NONE, WAKE_UP, SHORT_VIDEO, APP_LIMIT, SESSION_LIMIT
 }

@@ -5,6 +5,7 @@ import android.graphics.PixelFormat
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.annotation.MainThread
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,8 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,15 +30,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.view.ViewCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
-import com.example.screenmanager.domain.BlockDecision
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.example.screenmanager.domain.rules.BlockDecision
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 import kotlinx.coroutines.delay
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+/**
+ * Prikazuje full-screen blok preko zabranjene aplikacije.
+ *
+ * SVE metode su @MainThread — ranije su pozivane sa Dispatchers.Default,
+ * što ruši WindowManager/LifecycleRegistry. Jedan ComposeView se
+ * re-koristi; nova odluka samo menja state (bez remove/add treptanja).
+ */
 class BlockOverlayController(
     private val context: Context,
     private val onGoHome: () -> Unit
@@ -43,20 +54,25 @@ class BlockOverlayController(
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var composeView: ComposeView? = null
     private var lifecycleOwner: OverlayLifecycleOwner? = null
-    private var currentPackage: String? = null
+    private val decisionState: MutableState<BlockDecision?> = mutableStateOf(null)
 
+    val isShowing: Boolean
+        get() = composeView != null
+
+    @MainThread
     fun show(decision: BlockDecision) {
         if (!Settings.canDrawOverlays(context)) return
-        if (composeView != null && currentPackage == decision.packageName) return
-        hide()
+        decisionState.value = decision
+        if (composeView != null) return
 
         val owner = OverlayLifecycleOwner().also { it.start() }
         val view = ComposeView(context).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 ScreenManagerTheme {
-                    BlockOverlay(decision = decision, onGoHome = onGoHome)
+                    decisionState.value?.let { BlockOverlay(decision = it, onGoHome = onGoHome) }
                 }
             }
         }
@@ -72,20 +88,22 @@ class BlockOverlayController(
             gravity = Gravity.CENTER
         }
 
-        windowManager.addView(view, params)
-        ViewCompat.requestApplyInsets(view)
-        composeView = view
-        lifecycleOwner = owner
-        currentPackage = decision.packageName
+        runCatching { windowManager.addView(view, params) }
+            .onSuccess {
+                composeView = view
+                lifecycleOwner = owner
+            }
+            .onFailure { owner.stop() }
     }
 
+    @MainThread
     fun hide() {
         val view = composeView ?: return
         runCatching { windowManager.removeView(view) }
         lifecycleOwner?.stop()
         composeView = null
         lifecycleOwner = null
-        currentPackage = null
+        decisionState.value = null
     }
 }
 
@@ -121,9 +139,10 @@ private fun BlockOverlay(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = decision.reason,
+                text = decision.message,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFFE5E7EB)
+                color = Color(0xFFE5E7EB),
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -139,9 +158,15 @@ private fun BlockOverlay(
     }
 }
 
+/** HH:MM:SS za duže blokade (do ponoći), MM:SS za kratke. */
 private fun formatRemaining(ms: Long): String {
     val totalSeconds = TimeUnit.MILLISECONDS.toSeconds(ms).coerceAtLeast(0)
-    val minutes = totalSeconds / 60
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    return if (hours > 0) {
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
 }

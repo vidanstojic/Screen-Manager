@@ -1,5 +1,8 @@
 package com.example.screenmanager.ui
 
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,13 +64,27 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
     ScreenManagerGlassTheme(darkTheme = true) {
         val context = LocalContext.current
 
-        val dailyTotals by viewModel.dailyTotals.collectAsState()
+        val totalsForSelectedDay by viewModel.totalsForSelectedDay.collectAsState()
         val hourlyUsageForSelectedDay by viewModel.hourlyUsageForSelectedDay.collectAsState()
         val weeklyDailyBreakdown by viewModel.weeklyDailyBreakdown.collectAsState()
         val selectedDayStart by viewModel.selectedDayStart.collectAsState()
+        val permissionState by viewModel.permissionState.collectAsState()
 
-        val appsUsage = remember(dailyTotals) {
-            dailyTotals.toAppUsageSummaries(context).sortedByDescending { it.minutes }
+        // Po povratku iz sistemskih podešavanja osveži dozvole (i povuci
+        // istoriju ako je Usage Access upravo dat).
+        @Suppress("DEPRECATION")
+        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissions()
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
+        // Lista aplikacija prati dan izabran u DayPicker-u (ranije uvek "danas").
+        val appsUsage = remember(totalsForSelectedDay) {
+            totalsForSelectedDay.toAppUsageSummaries(context).sortedByDescending { it.minutes }
         }
 
         var selectedRange by remember { mutableStateOf(UsageRange.Day) }
@@ -110,6 +127,7 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
             Screen.NavigationHub -> {
                 SwipeBackContainer(onBack = ::navigateBack, enabled = swipeBackEnabled) {
                     NavigationHubScreen(
+                        permissionState = permissionState,
                         onUsageStatsClick = { navigateTo(Screen.Destination(MainDestination.UsageStats)) },
                         onUsageLimitsClick = { navigateTo(Screen.Destination(MainDestination.UsageLimits)) },
                         onGeneralUsageClick = { navigateTo(Screen.Destination(MainDestination.GeneralUsage)) },
@@ -173,7 +191,11 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
                                 selectedDestination = screen.destination,
                                 appsUsage = appsUsage,
                                 days = generateLastSevenDays(),
-                                chartTitle = if (isDayMode) "Today's Usage" else "Last 7 Days",
+                                chartTitle = when {
+                                    !isDayMode -> "Last 7 Days"
+                                    selectedDayStart == TimeBuckets.startOfToday() -> "Today's Usage"
+                                    else -> "Daily Usage"
+                                },
                                 chartHeadlineMinutes = chartPoints.sum(),
                                 chartPoints = chartPoints,
                                 chartLabels = chartLabels,

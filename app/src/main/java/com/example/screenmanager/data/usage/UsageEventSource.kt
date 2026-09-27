@@ -1,10 +1,12 @@
 package com.example.screenmanager.data.usage
 
+import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Process
 import com.example.screenmanager.domain.usage.RawEventKind
 import com.example.screenmanager.domain.usage.RawUsageEvent
 
@@ -29,6 +31,22 @@ class UsageEventSource(context: Context) {
             .queryIntentActivities(home, PackageManager.MATCH_ALL)
             .mapNotNull { it.activityInfo?.packageName }
         (launchers + appContext.packageName + SYSTEM_UI).toSet()
+    }
+
+    /**
+     * Da li aplikacija trenutno sme da čita UsageEvents.
+     *
+     * BEZ ove dozvole `queryEvents` NE baca izuzetak nego vraća prazan
+     * rezultat — sync bi to protumačio kao "nije bilo korišćenja".
+     */
+    fun hasAccess(): Boolean {
+        val appOps = appContext.getSystemService(AppOpsManager::class.java)
+        val mode = appOps.unsafeCheckOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            appContext.packageName
+        )
+        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     fun read(from: Long, to: Long): List<RawUsageEvent> {

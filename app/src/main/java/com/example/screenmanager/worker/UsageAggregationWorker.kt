@@ -21,6 +21,7 @@ class UsageAggregationWorker(
     override suspend fun doWork(): Result {
         return runCatching {
             val usageRepository = ServiceLocator.usageStatsRepository(applicationContext)
+            // Bez dozvole sync odmah izlazi i NE dira kursor.
             usageRepository.syncUsageEvents()
             usageRepository.cleanupOldLogs()
         }.fold(

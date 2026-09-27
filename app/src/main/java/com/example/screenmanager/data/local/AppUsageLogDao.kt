@@ -21,6 +21,9 @@ interface AppUsageLogDao {
     )
     suspend fun sessionsOverlapping(fromTimestamp: Long, toTimestamp: Long): List<AppUsageLog>
 
+    @Query("SELECT COUNT(*) FROM app_usage_log")
+    suspend fun count(): Int
+
     @Query("DELETE FROM app_usage_log WHERE endTimeStamp < :beforeTimestamp")
     suspend fun deleteOlderThan(beforeTimestamp: Long)
 }

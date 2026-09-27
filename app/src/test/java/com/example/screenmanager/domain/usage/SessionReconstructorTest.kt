@@ -67,6 +67,32 @@ class SessionReconstructorTest {
         assertEquals(listOf(UsageSession("b", 40_000, 90_000)), second.closedSessions)
     }
 
+    /**
+     * Stvarni redosled događaja sa Samsung S25 FE / One UI (Android 16), 26.09.:
+     * launcher → Recents → LinkedIn → Recents → launcher → WhatsApp (3 aktivnosti) → ekran ugašen.
+     */
+    @Test
+    fun `real samsung event sequence produces app sessions`() {
+        val launcher = "com.sec.android.app.launcher"
+        val r = SessionReconstructor(setOf(launcher))
+        val events = listOf(
+            resumed(0, launcher), paused(1_000, "com.whatsapp"), resumed(1_000, launcher),
+            paused(1_000, launcher), paused(2_000, launcher),
+            resumed(2_000, "com.linkedin.android"), resumed(5_000, launcher),
+            paused(9_000, "com.linkedin.android"), resumed(9_000, launcher), paused(9_000, launcher),
+            paused(10_000, launcher), resumed(10_000, launcher), paused(11_000, launcher),
+            resumed(11_000, "com.whatsapp"), paused(11_000, "com.whatsapp"), resumed(11_000, "com.whatsapp"),
+            paused(13_000, "com.whatsapp"), resumed(13_000, "com.whatsapp"),
+            paused(22_000, "com.whatsapp"), resumed(22_000, "com.whatsapp"),
+            resumed(23_000, launcher), paused(24_000, "com.whatsapp"), screenOff(24_000)
+        )
+        val result = r.reconstruct(events, 30_000)
+        assertEquals(
+            listOf(UsageSession("com.linkedin.android", 2_000, 5_000), UsageSession("com.whatsapp", 11_000, 23_000)),
+            result.closedSessions
+        )
+    }
+
     @Test
     fun `foreground resolver keeps state without new events`() {
         val resolver = ForegroundResolver()

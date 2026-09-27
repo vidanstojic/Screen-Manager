@@ -1,6 +1,7 @@
 package com.example.screenmanager.domain
 
 import android.content.Context
+import android.util.Log
 import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.data.local.AppInternalStateDao
 import com.example.screenmanager.data.local.AppUsageLog
@@ -104,13 +105,23 @@ class UsageStatsRepository(
      * Prvi sync ide [TimeBuckets.SYNC_LOOKBACK_DAYS] dana unazad, pa nedeljni
      * prikaz ima podatke odmah posle instalacije.
      */
-    suspend fun syncUsageEvents(now: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
+    suspend fun syncUsageEvents(now: Long = System.currentTimeMillis()): SyncResult = withContext(Dispatchers.IO) {
         syncMutex.withLock {
+            // Bez Usage Access-a queryEvents vraća PRAZNO (bez izuzetka). Ranije je
+            // takav "prazan" sync pomerao kursor na `now`, pa je sva istorija pre
+            // davanja dozvole trajno preskočena → svuda 0 (bag sa telefona 27.09.).
+            if (!eventSource.hasAccess()) {
+                Log.w(TAG, "Sync skipped: no usage access")
+                return@withLock SyncResult.NoAccess
+            }
+
             val zone = TimeBuckets.zone()
             val today = TimeBuckets.epochDay(now, zone)
             val lookbackStart = TimeBuckets.startOfDay(today - TimeBuckets.SYNC_LOOKBACK_DAYS, zone)
-            val cursor = (stateDao.getLong(AppStateKeys.USAGE_SYNC_CURSOR) ?: lookbackStart)
-                .coerceIn(lookbackStart, now)
+            // Samoisceljenje: ako nemamo NIJEDNU sesiju, kursor ne važi (npr. zatrovan
+            // ranijim sync-om bez dozvole) → čitamo ceo lookback prozor.
+            val storedCursor = if (usageLogDao.count() == 0) null else stateDao.getLong(AppStateKeys.USAGE_SYNC_CURSOR)
+            val cursor = (storedCursor ?: lookbackStart).coerceIn(lookbackStart, now)
 
             val events = eventSource.read(cursor - 1, now)
             val result = reconstructor.reconstruct(events, now)
@@ -137,8 +148,15 @@ class UsageStatsRepository(
                 }
             hourlyDao.replaceFromDay(firstDay, rows)
 
-            stateDao.upsert(AppInternalState(AppStateKeys.USAGE_SYNC_CURSOR, result.safeCursor))
+            // Kursor se pomera samo kad smo zaista videli događaje; prazan prozor
+            // (npr. privremeno nedostupni podaci) se sledeći put čita ponovo.
+            if (events.isNotEmpty()) {
+                stateDao.upsert(AppInternalState(AppStateKeys.USAGE_SYNC_CURSOR, result.safeCursor))
+            }
             stateDao.upsert(AppInternalState(AppStateKeys.LAST_USAGE_EVENT_SYNC_AT, now))
+
+            Log.i(TAG, "Sync from=$cursor events=${events.size} sessions=${sessions.size} hourlyRows=${rows.size}")
+            SyncResult.Synced(events = events.size, sessions = sessions.size, hourlyRows = rows.size)
         }
     }
 
@@ -153,7 +171,14 @@ class UsageStatsRepository(
     private fun totalsSince(fromTimestamp: Long): Flow<List<UsageSummary>> =
         hourlyDao.observeTotals(TimeBuckets.epochDay(fromTimestamp), TimeBuckets.epochDay(System.currentTimeMillis()))
 
+    sealed interface SyncResult {
+        data object NoAccess : SyncResult
+        data class Synced(val events: Int, val sessions: Int, val hourlyRows: Int) : SyncResult
+    }
+
     private companion object {
+        const val TAG = "UsageSync"
+
         /** Jedan sync u isto vreme u celom procesu (servis, worker i UI dele instancu baze). */
         val syncMutex = Mutex()
     }

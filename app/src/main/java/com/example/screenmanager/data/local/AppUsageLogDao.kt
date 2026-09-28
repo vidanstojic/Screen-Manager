@@ -21,6 +21,10 @@ interface AppUsageLogDao {
     )
     suspend fun sessionsOverlapping(fromTimestamp: Long, toTimestamp: Long): List<AppUsageLog>
 
+    /** Briše sesije koje počinju od [fromTimestamp] — koristi se pre punog backfill-a. */
+    @Query("DELETE FROM app_usage_log WHERE startTimeStamp >= :fromTimestamp")
+    suspend fun deleteStartingFrom(fromTimestamp: Long)
+
     @Query("SELECT COUNT(*) FROM app_usage_log")
     suspend fun count(): Int
 

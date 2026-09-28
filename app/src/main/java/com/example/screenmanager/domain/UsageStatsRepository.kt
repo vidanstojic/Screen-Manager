@@ -118,12 +118,21 @@ class UsageStatsRepository(
             val zone = TimeBuckets.zone()
             val today = TimeBuckets.epochDay(now, zone)
             val lookbackStart = TimeBuckets.startOfDay(today - TimeBuckets.SYNC_LOOKBACK_DAYS, zone)
-            // Samoisceljenje: ako nemamo NIJEDNU sesiju, kursor ne važi (npr. zatrovan
-            // ranijim sync-om bez dozvole) → čitamo ceo lookback prozor.
-            val storedCursor = if (usageLogDao.count() == 0) null else stateDao.getLong(AppStateKeys.USAGE_SYNC_CURSOR)
+            // Pun backfill istorije (ceo lookback prozor) se radi dok ne uspe jednom
+            // za tekuću BACKFILL_VERSION. Ranije se oslanjao samo na "tabela je
+            // prazna" — ali ako je stari proces u međuvremenu upisao par novih
+            // sesija, backfill se nikad nije desio i prethodni dani su ostali prazni.
+            val backfillDone = (stateDao.getLong(AppStateKeys.USAGE_BACKFILL_VERSION) ?: 0L) >= BACKFILL_VERSION &&
+                usageLogDao.count() > 0
+            val storedCursor = if (backfillDone) stateDao.getLong(AppStateKeys.USAGE_SYNC_CURSOR) else null
             val cursor = (storedCursor ?: lookbackStart).coerceIn(lookbackStart, now)
 
             val events = eventSource.read(cursor - 1, now)
+            if (!backfillDone && events.isNotEmpty()) {
+                // Čist početak prozora: sesije se rekonstruišu iz istih događaja,
+                // pa ne ostaju delimične sesije iz ranijih (neispravnih) sync-ova.
+                usageLogDao.deleteStartingFrom(cursor)
+            }
             val result = reconstructor.reconstruct(events, now)
             val sessions = result.allSessions
             if (sessions.isNotEmpty()) {
@@ -152,10 +161,13 @@ class UsageStatsRepository(
             // (npr. privremeno nedostupni podaci) se sledeći put čita ponovo.
             if (events.isNotEmpty()) {
                 stateDao.upsert(AppInternalState(AppStateKeys.USAGE_SYNC_CURSOR, result.safeCursor))
+                if (!backfillDone) {
+                    stateDao.upsert(AppInternalState(AppStateKeys.USAGE_BACKFILL_VERSION, BACKFILL_VERSION))
+                }
             }
             stateDao.upsert(AppInternalState(AppStateKeys.LAST_USAGE_EVENT_SYNC_AT, now))
 
-            Log.i(TAG, "Sync from=$cursor events=${events.size} sessions=${sessions.size} hourlyRows=${rows.size}")
+            Log.i(TAG, "Sync backfill=${!backfillDone} from=$cursor events=${events.size} sessions=${sessions.size} hourlyRows=${rows.size}")
             SyncResult.Synced(events = events.size, sessions = sessions.size, hourlyRows = rows.size)
         }
     }
@@ -178,6 +190,9 @@ class UsageStatsRepository(
 
     private companion object {
         const val TAG = "UsageSync"
+
+        /** Povećati kad god treba ponovo povući celu dostupnu istoriju (npr. posle ispravke sync-a). */
+        const val BACKFILL_VERSION = 1L
 
         /** Jedan sync u isto vreme u celom procesu (servis, worker i UI dele instancu baze). */
         val syncMutex = Mutex()

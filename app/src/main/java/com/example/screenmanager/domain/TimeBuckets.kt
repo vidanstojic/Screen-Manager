@@ -52,11 +52,15 @@ object TimeBuckets {
     const val HOUR_MS: Long = 60 * MINUTE_MS
     const val DAY_MS: Long = 24 * HOUR_MS
 
-    /** Koliko dana unazad sync sme da ide (UsageStats čuva događaje ~7-10 dana). */
-    const val SYNC_LOOKBACK_DAYS: Long = 7
+    /**
+     * Koliko dana unazad sync čita događaje. Android čuva 10 dnevnih fajlova sa
+     * događajima (potvrđeno `dumpsys usagestats database-info` na S25 FE), pa
+     * čitamo ceo taj prozor; queryEvents jednostavno vrati ono što postoji.
+     */
+    const val SYNC_LOOKBACK_DAYS: Long = 10
 
     /** Retencija sirovih sesija; rollup-ovi se čuvaju duže (vidi [ROLLUP_RETENTION_DAYS]). */
-    const val RAW_LOG_RETENTION_DAYS: Long = 10
+    const val RAW_LOG_RETENTION_DAYS: Long = 12
 
     /** Satni rollup-ovi — omogućavaju mesečni prikaz (TRS 2.1, B10). */
     const val ROLLUP_RETENTION_DAYS: Long = 400

@@ -78,6 +78,7 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.i(TAG, "Service connected")
         shortsConfig = settingsRepository.observeShortVideoConfig()
             .stateIn(serviceScope, SharingStarted.Eagerly, null)
     }
@@ -99,6 +100,7 @@ class ShortsAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        Log.i(TAG, "Service destroyed")
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -113,19 +115,26 @@ class ShortsAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun scan() {
-        val config = shortsConfig.value ?: return
+        val config = shortsConfig.value
+        if (config == null) {
+            Log.d(TAG, "Scan skipped: config not loaded yet")
+            return
+        }
         val root = rootInActiveWindow
         val packageName = root?.packageName?.toString() ?: lastEventPackage
         val now = System.currentTimeMillis()
 
         if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds) {
+            Log.d(TAG, "Scan skipped: root=${root != null} pkg=$packageName enabled=${config.isEnabled} apps=${config.selectedAppIds}")
             onShortsHidden(now)
             return
         }
 
         maybeDumpTree(root, now)
 
-        if (ShortsDetector.isShortFormVisible(root, packageName)) {
+        val visible = ShortsDetector.isShortFormVisible(root, packageName)
+        if (isDebuggable) Log.d(TAG, "Scan pkg=$packageName mode=${config.mode} shortFormVisible=$visible")
+        if (visible) {
             onShortsVisible(packageName, config, now)
         } else {
             onShortsHidden(now)
@@ -269,7 +278,15 @@ class ShortsAccessibilityService : AccessibilityService() {
         while (queue.isNotEmpty() && visited < DEBUG_DUMP_MAX_NODES) {
             val (node, depth) = queue.removeFirst()
             visited++
-            node.viewIdResourceName?.let { Log.d(TAG, "${"  ".repeat(depth.coerceAtMost(12))}id=$it class=${node.className}") }
+            if (node.viewIdResourceName != null || node.contentDescription != null) {
+                val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
+                Log.d(
+                    TAG,
+                    "DUMP ${"  ".repeat(depth.coerceAtMost(12))}id=${node.viewIdResourceName} " +
+                        "desc=${node.contentDescription} class=${node.className} vis=${node.isVisibleToUser} " +
+                        "sel=${node.isSelected} bounds=$bounds"
+                )
+            }
             for (index in 0 until node.childCount) {
                 node.getChild(index)?.let { queue.addLast(it to depth + 1) }
             }
@@ -283,7 +300,7 @@ class ShortsAccessibilityService : AccessibilityService() {
         private const val VISIBILITY_GRACE_MS = 4_000L
         private const val FLUSH_INTERVAL_MS = 5_000L
         private const val INTERACTION_WRITE_INTERVAL_MS = 5_000L
-        private const val DEBUG_DUMP_INTERVAL_MS = 10_000L
+        private const val DEBUG_DUMP_INTERVAL_MS = 5_000L
         private const val KICK_TOAST_INTERVAL_MS = 4_000L
         private const val DEBUG_DUMP_MAX_NODES = 400
     }

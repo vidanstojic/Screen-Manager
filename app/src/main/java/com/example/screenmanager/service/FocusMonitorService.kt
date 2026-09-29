@@ -23,6 +23,7 @@ import com.example.screenmanager.domain.rules.RulesSnapshot
 import com.example.screenmanager.domain.rules.RuntimeState
 import com.example.screenmanager.domain.rules.SessionLimitTracker
 import com.example.screenmanager.domain.rules.SessionState
+import com.example.screenmanager.domain.rules.ShortsPolicy
 import com.example.screenmanager.domain.usage.ForegroundResolver
 import com.example.screenmanager.domain.wakeup.WakeUpSource
 import kotlinx.coroutines.CoroutineScope
@@ -149,7 +150,10 @@ class FocusMonitorService : Service() {
             .stateIn(serviceScope, SharingStarted.Eagerly, emptyMap())
 
         serviceScope.launch {
-            sessionMutex.withLock { sessionStates.putAll(runtimeRepository.sessionStates()) }
+            // Shorts/Reels interval stanja vodi ShortsAccessibilityService — ne učitavamo ih
+            // (inače bi ih ovaj servis pri čuvanju pregazio zastarelim kopijama).
+            val appStates = runtimeRepository.sessionStates().filterKeys { !it.startsWith(ShortsPolicy.STATE_PREFIX) }
+            sessionMutex.withLock { sessionStates.putAll(appStates) }
             while (isActive) {
                 interactive.first { it }
                 runCatching { tick() }.onFailure { Log.w(TAG, "Monitor tick failed", it) }

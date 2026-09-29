@@ -44,7 +44,8 @@ fun UsageLimitsScreen(
     selectedDestination: MainDestination,
     onDestinationSelected: (MainDestination) -> Unit,
     onAddLimit: () -> Unit,
-    onScheduledBlockClick: () -> Unit = {}
+    onScheduledBlockClick: () -> Unit = {},
+    onOpenRuleSettings: () -> Unit = {}
 ) {
     GlassBackground {
         Scaffold(
@@ -80,12 +81,14 @@ fun UsageLimitsScreen(
                 }
 
                 LimitTile(
-                    title = "App limits",
-                    description = "Block any app after the configured daily usage window."
+                    title = "App limits & session intervals",
+                    description = "Daily caps and M/N/K sessions for whole apps.",
+                    onClick = onOpenRuleSettings
                 )
                 LimitTile(
                     title = "Shorts and Reels",
-                    description = "Add an extra penalty block after short-form content expires."
+                    description = "Block only Shorts/Reels: fully, with a daily budget, or with sessions.",
+                    onClick = onOpenRuleSettings
                 )
                 LimitTile(
                     title = "Scheduled blocking",
@@ -94,11 +97,13 @@ fun UsageLimitsScreen(
                 )
                 LimitTile(
                     title = "Wake-up blocking",
-                    description = "Block selected apps after the phone has been inactive long enough."
+                    description = "Block selected apps after the phone has been inactive long enough.",
+                    onClick = onOpenRuleSettings
                 )
                 LimitTile(
                     title = "Emergency sessions",
-                    description = "Temporarily bypass every block when you need a safe exception."
+                    description = "Temporarily bypass every block when you need a safe exception.",
+                    onClick = onOpenRuleSettings
                 )
             }
         }

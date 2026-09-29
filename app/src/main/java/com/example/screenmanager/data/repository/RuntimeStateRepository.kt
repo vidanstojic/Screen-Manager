@@ -77,6 +77,8 @@ class RuntimeStateRepository(
     fun observeSessionStates(): Flow<Map<String, SessionState>> =
         sessionLimitDao.observeStates().map { list -> list.associate { it.ruleId to it.toDomain() } }
 
+    suspend fun sessionState(ruleId: String): SessionState? = sessionLimitDao.state(ruleId)?.toDomain()
+
     suspend fun saveSessionStates(states: Collection<SessionState>) {
         if (states.isNotEmpty()) sessionLimitDao.upsertStates(states.map { it.toEntity() })
     }

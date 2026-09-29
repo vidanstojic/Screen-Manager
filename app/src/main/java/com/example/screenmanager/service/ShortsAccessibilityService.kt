@@ -5,9 +5,14 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
+import com.example.screenmanager.domain.rules.SessionState
+import com.example.screenmanager.domain.rules.ShortsPolicy
+import com.example.screenmanager.domain.rules.ShortsVerdict
 import com.example.screenmanager.model.ShortVideoConfig
+import com.example.screenmanager.model.ShortsMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -32,10 +38,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Tačnost (B7): detekcija preko [ShortsDetector] (ID plejera + veličina),
  * ne preko teksta "Shorts" koji postoji i u navigacionom tabu.
  *
- * Pravila dolaze iz korisnikovog [ShortVideoConfig]: dnevni budžet po
- * aplikaciji → posle toga kazna za celu aplikaciju (sprovodi je
- * FocusMonitorService preko RulesEngine-a) i automatski BACK iz
- * Shorts/Reels površine do kraja dana.
+ * Pravila dolaze iz korisnikovog [ShortVideoConfig], po [ShortsMode]:
+ * - BLOCKED: svaki ulazak u Shorts/Reels → BACK;
+ * - SESSIONS: interval mod (M/N/K) samo za Shorts/Reels → BACK tokom pauze
+ *   i posle N-te sesije do ponoći ([ShortsPolicy] + SessionLimitTracker);
+ * - BUDGET: dnevni budžet po aplikaciji → kazna za celu aplikaciju (sprovodi
+ *   je FocusMonitorService preko RulesEngine-a) i BACK do kraja dana.
+ * Ostatak aplikacije (obični video, poruke, feed) radi normalno u svim modovima.
  */
 class ShortsAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -63,6 +72,9 @@ class ShortsAccessibilityService : AccessibilityService() {
     private var cachedDay = -1L
     private val storedWatchMs = HashMap<String, Long>()
     private var lastDumpAt = 0L
+    private var lastKickToastAt = 0L
+    private val sessionCache = HashMap<String, SessionState?>()
+    private val sessionPersistedAt = HashMap<String, Long>()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -121,6 +133,68 @@ class ShortsAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun onShortsVisible(packageName: String, config: ShortVideoConfig, now: Long) {
+        when (config.mode) {
+            ShortsMode.BUDGET -> onBudgetVisible(packageName, config, now)
+            ShortsMode.BLOCKED, ShortsMode.SESSIONS -> onPolicyVisible(packageName, config, now)
+        }
+    }
+
+    /**
+     * BLOCKED i SESSIONS modovi: odluku donosi čist [ShortsPolicy]; ovde se
+     * samo čuva stanje interval sesije i izvršava BACK + kratko obaveštenje.
+     */
+    private suspend fun onPolicyVisible(packageName: String, config: ShortVideoConfig, now: Long) {
+        val key = ShortsPolicy.stateKey(packageName)
+        val previous = if (sessionCache.containsKey(key)) sessionCache[key] else runtimeRepository.sessionState(key)
+        val (next, verdict) = ShortsPolicy.onVisible(
+            config = config,
+            packageName = packageName,
+            previous = previous,
+            now = now,
+            zone = TimeBuckets.zone(),
+            startOfNextDay = TimeBuckets.startOfNextDay(now)
+        )
+
+        if (next != null && next != previous) {
+            sessionCache[key] = next
+            val structural = previous == null ||
+                previous.sessionsUsed != next.sessionsUsed ||
+                previous.sessionStartedAt != next.sessionStartedAt ||
+                previous.frozenUntil != next.frozenUntil ||
+                previous.epochDay != next.epochDay
+            if (structural || now - (sessionPersistedAt[key] ?: 0L) >= FLUSH_INTERVAL_MS) {
+                runtimeRepository.saveSessionStates(listOf(next))
+                sessionPersistedAt[key] = now
+            }
+        }
+
+        when (verdict) {
+            ShortsVerdict.Allow -> scheduleFollowUp()
+            is ShortsVerdict.Kick -> {
+                followUpJob?.cancel()
+                performGlobalAction(GLOBAL_ACTION_BACK)
+                notifyKick(verdict, now)
+            }
+        }
+    }
+
+    /** Kratko objašnjenje zašto je korisnik izbačen (najviše jednom u par sekundi). */
+    private suspend fun notifyKick(verdict: ShortsVerdict.Kick, now: Long) {
+        if (now - lastKickToastAt < KICK_TOAST_INTERVAL_MS) return
+        lastKickToastAt = now
+        val remaining = verdict.until?.let { (it - now).coerceAtLeast(0) }
+        val suffix = when {
+            remaining == null -> ""
+            remaining >= TimeBuckets.HOUR_MS -> " · još ${remaining / TimeBuckets.HOUR_MS}h ${(remaining % TimeBuckets.HOUR_MS) / TimeBuckets.MINUTE_MS}min"
+            else -> " · još ${remaining / TimeBuckets.MINUTE_MS}:${"%02d".format((remaining / 1000) % 60)}"
+        }
+        withContext(Dispatchers.Main) {
+            Toast.makeText(this@ShortsAccessibilityService, verdict.reason + suffix, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** BUDGET mod: dnevni budžet gledanja + kazna za celu aplikaciju. */
+    private suspend fun onBudgetVisible(packageName: String, config: ShortVideoConfig, now: Long) {
         val day = TimeBuckets.epochDay(now)
         if (day != cachedDay) {
             storedWatchMs.clear()
@@ -210,6 +284,7 @@ class ShortsAccessibilityService : AccessibilityService() {
         private const val FLUSH_INTERVAL_MS = 5_000L
         private const val INTERACTION_WRITE_INTERVAL_MS = 5_000L
         private const val DEBUG_DUMP_INTERVAL_MS = 10_000L
+        private const val KICK_TOAST_INTERVAL_MS = 4_000L
         private const val DEBUG_DUMP_MAX_NODES = 400
     }
 }

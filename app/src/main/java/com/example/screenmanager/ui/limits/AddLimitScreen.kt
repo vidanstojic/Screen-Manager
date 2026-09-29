@@ -41,6 +41,7 @@ import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.AppUsageSummary
 import com.example.screenmanager.model.SessionLimitRule
+import com.example.screenmanager.model.ShortsMode
 import com.example.screenmanager.ui.components.InfoBanner
 import com.example.screenmanager.ui.components.SectionCard
 import com.example.screenmanager.ui.components.StatusChip
@@ -48,6 +49,7 @@ import com.example.screenmanager.ui.components.ToggleChip
 import com.example.screenmanager.ui.settings.SettingsViewModel
 import com.example.screenmanager.ui.settings.SettingsViewModelFactory
 import com.example.screenmanager.ui.settings.components.AppPickerDialog
+import com.example.screenmanager.ui.settings.components.ShortsModePicker
 import com.example.screenmanager.ui.theme.GlassBackground
 import com.example.screenmanager.ui.theme.GlassTheme
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +87,7 @@ fun AddLimitScreen(
     var dailyLimitMinutes by remember { mutableStateOf(60) }
     var shortsBudgetMinutes by remember { mutableStateOf(15) }
     var shortsPenaltyMinutes by remember { mutableStateOf(60) }
+    var shortsMode by remember { mutableStateOf(ShortsMode.SESSIONS) }
     var sessionLengthMinutes by remember { mutableStateOf(5) }
     var maxSessions by remember { mutableStateOf(5) }
     var cooldownMinutes by remember { mutableStateOf(15) }
@@ -122,11 +125,22 @@ fun AddLimitScreen(
                 )
             )
 
-            RuleType.SHORTS -> viewModel.mergeShortVideoConfig(
-                maxReelsWatchMinutes = shortsBudgetMinutes,
-                fullAppBlockMinutes = shortsPenaltyMinutes,
-                additionalAppIds = selectedAppIds
-            )
+            RuleType.SHORTS -> viewModel.mergeShortVideoConfig(additionalAppIds = selectedAppIds) { current ->
+                when (shortsMode) {
+                    ShortsMode.BLOCKED -> current.copy(mode = ShortsMode.BLOCKED)
+                    ShortsMode.BUDGET -> current.copy(
+                        mode = ShortsMode.BUDGET,
+                        maxReelsWatchMinutes = shortsBudgetMinutes,
+                        fullAppBlockMinutes = shortsPenaltyMinutes
+                    )
+                    ShortsMode.SESSIONS -> current.copy(
+                        mode = ShortsMode.SESSIONS,
+                        sessionLengthMinutes = sessionLengthMinutes,
+                        maxSessions = maxSessions,
+                        cooldownMinutes = cooldownMinutes
+                    )
+                }
+            }
         }
         onSave()
     }
@@ -226,8 +240,20 @@ fun AddLimitScreen(
                         }
 
                         RuleType.SHORTS -> {
-                            LabeledSlider("Daily Shorts/Reels budget", shortsBudgetMinutes, "m", 0..120, 5) { shortsBudgetMinutes = it }
-                            LabeledSlider("Full app block after budget", shortsPenaltyMinutes, "m", 5..240, 5) { shortsPenaltyMinutes = it }
+                            Text("Only Shorts/Reels are limited — the rest of the app keeps working.", color = GlassTheme.colors.textSecondary, fontSize = 12.sp)
+                            ShortsModePicker(selected = shortsMode) { shortsMode = it }
+                            when (shortsMode) {
+                                ShortsMode.BLOCKED -> Text("Shorts/Reels are closed every time they open.", color = GlassTheme.colors.textPrimary)
+                                ShortsMode.BUDGET -> {
+                                    LabeledSlider("Daily Shorts/Reels budget", shortsBudgetMinutes, "m", 0..120, 5) { shortsBudgetMinutes = it }
+                                    LabeledSlider("Full app block after budget", shortsPenaltyMinutes, "m", 5..240, 5) { shortsPenaltyMinutes = it }
+                                }
+                                ShortsMode.SESSIONS -> {
+                                    LabeledSlider("Shorts session length (M)", sessionLengthMinutes, "m", 1..60, 1) { sessionLengthMinutes = it }
+                                    LabeledSlider("Shorts sessions per day (N)", maxSessions, "", 1..30, 1) { maxSessions = it }
+                                    LabeledSlider("Pause after a session (K)", cooldownMinutes, "m", 0..180, 5) { cooldownMinutes = it }
+                                }
+                            }
                             Text("Applies to the global Shorts/Reels rule; selected apps are added to it.", color = GlassTheme.colors.textSecondary, fontSize = 12.sp)
                         }
                     }
@@ -243,7 +269,11 @@ fun AddLimitScreen(
                         val detail = when (ruleType) {
                             RuleType.APP_LIMIT -> "Daily cap: ${dailyLimitMinutes}m, then blocked until midnight"
                             RuleType.SESSIONS -> "$maxSessions × ${sessionLengthMinutes}m, ${cooldownMinutes}m cool-down"
-                            RuleType.SHORTS -> "${shortsBudgetMinutes}m Shorts/day, then ${shortsPenaltyMinutes}m app block"
+                            RuleType.SHORTS -> when (shortsMode) {
+                                ShortsMode.BLOCKED -> "Shorts/Reels fully blocked"
+                                ShortsMode.BUDGET -> "${shortsBudgetMinutes}m Shorts/day, then ${shortsPenaltyMinutes}m app block"
+                                ShortsMode.SESSIONS -> "Shorts: $maxSessions × ${sessionLengthMinutes}m, ${cooldownMinutes}m pause"
+                            }
                         }
                         Text(detail, color = GlassTheme.colors.textPrimary)
                     }

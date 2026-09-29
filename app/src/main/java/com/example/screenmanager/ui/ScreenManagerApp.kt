@@ -213,7 +213,8 @@ fun ScreenManagerApp(viewModel: DashboardViewModel = viewModel()) {
                             selectedDestination = screen.destination,
                             onDestinationSelected = { navigateTo(Screen.Destination(it)) },
                             onAddLimit = { navigateTo(Screen.AddLimit(null)) },
-                            onScheduledBlockClick = { navigateTo(Screen.ScheduledBlock) }
+                            onScheduledBlockClick = { navigateTo(Screen.ScheduledBlock) },
+                            onOpenRuleSettings = { navigateTo(Screen.Destination(MainDestination.GeneralUsage)) }
                         )
 
                         MainDestination.GeneralUsage -> GeneralSettingsScreen(

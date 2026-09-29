@@ -98,17 +98,17 @@ class SettingsViewModel(
      * Menja globalno Shorts/Reels pravilo čitajući AKTUELNU vrednost iz baze
      * (StateFlow.value može biti još početna vrednost dok niko ne kolektuje).
      */
-    fun mergeShortVideoConfig(maxReelsWatchMinutes: Int, fullAppBlockMinutes: Int, additionalAppIds: List<String>) {
+    fun mergeShortVideoConfig(
+        additionalAppIds: List<String>,
+        transform: (ShortVideoConfig) -> ShortVideoConfig
+    ) {
         viewModelScope.launch {
             val current = settingsRepository.getShortVideoConfig() ?: ShortVideoConfig()
-            settingsRepository.updateShortVideoConfig(
-                current.copy(
-                    maxReelsWatchMinutes = maxReelsWatchMinutes,
-                    fullAppBlockMinutes = fullAppBlockMinutes,
-                    selectedAppIds = (current.selectedAppIds + additionalAppIds).distinct(),
-                    isEnabled = true
-                )
+            val updated = transform(current).copy(
+                selectedAppIds = (current.selectedAppIds + additionalAppIds).distinct(),
+                isEnabled = true
             )
+            settingsRepository.updateShortVideoConfig(updated)
         }
     }
 

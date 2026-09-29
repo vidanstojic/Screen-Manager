@@ -1,6 +1,7 @@
 package com.example.screenmanager.domain.rules
 
 import com.example.screenmanager.model.SessionLimitRule
+import com.example.screenmanager.model.ShortsMode
 import java.time.Instant
 import java.time.ZoneId
 
@@ -53,7 +54,10 @@ class RulesEngine {
 
         rules.shortVideo?.let { config ->
             val penaltyUntil = state.shortsPenaltyUntil[packageName] ?: 0L
-            if (config.isEnabled && packageName in config.selectedAppIds && penaltyUntil > now) {
+            // Kazna za celu aplikaciju postoji samo u BUDGET modu.
+            if (config.isEnabled && config.mode == ShortsMode.BUDGET &&
+                packageName in config.selectedAppIds && penaltyUntil > now
+            ) {
                 candidates += BlockDecision(packageName, BlockReason.SHORTS_PENALTY, penaltyUntil)
             }
         }

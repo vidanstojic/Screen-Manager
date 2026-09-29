@@ -22,12 +22,16 @@ interface SessionLimitDao {
     @Upsert
     suspend fun upsertStates(states: List<SessionLimitStateEntity>)
 
+    @Query("SELECT * FROM session_limit_state WHERE ruleId = :ruleId LIMIT 1")
+    suspend fun state(ruleId: String): SessionLimitStateEntity?
+
     @Query("SELECT * FROM session_limit_state")
     suspend fun allStates(): List<SessionLimitStateEntity>
 
     @Query("SELECT * FROM session_limit_state")
     fun observeStates(): Flow<List<SessionLimitStateEntity>>
 
-    @Query("DELETE FROM session_limit_state WHERE ruleId NOT IN (SELECT id FROM session_limit_rules)")
+    /** Shorts/Reels interval stanja (`shorts:<paket>`) nemaju red u session_limit_rules — ne brišu se. */
+    @Query("DELETE FROM session_limit_state WHERE ruleId NOT IN (SELECT id FROM session_limit_rules) AND ruleId NOT LIKE 'shorts:%'")
     suspend fun deleteOrphanStates()
 }

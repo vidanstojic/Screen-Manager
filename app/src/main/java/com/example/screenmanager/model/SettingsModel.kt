@@ -23,18 +23,40 @@ data class WakeUpConfig(
 )
 
 /**
- * Shorts/Reels ograničenje (TRS 2.3).
+ * Kako se tretira short-form sadržaj (Shorts/Reels) — ostatak aplikacije
+ * (obični YouTube video, Instagram poruke/feed) radi normalno u svim modovima.
+ */
+enum class ShortsMode {
+    /** Shorts/Reels su potpuno zabranjeni: svaki ulazak odmah dobija BACK. */
+    BLOCKED,
+
+    /** Dnevni budžet; po isteku kazna za celu aplikaciju + Shorts zaključan do kraja dana. */
+    BUDGET,
+
+    /** Interval mod samo za Shorts/Reels: M min po sesiji, N sesija dnevno, K min pauze. */
+    SESSIONS
+}
+
+/**
+ * Shorts/Reels pravilo (TRS 2.3). Jedno globalno pravilo koje važi za svaku
+ * aplikaciju iz [selectedAppIds]; stanje (budžet, sesije) se vodi PO APLIKACIJI.
  *
- * [maxReelsWatchMinutes] je DNEVNI budžet gledanja short-form sadržaja po
- * aplikaciji. Kada se potroši, cela aplikacija se blokira
- * [fullAppBlockMinutes] minuta, a Shorts/Reels površina ostaje zaključana
- * (automatski BACK) do kraja dana.
+ * - [ShortsMode.BUDGET]: [maxReelsWatchMinutes] je dnevni budžet po aplikaciji;
+ *   posle njega cela aplikacija je blokirana [fullAppBlockMinutes] minuta, a
+ *   Shorts/Reels do kraja dana.
+ * - [ShortsMode.SESSIONS]: [sessionLengthMinutes] / [maxSessions] / [cooldownMinutes]
+ *   (ista semantika kao [SessionLimitRule], ali meri se samo vreme u Shorts/Reels).
+ * - [ShortsMode.BLOCKED]: bez dozvoljenog vremena.
  */
 data class ShortVideoConfig(
     val maxReelsWatchMinutes: Int = 15,
     val fullAppBlockMinutes: Int = 60,
     val selectedAppIds: List<String> = listOf("com.instagram.android", "com.google.android.youtube"),
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
+    val mode: ShortsMode = ShortsMode.BUDGET,
+    val sessionLengthMinutes: Int = 5,
+    val maxSessions: Int = 3,
+    val cooldownMinutes: Int = 30
 )
 
 data class ScheduleRule(

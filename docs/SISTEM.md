@@ -1,6 +1,6 @@
 # ScreenManager (Focus Flow) — kako sistem radi
 
-> Dokument opisuje stanje grane `refactor/phase1-engine` (commit-i `f18f733`, `e61ca36`, `2d199e3`).
+> Dokument opisuje stanje grane `refactor/phase1-engine` (commit-i `f18f733`, `e61ca36`, `2d199e3`, `fcfdb9c`).
 > Za svaki deo: **šta** radi, **gde** je u kodu, **zašto** je tako urađeno i **kako** radi iznutra.
 > Putanje su relativne u odnosu na `app/src/main/java/com/example/screenmanager/`.
 
@@ -168,7 +168,10 @@ Room Flow-ovi se sami osvežavaju posle svakog sync-a (invalidacija tabele), pa 
 
 ## 4. Baza podataka (Room v5)
 
-Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version = 5`, `fallbackToDestructiveMigration(dropAllTables = true)`. Projekat je u razvoju: pravila se ponovo seed-uju, a istorija se povlači iz UsageStats.
+Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version = 6`.
+
+- **5 → 6:** prava migracija `MIGRATION_5_6` (4× `ALTER TABLE short_video_configs ADD COLUMN ...` za `mode`, `sessionLengthMinutes`, `maxSessions`, `cooldownMinutes`), pa se pravila i istorija čuvaju. Default vrednosti u SQL-u moraju biti iste kao `@ColumnInfo(defaultValue)` u `ShortVideoConfigEntity`, inače Room pri otvaranju baze prijavi da migracija nije ispravna. Provereno: `PRAGMA table_info` posle migracije je jednak Room-ovom očekivanom `TableInfo`.
+- **Starije od 5:** `fallbackToDestructiveMigration(dropAllTables = true)`. Pravila se ponovo seed-uju, a istorija se povlači iz UsageStats.
 
 | Tabela | Entitet | Sadržaj | Ključ |
 |---|---|---|---|
@@ -178,8 +181,8 @@ Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version =
 | `app_limit_rules` | `AppLimitRuleEntity` | dnevni limiti | `id` |
 | `schedule_rules` | `ScheduleRuleEntity` | zakazane blokade | `id` |
 | `session_limit_rules` | `SessionLimitRuleEntity` | interval mod (M/N/K) | `id` |
-| `session_limit_state` | `SessionLimitStateEntity` | runtime stanje interval moda | `ruleId` |
-| `short_video_configs` | `ShortVideoConfigEntity` | Shorts/Reels pravilo (jedan red) | `"shorts_global"` |
+| `session_limit_state` | `SessionLimitStateEntity` | runtime stanje interval moda (i `shorts:<paket>` za Shorts sesije) | `ruleId` |
+| `short_video_configs` | `ShortVideoConfigEntity` | Shorts/Reels pravilo (jedan red): mod i parametri | `"shorts_global"` |
 | `wake_up_configs` | `WakeUpConfigEntity` | jutarnja blokada (jedan red) | `"wakeup_global"` |
 | `emergency_sessions` | `EmergencySessionConfigEntity` | emergency sesija (`activeUntilMillis`) | `"emergency_global"` |
 | `alarms` | `AlarmEntity` | Smart Alarm | — |
@@ -211,7 +214,7 @@ Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version =
 | `AppLimitRule` | `selectedAppIds`, `dailyLimitMinutes`, `blockDurationMinutes` | **Grupni** dnevni limit: sabira se potrošnja svih aplikacija u pravilu. Kad se potroši, grupa je blokirana **do ponoći**. `blockDurationMinutes` se trenutno ne koristi (otvoreno pitanje, §16). |
 | `ScheduleRule` | `startTime`, `endTime`, `daysOfWeek`, `selectedAppIds` | Blokada u vremenskom prozoru. Prozor preko ponoći pripada danu u kom je **počeo**. |
 | `SessionLimitRule` | `sessionLengthMinutes` (M), `maxSessions` (N), `cooldownMinutes` (K) | Interval mod (TRS 2.4), vidi §5.4. |
-| `ShortVideoConfig` | `maxReelsWatchMinutes`, `fullAppBlockMinutes`, `selectedAppIds` | **Dnevni budžet** Shorts/Reels po aplikaciji. Posle toga cela aplikacija je blokirana `fullAppBlockMinutes`, a Shorts površina do kraja dana. |
+| `ShortVideoConfig` | `mode`, `maxReelsWatchMinutes`, `fullAppBlockMinutes`, `sessionLengthMinutes`, `maxSessions`, `cooldownMinutes`, `selectedAppIds` | Ograničava **samo Shorts/Reels**, ostatak aplikacije radi normalno. Modovi: **BLOCKED** (uvek zatvori), **BUDGET** (dnevni budžet po aplikaciji, posle njega kazna za celu aplikaciju i Shorts zaključan do ponoći), **SESSIONS** (M/N/K samo za vreme u Shorts/Reels, po aplikaciji). Vidi §8. |
 | `WakeUpConfig` | `inactivityHours`, `triggerDelayMinutes`, `blockDurationMinutes`, `selectedAppIds` | Jutarnja blokada, vidi §9. |
 | `EmergencySessionConfig` | `defaultDurationMinutes`, `activeUntilMillis` | Privremeno gasi **sva** pravila. `isActive` i `activeUntilLabel` su izvedeni iz apsolutnog trenutka isteka. |
 
@@ -328,7 +331,17 @@ Fajlovi: `service/ShortsAccessibilityService.kt`, `service/ShortsDetector.kt`, `
 - Dok je plejer vidljiv, ponovo se skenira na svake 2 s (follow-up), jer pasivno gledanje jednog Short-a ne mora da šalje događaje.
 - `markInteraction` se upisuje najviše jednom u 5 s. Dump stabla u logcat ide samo u debuggable build-u.
 
-**Brojanje i kazna:**
+**Modovi** (`ShortVideoConfig.mode`; bira se u Settings → „Shorts and Reels“ ili u AddLimit → Shorts/Reels):
+
+| Mod | Šta se dešava kad je plejer vidljiv | Gde je logika |
+|---|---|---|
+| `BLOCKED` | odmah `GLOBAL_ACTION_BACK` i Toast „Shorts/Reels su blokirani“ | `domain/rules/ShortsPolicy.kt` |
+| `SESSIONS` | `SessionLimitTracker.advance()` sa sintetičkim pravilom `shorts:<paket>`, uz tick samo dok je plejer vidljiv (skeniranje na 2 s). Dok sesija traje, gledanje je dozvoljeno. Tokom pauze K i posle N-te sesije (do ponoći) sledi BACK i Toast sa preostalim vremenom. Stanje se čuva u `session_limit_state` pod `shorts:<paket>`; FocusMonitorService te ključeve ne učitava, da ih ne bi pregazio. | `ShortsPolicy` + `SessionLimitTracker` |
+| `BUDGET` | brojanje vremena gledanja i kazna (opisano ispod) | `ShortsAccessibilityService.onBudgetVisible` |
+
+Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET modu.
+
+**BUDGET: brojanje i kazna:**
 - Vreme između dve uzastopne detekcije, ako je razmak ≤ 4 s, dodaje se u `pendingWatchMs`. Na disk (`addShortsWatchedMs`) upisuje se na svakih 5 s.
 - Kad današnji zbir **pređe** budžet, upisuje se `shorts_penalty_until:<paket> = now + fullAppBlockMinutes` i izvršava se `GLOBAL_ACTION_BACK`.
 - Dok je budžet potrošen, svaki ulazak u Shorts/Reels do kraja dana odmah dobija BACK.
@@ -400,13 +413,14 @@ Važni detalji:
 
 ## 13. Testovi i verifikacija
 
-JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/domain/` (23 testa):
+JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/domain/` (27 testova):
 
 | Test | Pokriva |
 |---|---|
 | `usage/SessionReconstructorTest` | zatvaranje i otvaranje sesija, spajanje aktivnosti, launcher, gašenje ekrana, idempotentnost preko `safeCursor`, **stvarni Samsung redosled događaja**, `ForegroundResolver` |
 | `usage/UsageSplitterTest` | sečenje po satima i danima, **DST 25.10.**, brojanje početaka sesija |
 | `rules/RulesEngineTest` | noćni schedule, grupni dnevni limit do ponoći, emergency preko ponoći, prioritet najrestriktivnijeg, interval pauza i iscrpljen pool |
+| `rules/ShortsPolicyTest` | BLOCKED uvek izbacuje; BUDGET prepušten servisu; SESSIONS: M minuta dozvoljeno, pa pauza K, pa nova sesija; posle N-te sesije zaključano do ponoći |
 | `rules/SessionLimitTrackerTest` | istek M → pauza K, nema nove sesije tokom pauze, izlazak duži od grace perioda, povratak posle duge rupe, iscrpljenje N i reset sledećeg dana |
 
 Pokretanje: `./gradlew testDebugUnitTest`.

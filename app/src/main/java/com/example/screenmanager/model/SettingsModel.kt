@@ -1,10 +1,16 @@
 package com.example.screenmanager.model
 
+import java.io.Serializable
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+/*
+ * Napomena: modeli pravila su Serializable da bi forma za izmenu mogla da
+ * sačuva nesnimljene izmene preko rotacije ekrana (rememberSaveable).
+ */
 
 /**
  * Jutarnja blokada (TRS 2.5).
@@ -20,7 +26,7 @@ data class WakeUpConfig(
     val blockDurationMinutes: Int = 30,
     val selectedAppIds: List<String> = emptyList(),
     val isEnabled: Boolean = true
-)
+) : Serializable
 
 /**
  * Kako se tretira short-form sadržaj (Shorts/Reels) — ostatak aplikacije
@@ -57,7 +63,7 @@ data class ShortVideoConfig(
     val sessionLengthMinutes: Int = 5,
     val maxSessions: Int = 3,
     val cooldownMinutes: Int = 30
-)
+) : Serializable
 
 data class ScheduleRule(
     val id: String,
@@ -67,7 +73,7 @@ data class ScheduleRule(
     val daysOfWeek: Set<DayOfWeek>,
     val selectedAppIds: List<String> = emptyList(),
     val isEnabled: Boolean = true
-)
+) : Serializable
 
 /**
  * Dnevni limit za GRUPU aplikacija: zbir potrošnje svih [selectedAppIds]
@@ -83,7 +89,7 @@ data class AppLimitRule(
     val blockDurationMinutes: Int,
     val isEnabled: Boolean = true,
     val description: String = ""
-)
+) : Serializable
 
 /**
  * Interval mod (TRS 2.4) za grupu aplikacija.
@@ -102,7 +108,7 @@ data class SessionLimitRule(
     val maxSessions: Int,
     val cooldownMinutes: Int,
     val isEnabled: Boolean = true
-)
+) : Serializable
 
 /**
  * Emergency sesija — privremeno gasi SVA pravila.

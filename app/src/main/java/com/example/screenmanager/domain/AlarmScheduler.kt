@@ -87,7 +87,11 @@ class AlarmScheduler(
         return (alarmId xor (alarmId ushr 32)).toInt()
     }
 
-    private fun nextTriggerAt(alarm: AlarmRule, now: Long = System.currentTimeMillis()): Long {
+    /**
+     * Sledeći trenutak kada [alarm] treba da zazvoni. Javno jer isti račun
+     * koristi i UI ("Next alarm"), da prikaz i stvarno zakazivanje ne odstupe.
+     */
+    fun nextTriggerAt(alarm: AlarmRule, now: Long = System.currentTimeMillis()): Long {
         val calendar = Calendar.getInstance().apply {
             timeInMillis = now
             set(Calendar.SECOND, 0)

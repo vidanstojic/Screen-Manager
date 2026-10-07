@@ -58,6 +58,15 @@ class UsageStatsRepository(
 
     fun observeWeeklyTotals(): Flow<List<UsageSummary>> = totalsSince(TimeBuckets.startOfWeek())
 
+    /**
+     * Po aplikaciji za poslednjih 7 dana (danas uključen) — isti prozor kao
+     * [observeWeeklyDailyBreakdown], pa se lista i "Week" grafik slažu.
+     */
+    fun observeRollingWeekTotals(): Flow<List<UsageSummary>> {
+        val today = TimeBuckets.epochDay(System.currentTimeMillis())
+        return hourlyDao.observeTotals(today - 6, today)
+    }
+
     fun observeMonthlyTotals(): Flow<List<UsageSummary>> = totalsSince(TimeBuckets.startOfMonth())
 
     /** Ukupno po danu za poslednjih 7 dana (indeks 0..6) — "Week" grafik. */

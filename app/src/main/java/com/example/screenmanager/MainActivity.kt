@@ -3,18 +3,20 @@ package com.example.screenmanager
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.graphics.Color
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.example.screenmanager.service.FocusMonitorService
 import com.example.screenmanager.ui.ScreenManagerApp
-import com.example.screenmanager.ui.theme.ScreenManagerTheme
 
 /**
  * Ulazna Android aktivnost.
  *
- * Postavlja Compose temu i predaje kontrolu [ScreenManagerApp]. Na svakom
+ * Predaje kontrolu [ScreenManagerApp] (tema + navigacija). Na svakom
  * povratku u aplikaciju (onResume) pokušava da pokrene [FocusMonitorService]
  * — korisnik se tipično vraća iz sistemskih podešavanja posle davanja
  * Usage Access dozvole, pa servis kreće bez restarta aplikacije.
@@ -25,13 +27,14 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Tema je uvek tamna: sistemske trake su providne, sa svetlim ikonicama.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
         requestNotificationPermissionIfNeeded()
-        setContent {
-            ScreenManagerTheme {
-                ScreenManagerApp()
-            }
-        }
+        setContent { ScreenManagerApp() }
     }
 
     override fun onResume() {

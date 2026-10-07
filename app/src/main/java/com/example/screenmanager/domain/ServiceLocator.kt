@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.screenmanager.data.apps.InstalledAppsSource
 import com.example.screenmanager.data.local.ScreenManagerDatabase
 import com.example.screenmanager.data.repository.AlarmRepository
 import com.example.screenmanager.data.repository.AppLimitRulesRepository
@@ -29,6 +30,9 @@ import java.util.concurrent.TimeUnit
 object ServiceLocator {
     @Volatile
     private var settingsRepository: SettingsRepository? = null
+
+    @Volatile
+    private var installedApps: InstalledAppsSource? = null
 
     fun database(context: Context) = ScreenManagerDatabase.getInstance(context)
 
@@ -78,6 +82,13 @@ object ServiceLocator {
     }
 
     fun permissionStateChecker(context: Context) = PermissionStateChecker(context.applicationContext)
+
+    /** Keširano: imena i lista instaliranih aplikacija se dele između ekrana. */
+    fun installedApps(context: Context): InstalledAppsSource {
+        return installedApps ?: synchronized(this) {
+            installedApps ?: InstalledAppsSource(context).also { installedApps = it }
+        }
+    }
 
     /**
      * Periodični worker: sync + retencija. Ovo je rezervni mehanizam —

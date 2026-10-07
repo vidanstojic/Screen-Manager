@@ -51,15 +51,15 @@ object ShortsPolicy {
         zone: ZoneId,
         startOfNextDay: Long
     ): Pair<SessionState?, ShortsVerdict> = when (config.mode) {
-        ShortsMode.BLOCKED -> previous to ShortsVerdict.Kick("Shorts/Reels su blokirani", null)
+        ShortsMode.BLOCKED -> previous to ShortsVerdict.Kick("Shorts/Reels are blocked", null)
         ShortsMode.BUDGET -> previous to ShortsVerdict.Allow
         ShortsMode.SESSIONS -> {
             val next = SessionLimitTracker.advance(sessionRule(config, packageName), previous, true, now, zone)
             val verdict = when {
                 next.isSessionRunning -> ShortsVerdict.Allow
                 next.sessionsUsed >= config.maxSessions ->
-                    ShortsVerdict.Kick("Iskorišćene su sve Shorts/Reels sesije za danas", startOfNextDay)
-                else -> ShortsVerdict.Kick("Shorts/Reels pauza", next.frozenUntil)
+                    ShortsVerdict.Kick("All Shorts/Reels sessions for today are used up", startOfNextDay)
+                else -> ShortsVerdict.Kick("Shorts/Reels break", next.frozenUntil)
             }
             next to verdict
         }

@@ -326,7 +326,7 @@ class FocusMonitorService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("Praćenje fokusa i ekranskog vremena je aktivno")
+            .setContentText("Screen time tracking and limits are active")
             .setContentIntent(openApp)
             .setOngoing(true)
             .build()

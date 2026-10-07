@@ -194,8 +194,8 @@ class ShortsAccessibilityService : AccessibilityService() {
         val remaining = verdict.until?.let { (it - now).coerceAtLeast(0) }
         val suffix = when {
             remaining == null -> ""
-            remaining >= TimeBuckets.HOUR_MS -> " · još ${remaining / TimeBuckets.HOUR_MS}h ${(remaining % TimeBuckets.HOUR_MS) / TimeBuckets.MINUTE_MS}min"
-            else -> " · još ${remaining / TimeBuckets.MINUTE_MS}:${"%02d".format((remaining / 1000) % 60)}"
+            remaining >= TimeBuckets.HOUR_MS -> " · ${remaining / TimeBuckets.HOUR_MS}h ${(remaining % TimeBuckets.HOUR_MS) / TimeBuckets.MINUTE_MS}m left"
+            else -> " · ${remaining / TimeBuckets.MINUTE_MS}:${"%02d".format((remaining / 1000) % 60)} left"
         }
         withContext(Dispatchers.Main) {
             Toast.makeText(this@ShortsAccessibilityService, verdict.reason + suffix, Toast.LENGTH_SHORT).show()

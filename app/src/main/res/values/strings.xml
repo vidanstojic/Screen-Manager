@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Focus Flow</string>
-    <string name="accessibility_service_description">Prati Shorts/Reels elemente i aktivira fokus restrikcije.</string>
+    <string name="accessibility_service_description">Detects Shorts and Reels inside YouTube and Instagram so Focus Flow can apply your limits to them.</string>
 </resources>

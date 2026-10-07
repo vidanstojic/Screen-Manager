@@ -50,12 +50,12 @@ data class RuntimeState(
 )
 
 enum class BlockReason(val message: String) {
-    SCHEDULE("Zakazana blokada je aktivna"),
-    DAILY_LIMIT("Dnevni limit je potrošen"),
-    SESSION_COOLDOWN("Pauza između sesija"),
-    SESSION_POOL_EXHAUSTED("Iskorišćene su sve sesije za danas"),
-    SHORTS_PENALTY("Shorts/Reels limit je potrošen"),
-    WAKE_UP("Jutarnja blokada je aktivna")
+    SCHEDULE("A scheduled block is active"),
+    DAILY_LIMIT("Daily limit reached"),
+    SESSION_COOLDOWN("Break between sessions"),
+    SESSION_POOL_EXHAUSTED("All sessions for today are used up"),
+    SHORTS_PENALTY("Shorts/Reels limit reached"),
+    WAKE_UP("Morning lock is active")
 }
 
 data class BlockDecision(

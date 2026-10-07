@@ -69,6 +69,6 @@ class ShortsPolicyTest {
         val config = ShortVideoConfig(mode = ShortsMode.SESSIONS, sessionLengthMinutes = 1, maxSessions = 1, cooldownMinutes = 0)
         val (state, _) = watch(config, null, t0, t0 + 64_000)
         val (_, verdict) = visible(config, state, t0 + 2 * 60 * 60_000)
-        assertEquals(ShortsVerdict.Kick("Iskorišćene su sve Shorts/Reels sesije za danas", midnight), verdict)
+        assertEquals(ShortsVerdict.Kick("All Shorts/Reels sessions for today are used up", midnight), verdict)
     }
 }

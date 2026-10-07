@@ -1,6 +1,6 @@
 # ScreenManager (Focus Flow) — kako sistem radi
 
-> Dokument opisuje stanje grane `refactor/phase1-engine` (commit-i `f18f733`, `e61ca36`, `2d199e3`, `fcfdb9c`).
+> Dokument opisuje stanje grane `refactor/ui` (engine: `refactor/phase1-engine`, commit-i `f18f733`, `e61ca36`, `2d199e3`, `fcfdb9c`; UI: poglavlje 10).
 > Za svaki deo: **šta** radi, **gde** je u kodu, **zašto** je tako urađeno i **kako** radi iznutra.
 > Putanje su relativne u odnosu na `app/src/main/java/com/example/screenmanager/`.
 
@@ -58,17 +58,18 @@ Tri ključne ideje:
 
 | Paket | Uloga | Zavisi od Androida? |
 |---|---|---|
-| `model/` | Korisnička pravila i UI modeli (`AppLimitRule`, `ScheduleRule`, `SessionLimitRule`, `ShortVideoConfig`, `WakeUpConfig`, `EmergencySessionConfig`, ...) | Ne (osim `UsageModel.kt` zbog Parcelable/Color) |
+| `model/` | Korisnička pravila (`AppLimitRule`, `ScheduleRule`, `SessionLimitRule`, `ShortVideoConfig`, `WakeUpConfig`, `EmergencySessionConfig`, `AlarmRule`, `AppOption`) | **Ne** |
 | `domain/usage/` | `SessionReconstructor`, `ForegroundResolver`, `UsageSplitter` | **Ne** |
 | `domain/rules/` | `RulesEngine`, `ScheduleWindows`, `SessionLimitTracker`, `RulesModels` | **Ne** |
 | `domain/wakeup/` | Ugovor `WakeUpLockoutTrigger` + `WakeUpSource` | **Ne** |
-| `domain/` (ostalo) | `TimeBuckets`, `UsageStatsRepository`, `ServiceLocator`, `PermissionStateChecker`, mape za UI | Da |
+| `domain/` (ostalo) | `TimeBuckets`, `UsageStatsRepository`, `ServiceLocator`, `PermissionStateChecker`, `AlarmScheduler` | Da |
 | `data/local/` | Room entiteti, DAO-i, baza | Da (Room) |
 | `data/repository/` | Repozitorijumi nad DAO-ima, `SettingsRepository`, `RuntimeStateRepository`, `WakeUpLockoutController` | Da |
 | `data/usage/` | `UsageEventSource` (adapter nad `UsageStatsManager`) | Da |
+| `data/apps/` | `InstalledAppsSource` — imena i lista instaliranih aplikacija (PackageManager, keširano) | Da |
 | `service/` | `FocusMonitorService`, `ShortsAccessibilityService`, `ShortsDetector`, overlay, receiver-i | Da |
 | `worker/` | `UsageAggregationWorker` (periodični sync + retencija) | Da |
-| `ui/` | Compose ekrani i ViewModel-i | Da |
+| `ui/` | Compose UI: tema, komponente, navigacija i po jedan folder za svaki ekran (vidi [poglavlje 10](#10-ui-sloj)) | Da |
 
 **Zašto je logika odvojena:** TRS traži da engine bude odvojen od UI-ja i spreman za Phase 2 (Smart Alarm, cloud backup). Paketi `domain/usage` i `domain/rules` mogu se bez izmena prebaciti u zaseban Gradle modul (`:core:engine`).
 
@@ -117,7 +118,7 @@ Ostali tipovi (STOPPED, NOTIFICATION_INTERRUPTION, STANDBY_BUCKET_CHANGED...) se
 
 Ovo je **jedini upisivač potrošnje**. Poziva ga:
 - `FocusMonitorService` na svakih 60 s dok je ekran upaljen, i pri gašenju ekrana;
-- `DashboardViewModel` pri ulasku na ekran i odmah pošto korisnik da Usage Access;
+- `ui/AppViewModel` svaki put kada aplikacija dođe u prvi plan (ON_RESUME), ako postoji Usage Access;
 - `UsageAggregationWorker` na svakih 6 h, kao rezerva.
 
 Globalni `Mutex` garantuje da u procesu radi samo jedan sync istovremeno.
@@ -153,7 +154,9 @@ Svi grafici čitaju iz `usage_hourly` (`UsageHourlyDao`), ne računaju ništa u 
 | `observeHourlyUsageForDay(dayStart)` | suma po satu za dan | Day grafik |
 | `observeTotalsForDay(dayStart)` | suma po aplikaciji za dan | lista aplikacija (prati DayPicker) |
 | `observeWeeklyDailyBreakdown()` | suma po danu, poslednjih 7 dana (indeks 0..6) | Week grafik |
-| `observeMonthlyDailyBreakdown()` | suma po danu od 1. u mesecu | spremno za Month prikaz |
+| `observeRollingWeekTotals()` | suma po aplikaciji za istih 7 dana | lista aplikacija u Week prikazu |
+| `observeMonthlyDailyBreakdown()` | suma po danu od 1. u mesecu | Month grafik |
+| `observeMonthlyTotals()` | suma po aplikaciji od 1. u mesecu | lista aplikacija u Month prikazu |
 | `observeHourlyUsageForApp`, `observeDailyUsageForApp`, `observeSessionCountForApp` | isto, za jednu aplikaciju | AppDetails |
 | `todayUsageByPackage()` | današnja suma po paketu | RulesEngine (dnevni limiti) |
 
@@ -299,10 +302,10 @@ Fajl: `service/FocusMonitorService.kt`. Foreground servis tipa `specialUse`, sa 
 
 ## 7. Blok ekran (overlay)
 
-Fajlovi: `service/BlockOverlayController.kt`, `service/OverlayLifecycleOwner.kt`.
+Fajlovi: `service/BlockOverlayController.kt` (prozor), `service/OverlayLifecycleOwner.kt`, `ui/feature/blocking/BlockScreen.kt` (izgled).
 
 - `ComposeView` u prozoru `TYPE_APPLICATION_OVERLAY` preko cele površine (zahteva `SYSTEM_ALERT_WINDOW`).
-- Prikazuje razlog i ime pravila (`decision.message`), odbrojavanje (MM:SS ili H:MM:SS) i dugme „Nazad na Home“.
+- Prikazuje razlog i ime pravila (`decision.message`), odbrojavanje (MM:SS ili H:MM:SS), vreme kada blokada ističe i dugme „Go to home screen“. Koristi istu temu kao aplikacija.
 - **Jedan ComposeView se ponovo koristi:** nova odluka samo menja `mutableStateOf`, bez uklanjanja i ponovnog dodavanja prozora, pa nema treperenja.
 - **Sve metode su `@MainThread`.** Ranije su zvane sa pozadinske niti, što ruši `WindowManager` i `LifecycleRegistry` (B12).
 - **`OverlayLifecycleOwner` implementira `LifecycleOwner` i `SavedStateRegistryOwner`.** Compose van Activity-ja bez `ViewTreeSavedStateRegistryOwner` baca `IllegalStateException` (B13).
@@ -363,20 +366,61 @@ Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET 
 
 ## 10. UI sloj
 
-| Ekran / VM | Šta prikazuje | Odakle podaci |
+UI je refaktorisan na grani `refactor/ui` (07.10.2026): kod je organizovan **po ekranima**, navigacija ima pravu donju traku, a izgled je prečišćena tamna tema. Tekstovi u aplikaciji su na engleskom.
+
+### 10.1 Gde se šta nalazi
+
+Putanje su relativne u odnosu na `ui/`.
+
+| Folder | Šta je unutra | Pravilo |
 |---|---|---|
-| `ui/ScreenManagerApp.kt` | ruter (back-stack), Usage Stats kompozicija | `DashboardViewModel` |
-| `ui/dashboard/DashboardViewModel.kt` | izabrani dan, satni i nedeljni grafik, lista aplikacija **za izabrani dan**, dozvole | `UsageStatsRepository`, `RuntimeStateRepository` |
-| `ui/NavigationHubScreen.kt` | meni + **`PermissionsCard`** dok neka kritična dozvola nije data | `DashboardViewModel.permissionState` |
-| `ui/details/*` | detalji jedne aplikacije | `AppDetailsViewModel` |
-| `ui/settings/GeneralSettingsScreen.kt` | sva pravila: app limiti, **interval pravila**, Shorts, schedule, wake-up, emergency | `SettingsViewModel` |
-| `ui/limits/AddLimitScreen.kt` | kreiranje pravila: App limit / Sessions (M-N-K) / Shorts; **čuva u bazu** | `SettingsViewModel` |
-| `ui/limits/ScheduledBlockScreen.kt` | zakazana pravila; **čita i piše bazu** | `SettingsViewModel` |
+| `theme/` | `Color.kt` (paleta `AppColors`), `Type.kt`, `Dimens.kt` (`Spacing`, oblici), `Theme.kt` (`ScreenManagerTheme`, `AppTheme`) | Boje i veličine se menjaju SAMO ovde. Ekrani ne kucaju `Color(0xFF…)`. |
+| `components/` | Gradivni elementi: `AppScreen` (kostur ekrana), `AppCard`, `ListRow`, `SectionHeader`, dugmad, `SegmentedControl`, `AppSwitch`, `StepperRow`, `SliderRow`, `BarChart`, `AppIcon`, `AppUsageRow`, `DayStrip`, `AppPickerDialog`, `WeekdaySelector`, `AppTimePickerDialog` | Ne znaju ništa o ekranima ni o ViewModel-ima. |
+| `common/` | Bez izgleda: `Formatters.kt` (sva trajanja i vremena), `AppIconLoader`, `OnResume`, `rememberNow` / `tickerFlow` | |
+| `model/` | Modeli koje ekrani prikazuju: `UsageRange`, `AppUsageItem`, `DayOption` + mapiranja iz Room projekcija | Trajanja su u ms; u tekst se pretvaraju tek pri prikazu. |
+| `navigation/` | `Screen` (lista svih ekrana), `Navigator` (back-stack), `AppNavHost` (ekran → composable), `BottomBar`, `SwipeBackContainer` | Novi ekran: dodaj ga u `Screen` i mapiraj u `AppNavHost`. |
+| `feature/home/` | Home tab | |
+| `feature/stats/` | Stats tab (Day / Week / Month) | |
+| `feature/appdetails/` | Detalji jedne aplikacije | |
+| `feature/limits/` | Limits tab + `editor/` (forme za svako pravilo) | |
+| `feature/alarms/` | Alarms tab + forma alarma | |
+| `feature/settings/` | Dozvole i „About“ | |
+| `feature/blocking/` | Blok ekran (crta ga servis preko druge aplikacije) | |
+
+Svaki `feature/<x>/` folder ima isti oblik:
+- `XRoute` — stateful: uzima ViewModel, skuplja stanje, prosleđuje akcije;
+- `XScreen` — stateless: prima `XUiState` + lambde i samo crta (može u Preview);
+- `XViewModel` — izlaže **jedan** `StateFlow<XUiState>` i funkcije za akcije.
+
+### 10.2 Navigacija
+
+- Donja traka: **Home · Stats · Limits · Alarms**. Settings se otvara ikonicom na Home-u (tačka upozorenja dok fali neka dozvola).
+- `Navigator` drži back-stack (`rememberSaveable`, preživljava rotaciju). Koren je uvek Home; izbor taba daje `[Home]` ili `[Home, tab]`; ostali ekrani se dodaju na vrh.
+- Sistemski back, swipe-back sa leve ivice i strelica u naslovu zovu isti `Navigator.back()`.
+- Stanje ekrana (skrol, izabrani stubić, nesnimljena forma) se čuva dok je ekran na stack-u (`SaveableStateHolder`).
+- Pravila ponašanja back-stack-a su pokrivena testom `ui/navigation/NavigatorTest`.
+
+### 10.3 Ekrani
+
+| Ekran | Šta prikazuje | ViewModel → izvor podataka |
+|---|---|---|
+| Home | današnje vreme i poređenje sa jučerašnjim danom **do istog doba dana**, mini grafik po satima, 3 najkorišćenije aplikacije, broj uključenih pravila po vrsti, aktivna emergency pauza / jutarnja blokada, sledeći alarm | `HomeViewModel` → `UsageStatsRepository`, `SettingsRepository.observeRulesSnapshot()`, `RuntimeStateRepository`, `AlarmRepository` |
+| Stats | Day (24 sata, izbor dana) / Week (7 dana) / Month (dani tekućeg meseca): ukupno, dnevni prosek, stubičasti grafik (dodir stubića prikazuje vrednost), lista aplikacija **za isti period** | `StatsViewModel` → `UsageStatsRepository` |
+| App details | potrošnja jedne aplikacije po satu / po danu, **broj otvaranja**, 7-dnevni prosek, pravila koja je pokrivaju, „Limit this app“ | `AppDetailsViewModel` → `UsageStatsRepository`, `SettingsRepository` |
+| Limits | sva pravila grupisana po vrsti: Daily limits, Session limits, Schedules, Shorts & Reels, Morning lock, Emergency pause. Switch uključuje/isključuje, klik otvara formu. | `LimitsViewModel` → `SettingsRepository` |
+| Forme pravila (`limits/editor/`) | jedna forma po vrsti; rade nad radnom kopijom, u bazu upisuju tek na **Save**; brisanje uz potvrdu | `LimitsViewModel` |
+| Alarms | lista alarma, „Next alarm in …“, forma sa točkovima za vreme, danima i nazivom, brisanje | `AlarmsViewModel` → `AlarmRepository`, `AlarmScheduler` |
+| Settings | 4 dozvole sa stanjem i dugmetom „Allow“, verzija | `AppViewModel` → `PermissionStateChecker` |
 
 Važni detalji:
-- Dozvole se osvežavaju na `ON_RESUME` (povratak iz sistemskih podešavanja). Ako je Usage Access upravo dat, odmah se radi sync.
-- `SettingsViewModel.mergeShortVideoConfig` čita **aktuelnu** vrednost iz baze, ne `StateFlow.value`, koja može biti početna vrednost dok niko ne kolektuje.
-- Picker aplikacija nudi stvarno instalirane aplikacije (`getInstalledApps`), učitane van main thread-a. Pravila koriste **packageName**, ne ime aplikacije.
+- `ui/AppViewModel` na svaki `ON_RESUME` osvežava dozvole i radi sync potrošnje. `HomeViewModel` i `StatsViewModel` tada proveravaju i da li je prošla ponoć (ViewModel živi koliko i aktivnost).
+- `RuleEditorRoute` čeka da se pravila učitaju iz baze pre nego što napravi radnu kopiju — forma nikad ne kreće od podrazumevanih vrednosti umesto stvarnih. Radne kopije preživljavaju rotaciju jer su modeli pravila `Serializable`.
+- Imena aplikacija i lista instaliranih aplikacija dolaze iz `data/apps/InstalledAppsSource` (keširano, van main thread-a). Ikonice učitava `AppIconLoader` na IO niti. Pravila koriste **packageName**.
+- Opis pravila u jednom redu (`feature/limits/RuleSummaries.kt`) je isti na Limits, Home i App details ekranu.
+- `AlarmScheduler.nextTriggerAt()` je javan da bi UI („Next alarm“) i stvarno zakazivanje koristili isti račun.
+- Shorts & Reels forma nudi samo YouTube i Instagram (`ShortsApps.supported`), jer samo njih detektor podržava.
+
+**Uklonjeno iz starog UI-a** (lažni ili nefunkcionalni elementi): Menu ekran, donja traka bez funkcije na Home-u, hardkodovane vrednosti („4h 12m“, „82%“, „Sleep quality“), Apps/Categories prekidač, „Mobile Web / Desktop App“ legenda, „Reset Filters“, Stats/Settings tabovi u detaljima, Sound/Vibration/Snooze prekidači u alarmu (nisu se čuvali — `AlarmRule` nema ta polja), prekidač „Manual override“ (engine ga ne koristi).
 
 ---
 
@@ -384,10 +428,10 @@ Važni detalji:
 
 | Dozvola | Za šta | Gde se traži |
 |---|---|---|
-| `PACKAGE_USAGE_STATS` (Usage Access) | statistika + FGS | `PermissionsCard` → `ACTION_USAGE_ACCESS_SETTINGS` |
-| `SYSTEM_ALERT_WINDOW` | blok ekran | `PermissionsCard` → `ACTION_MANAGE_OVERLAY_PERMISSION` |
-| Accessibility servis | Shorts/Reels | `PermissionsCard` → `ACTION_ACCESSIBILITY_SETTINGS` |
-| `POST_NOTIFICATIONS` | FGS i alarm notifikacije | runtime zahtev u `MainActivity.onCreate` |
+| `PACKAGE_USAGE_STATS` (Usage Access) | statistika + FGS | Settings ekran → `ACTION_USAGE_ACCESS_SETTINGS` |
+| `SYSTEM_ALERT_WINDOW` | blok ekran | Settings ekran → `ACTION_MANAGE_OVERLAY_PERMISSION` |
+| Accessibility servis | Shorts/Reels | Settings ekran → `ACTION_ACCESSIBILITY_SETTINGS` |
+| `POST_NOTIFICATIONS` | FGS i alarm notifikacije | runtime zahtev u `MainActivity.onCreate`; kasnije Settings ekran |
 | `FOREGROUND_SERVICE(_SPECIAL_USE)` | monitoring servis | manifest |
 | `RECEIVE_BOOT_COMPLETED` | restart posle boot-a | manifest (`BootReceiver`) |
 | `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` | Smart Alarm | manifest |
@@ -397,7 +441,7 @@ Važni detalji:
 1. `ScreenManagerApplication.onCreate` asinhrono seed-uje podrazumevana pravila ako ih nema.
 2. `MainActivity.onCreate` traži dozvolu za notifikacije i pokreće Compose.
 3. `MainActivity.onResume` → `FocusMonitorService.start()` ako postoji Usage Access.
-4. `DashboardViewModel.init` → sync, ako postoji dozvola.
+4. `ScreenManagerApp` → `AppViewModel.onResume()` → osvežavanje dozvola i sync, ako postoji dozvola.
 5. `FocusMonitorService.onCreate` zakazuje `UsageAggregationWorker` (6 h).
 
 ---
@@ -406,14 +450,14 @@ Važni detalji:
 
 `domain/TimeBuckets.kt` sve računa preko `java.time` + `ZoneId.systemDefault()`:
 - `epochDay(millis)`, `startOfDay(epochDay)`, `startOfToday`, `startOfNextDay`, `startOfWeek` (ponedeljak), `startOfMonth`, `startOfRollingWeek`.
-- **Nikad `± n * 24h` u milisekundama.** Dan oko DST prelaza ima 23 ili 25 sati (npr. 25.10.). Isto važi za `DayUiModelGenerator`.
+- **Nikad `± n * 24h` u milisekundama.** Dan oko DST prelaza ima 23 ili 25 sati (npr. 25.10.). Isto važi za `lastSevenDays()` u `ui/model/UsageUiModels.kt`.
 - U bazi je dan `epochDay` (`LocalDate.toEpochDay()`), a ne timestamp ponoći, pa je grupisanje po danu trivijalno i tačno.
 
 ---
 
 ## 13. Testovi i verifikacija
 
-JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/domain/` (27 testova):
+JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (57 testova: 27 za engine u `domain/`, 30 za UI logiku u `ui/`):
 
 | Test | Pokriva |
 |---|---|
@@ -422,6 +466,12 @@ JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/domain/` (27 test
 | `rules/RulesEngineTest` | noćni schedule, grupni dnevni limit do ponoći, emergency preko ponoći, prioritet najrestriktivnijeg, interval pauza i iscrpljen pool |
 | `rules/ShortsPolicyTest` | BLOCKED uvek izbacuje; BUDGET prepušten servisu; SESSIONS: M minuta dozvoljeno, pa pauza K, pa nova sesija; posle N-te sesije zaključano do ponoći |
 | `rules/SessionLimitTrackerTest` | istek M → pauza K, nema nove sesije tokom pauze, izlazak duži od grace perioda, povratak posle duge rupe, iscrpljenje N i reset sledećeg dana |
+| `ui/navigation/NavigatorTest` | back-stack: koren Home, tabovi se zamenjuju a ne slažu, push/pop, bez duplih ekrana |
+| `ui/common/FormattersTest` | format trajanja, odbrojavanja i vremena |
+| `ui/feature/limits/RuleSummariesTest` | opisi pravila u jednom redu, nazivi grupa dana |
+| `ui/feature/alarms/AlarmFormatTest` | zapis dana alarma ↔ `DayOfWeek` (isti tokeni koje čita `AlarmScheduler`), „in 7h 20m“ |
+| `ui/model/UsageUiModelsTest` | popunjavanje sati/dana nulama, poslednjih 7 dana |
+| `ui/feature/limits/RuleDraftSerializationTest` | radne kopije pravila (sa listama i skupovima kakve pravi baza) preživljavaju serijalizaciju → forme ne padaju pri rotaciji |
 
 Pokretanje: `./gradlew testDebugUnitTest`.
 
@@ -480,7 +530,7 @@ Rezervna kopija stanja pre refaktora: `git stash apply refs/backup/pre-refactor`
 3. Pauza K: da li važi i kad korisnik sam izađe iz aplikacije (sada važi)?
 
 **Nije urađeno:**
-- Month tab na Usage Stats ekranu (podaci i `observeMonthlyDailyBreakdown()` postoje).
-- „Sessions“ statistika u AppDetails (`observeSessionCountForApp()` postoji).
+- UI refaktor (grana `refactor/ui`) je kompajliran i pokriven testovima logike, ali **izgled i ponašanje na uređaju još nisu provereni**.
+- Tekstovi UI-a su u Kotlin kodu, ne u `strings.xml` (prebaciti ako bude trebala lokalizacija).
 - Približni podaci za dane starije od 10 dana iz agregata `queryUsageStats` (bucket-i ne počinju u ponoć).
 - Izdvajanje `domain/usage` + `domain/rules` u Gradle modul `:core:engine` (TRS „Module Isolation“).

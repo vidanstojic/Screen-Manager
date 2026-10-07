@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.common.formatClock
@@ -58,11 +59,11 @@ fun AppSwitch(
         enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedThumbColor = AppTheme.colors.onAccent,
-            checkedTrackColor = AppTheme.colors.accent,
-            checkedBorderColor = AppTheme.colors.accent,
+            checkedTrackColor = AppTheme.colors.accentStart,
+            checkedBorderColor = AppTheme.colors.accentStart,
             uncheckedThumbColor = AppTheme.colors.textSecondary,
             uncheckedTrackColor = AppTheme.colors.surfaceRaised,
-            uncheckedBorderColor = AppTheme.colors.outline
+            uncheckedBorderColor = AppTheme.colors.glassBorderTop
         )
     )
 }
@@ -211,7 +212,7 @@ fun AppTextField(
             focusedTextColor = AppTheme.colors.textPrimary,
             unfocusedTextColor = AppTheme.colors.textPrimary,
             focusedBorderColor = AppTheme.colors.accent,
-            unfocusedBorderColor = AppTheme.colors.outline,
+            unfocusedBorderColor = AppTheme.colors.glassBorderTop,
             focusedLabelColor = AppTheme.colors.accent,
             unfocusedLabelColor = AppTheme.colors.textSecondary,
             focusedPlaceholderColor = AppTheme.colors.textMuted,
@@ -241,7 +242,7 @@ fun WeekdaySelector(
                     .weight(1f)
                     .aspectRatio(1f)
                     .clip(CircleShape)
-                    .background(if (isSelected) AppTheme.colors.accent else AppTheme.colors.surfaceRaised)
+                    .background(if (isSelected) AppTheme.colors.accentBrush else SolidColor(AppTheme.colors.surfaceRaised))
                     .clickable { onToggle(day) },
                 contentAlignment = Alignment.Center
             ) {
@@ -305,11 +306,11 @@ fun AppTimePickerDialog(
                 TimePicker(
                     state = state,
                     colors = TimePickerDefaults.colors(
-                        clockDialColor = AppTheme.colors.surfaceRaised,
+                        clockDialColor = AppTheme.colors.surfaceHigh,
                         selectorColor = AppTheme.colors.accent,
                         timeSelectorSelectedContainerColor = AppTheme.colors.accentSoft,
                         timeSelectorSelectedContentColor = AppTheme.colors.accent,
-                        timeSelectorUnselectedContainerColor = AppTheme.colors.surfaceRaised,
+                        timeSelectorUnselectedContainerColor = AppTheme.colors.surfaceHigh,
                         timeSelectorUnselectedContentColor = AppTheme.colors.textPrimary
                     )
                 )

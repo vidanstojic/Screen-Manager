@@ -22,7 +22,10 @@ import com.example.screenmanager.ui.common.formatDuration
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.model.DayOption
 import com.example.screenmanager.ui.theme.AppTheme
+import com.example.screenmanager.ui.theme.GlowAlpha
 import com.example.screenmanager.ui.theme.Spacing
+import com.example.screenmanager.ui.theme.glass
+import com.example.screenmanager.ui.theme.glow
 
 /**
  * Red liste potrošnje: ikonica, ime, vreme i traka udela u odnosu na
@@ -69,7 +72,7 @@ fun AppUsageRow(
     }
 }
 
-/** Traka sa poslednjih 7 dana; izabrani dan je obojen akcentom. */
+/** Traka sa poslednjih 7 dana; izabrani dan je u akcentnom gradijentu sa sjajem. */
 @Composable
 fun DayStrip(
     days: List<DayOption>,
@@ -77,17 +80,27 @@ fun DayStrip(
     onDaySelected: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         days.forEach { day ->
             val isSelected = day.dayStart == selectedDayStart
+            val shape = MaterialTheme.shapes.medium
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(if (isSelected) AppTheme.colors.accent else AppTheme.colors.surface)
+                    .then(
+                        if (isSelected) {
+                            Modifier
+                                .glow(colors.accentStart.copy(alpha = GlowAlpha), cornerRadius = 16.dp, blurRadius = 12.dp)
+                                .clip(shape)
+                                .background(colors.accentBrush)
+                        } else {
+                            Modifier.glass(colors, shape)
+                        }
+                    )
                     .clickable { onDaySelected(day.dayStart) }
                     .padding(vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally

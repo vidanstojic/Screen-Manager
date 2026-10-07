@@ -43,7 +43,8 @@ fun AppBottomBar(
     Column {
         CardDivider()
         NavigationBar(
-            containerColor = AppTheme.colors.background,
+            // Poluprovidna: aurora pozadina iz korena se nazire kroz traku.
+            containerColor = AppTheme.colors.glassBottom,
             contentColor = AppTheme.colors.textSecondary,
             tonalElevation = 0.dp
         ) {
@@ -60,9 +61,9 @@ fun AppBottomBar(
                     },
                     label = { Text(text = item.label, style = MaterialTheme.typography.labelMedium) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = AppTheme.colors.accent,
+                        selectedIconColor = AppTheme.colors.onAccent,
                         selectedTextColor = AppTheme.colors.textPrimary,
-                        indicatorColor = AppTheme.colors.accentSoft,
+                        indicatorColor = AppTheme.colors.accentStart.copy(alpha = 0.55f),
                         unselectedIconColor = AppTheme.colors.textMuted,
                         unselectedTextColor = AppTheme.colors.textMuted
                     )

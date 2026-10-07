@@ -42,6 +42,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.ui.common.pluralize
 import com.example.screenmanager.ui.theme.AppTheme
+import com.example.screenmanager.ui.theme.AuroraBackground
 import com.example.screenmanager.ui.theme.Spacing
 
 /**
@@ -135,70 +136,72 @@ fun AppPickerDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(AppTheme.colors.background)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding()
-        ) {
-            Row(
+        // Dijalog je zaseban prozor, pa crta svoju aurora pozadinu.
+        AuroraBackground {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding()
             ) {
-                CircleIconButton(icon = Icons.Rounded.Close, contentDescription = "Close", onClick = onDismiss)
-                Spacer(Modifier.width(Spacing.md))
-                Text(
-                    text = "Choose apps",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = AppTheme.colors.textPrimary,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            AppTextField(
-                value = query,
-                onValueChange = { query = it },
-                label = "Search",
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                modifier = Modifier.padding(horizontal = Spacing.screen)
-            )
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = Spacing.sm)
-            ) {
-                items(filteredApps, key = { it.id }) { app ->
-                    val isSelected = app.id in selectedIds
-                    AppPickerRow(
-                        app = app,
-                        selected = isSelected,
-                        onToggle = {
-                            selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircleIconButton(icon = Icons.Rounded.Close, contentDescription = "Close", onClick = onDismiss)
+                    Spacer(Modifier.width(Spacing.md))
+                    Text(
+                        text = "Choose apps",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = AppTheme.colors.textPrimary,
+                        modifier = Modifier.weight(1f)
                     )
                 }
-                if (filteredApps.isEmpty()) {
-                    item {
-                        Text(
-                            text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppTheme.colors.textSecondary,
-                            modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
+
+                AppTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = "Search",
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = Spacing.screen)
+                )
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = Spacing.sm)
+                ) {
+                    items(filteredApps, key = { it.id }) { app ->
+                        val isSelected = app.id in selectedIds
+                        AppPickerRow(
+                            app = app,
+                            selected = isSelected,
+                            onToggle = {
+                                selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
+                            }
                         )
                     }
+                    if (filteredApps.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppTheme.colors.textSecondary,
+                                modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
+                            )
+                        }
+                    }
                 }
-            }
 
-            BottomActionBar {
-                PrimaryButton(
-                    text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
-                    onClick = { onConfirm(selectedIds.toList()) },
-                    modifier = Modifier.weight(1f)
-                )
+                BottomActionBar {
+                    PrimaryButton(
+                        text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
+                        onClick = { onConfirm(selectedIds.toList()) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -227,7 +230,7 @@ private fun AppPickerRow(app: AppOption, selected: Boolean, onToggle: () -> Unit
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .background(if (selected) AppTheme.colors.accent else AppTheme.colors.surfaceRaised),
+                .background(if (selected) AppTheme.colors.accentStart else AppTheme.colors.surfaceRaised),
             contentAlignment = Alignment.Center
         ) {
             if (selected) {

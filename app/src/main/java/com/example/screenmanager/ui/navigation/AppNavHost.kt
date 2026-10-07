@@ -13,7 +13,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -29,13 +29,13 @@ import androidx.compose.ui.node.Ref
 import com.example.screenmanager.ui.feature.alarms.AlarmEditorRoute
 import com.example.screenmanager.ui.feature.alarms.AlarmsRoute
 import com.example.screenmanager.ui.feature.appdetails.AppDetailsRoute
-import com.example.screenmanager.ui.feature.overview.OverviewRoute
 import com.example.screenmanager.ui.feature.launcher.LauncherRoute
 import com.example.screenmanager.ui.feature.limits.LimitsRoute
 import com.example.screenmanager.ui.feature.limits.editor.RuleEditorRoute
+import com.example.screenmanager.ui.feature.overview.OverviewRoute
 import com.example.screenmanager.ui.feature.settings.SettingsRoute
 import com.example.screenmanager.ui.feature.stats.StatsRoute
-import com.example.screenmanager.ui.theme.AppTheme
+import com.example.screenmanager.ui.theme.AuroraBackground
 
 /**
  * Koren UI-a: prikazuje ekran sa vrha back-stack-a i donju navigaciju.
@@ -44,6 +44,7 @@ import com.example.screenmanager.ui.theme.AppTheme
  * - Svi ekrani osim početnog i tabova podržavaju swipe-back sa leve ivice.
  * - Stanje ekrana (skrol, izbor) se čuva dok je ekran na stack-u, a briše
  *   kad se ekran zatvori; tabovi svoje stanje zadržavaju stalno.
+ * - Aurora pozadina se crta ovde, jednom; ekrani su providni i klize preko nje.
  */
 @Composable
 fun AppNavHost(navigator: Navigator = rememberNavigator()) {
@@ -67,11 +68,14 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
     val shownTab = navigator.currentTab ?: lastTabRef.value ?: Screen.Overview
     SideEffect { navigator.currentTab?.let { lastTabRef.value = it } }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppTheme.colors.background)
-    ) {
+    AuroraBackground {
+        NavContent(navigator = navigator, shownTab = shownTab, stateHolder = stateHolder)
+    }
+}
+
+@Composable
+private fun NavContent(navigator: Navigator, shownTab: Screen.Tab, stateHolder: SaveableStateHolder) {
+    Column(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = navigator.current,
             modifier = Modifier.weight(1f),

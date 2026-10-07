@@ -366,7 +366,7 @@ Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET 
 
 ## 10. UI sloj
 
-UI je refaktorisan na grani `refactor/ui` (07.10.2026): kod je organizovan **po ekranima**, aplikacija ima početni ekran sa izborom između dva odvojena dela (Screen Manager i Smart Alarms), a izgled je prečišćena tamna tema. Tekstovi u aplikaciji su na engleskom.
+UI je refaktorisan na grani `refactor/ui` (07.10.2026): kod je organizovan **po ekranima**, aplikacija ima početni ekran sa izborom između dva odvojena dela (Screen Manager i Smart Alarms), a izgled je tamna tema u stilu „aurora / glass“ (meke mrlje boje u pozadini, poluprovidne kartice, akcentni gradijent sa sjajem). Tekstovi u aplikaciji su na engleskom.
 
 ### 10.1 Gde se šta nalazi
 
@@ -374,7 +374,7 @@ Putanje su relativne u odnosu na `ui/`.
 
 | Folder | Šta je unutra | Pravilo |
 |---|---|---|
-| `theme/` | `Color.kt` (paleta `AppColors`), `Type.kt`, `Dimens.kt` (`Spacing`, oblici), `Theme.kt` (`ScreenManagerTheme`, `AppTheme`) | Boje i veličine se menjaju SAMO ovde. Ekrani ne kucaju `Color(0xFF…)`. |
+| `theme/` | `Color.kt` (paleta `AppColors`), `Aurora.kt` (`AuroraBackground`), `Glass.kt` (`Modifier.glass`, `Modifier.glow`), `Type.kt`, `Dimens.kt` (`Spacing`, oblici), `Theme.kt` (`ScreenManagerTheme`, `AppTheme`) | Boje i veličine se menjaju SAMO ovde. Ekrani ne kucaju `Color(0xFF…)`. |
 | `components/` | Gradivni elementi: `AppScreen` (kostur ekrana), `AppCard`, `ListRow`, `SectionHeader`, dugmad, `SegmentedControl`, `AppSwitch`, `StepperRow`, `SliderRow`, `BarChart`, `AppIcon`, `AppUsageRow`, `DayStrip`, `AppPickerDialog`, `WeekdaySelector`, `AppTimePickerDialog` | Ne znaju ništa o ekranima ni o ViewModel-ima. |
 | `common/` | Bez izgleda: `Formatters.kt` (sva trajanja i vremena), `AppIconLoader`, `OnResume`, `rememberNow` / `tickerFlow` | |
 | `model/` | Modeli koje ekrani prikazuju: `UsageRange`, `AppUsageItem`, `DayOption` + mapiranja iz Room projekcija | Trajanja su u ms; u tekst se pretvaraju tek pri prikazu. |
@@ -425,6 +425,7 @@ Launcher ──► Screen Manager:  Overview · Stats · Limits   (donja traka)
 | Settings | 4 dozvole sa stanjem i dugmetom „Allow“, verzija | `AppViewModel` → `PermissionStateChecker` |
 
 Važni detalji:
+- Aurora pozadinu crta `AppNavHost` jednom, u korenu; ekrani (`AppScreen`) su providni. Svoju pozadinu crtaju samo zasebni prozori: `AppPickerDialog` i `BlockScreen`. Dijalozi i donji listovi koriste neprovidne površine (`surface`, `surfaceHigh`), a kartice staklo (`Modifier.glass`).
 - `ui/AppViewModel` na svaki `ON_RESUME` osvežava dozvole i radi sync potrošnje. `LauncherViewModel`, `OverviewViewModel` i `StatsViewModel` tada proveravaju i da li je prošla ponoć (ViewModel živi koliko i aktivnost).
 - `RuleEditorRoute` čeka da se pravila učitaju iz baze pre nego što napravi radnu kopiju — forma nikad ne kreće od podrazumevanih vrednosti umesto stvarnih. Radne kopije preživljavaju rotaciju jer su modeli pravila `Serializable`.
 - Imena aplikacija i lista instaliranih aplikacija dolaze iz `data/apps/InstalledAppsSource` (keširano, van main thread-a). Ikonice učitava `AppIconLoader` na IO niti. Pravila koriste **packageName**.

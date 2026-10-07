@@ -1,6 +1,5 @@
 package com.example.screenmanager.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,15 +18,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,43 +36,33 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
+import com.example.screenmanager.ui.theme.glass
 
 /**
- * Osnovna kartica: puna površina sa tankom ivicom.
+ * Osnovna kartica: "staklena" površina (poluprovidna, sa svetlom ivicom).
  * Sa [onClick] cela kartica postaje klikabilna (sa ripple efektom).
+ *
+ * @param borderColor obojena ivica umesto podrazumevane (npr. kartica upozorenja).
  */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     shape: Shape = MaterialTheme.shapes.large,
-    color: Color = AppTheme.colors.surface,
-    borderColor: Color = AppTheme.colors.outline,
+    borderColor: Color? = null,
     contentPadding: PaddingValues = PaddingValues(Spacing.lg),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val border = BorderStroke(1.dp, borderColor)
-    val body: @Composable () -> Unit = {
-        Column(modifier = Modifier.padding(contentPadding), content = content)
-    }
-    if (onClick != null) {
-        Surface(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            color = color,
-            contentColor = AppTheme.colors.textPrimary,
-            border = border,
-            content = body
-        )
-    } else {
-        Surface(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            color = color,
-            contentColor = AppTheme.colors.textPrimary,
-            border = border,
-            content = body
+    val colors = AppTheme.colors
+    val border = borderColor?.let { SolidColor(it) } ?: colors.glassBorderBrush
+    CompositionLocalProvider(LocalContentColor provides colors.textPrimary) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .glass(colors, shape, border)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(contentPadding),
+            content = content
         )
     }
 }
@@ -193,7 +184,7 @@ fun IconBadge(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(size * 0.3f))
-            .background(tint.copy(alpha = 0.14f)),
+            .background(tint.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center
     ) {
         Icon(

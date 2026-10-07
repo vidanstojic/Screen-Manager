@@ -2,34 +2,49 @@ package com.example.screenmanager.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.theme.AppTheme
+import com.example.screenmanager.ui.theme.GlowAlpha
 import com.example.screenmanager.ui.theme.Spacing
+import com.example.screenmanager.ui.theme.glass
+import com.example.screenmanager.ui.theme.glow
 
 private val ButtonPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
 
-/** Glavna akcija na ekranu (najviše jedna po ekranu): Save, Activate... */
+// Zaobljenja za sjaj; moraju da prate MaterialTheme.shapes.medium / large (ui/theme/Dimens.kt).
+private val ButtonCorner = 16.dp
+private val FabCorner = 20.dp
+
+/**
+ * Glavna akcija na ekranu (najviše jedna po ekranu): Save, Activate...
+ * Akcentni gradijent sa mekim sjajem; isključeno dugme je ravno i prigušeno.
+ */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -38,24 +53,22 @@ fun PrimaryButton(
     enabled: Boolean = true,
     icon: ImageVector? = null
 ) {
-    Button(
+    val colors = AppTheme.colors
+    val shape = MaterialTheme.shapes.medium
+    ButtonRow(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 50.dp),
         enabled = enabled,
-        shape = MaterialTheme.shapes.medium,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = AppTheme.colors.accent,
-            contentColor = AppTheme.colors.onAccent,
-            disabledContainerColor = AppTheme.colors.surfaceRaised,
-            disabledContentColor = AppTheme.colors.textMuted
-        ),
-        contentPadding = ButtonPadding
+        contentColor = if (enabled) colors.onAccent else colors.textMuted,
+        modifier = modifier
+            .then(if (enabled) Modifier.glow(colors.accentStart.copy(alpha = GlowAlpha), ButtonCorner) else Modifier)
+            .clip(shape)
+            .background(if (enabled) colors.accentBrush else SolidColor(colors.surfaceRaised))
     ) {
         ButtonContent(text = text, icon = icon)
     }
 }
 
-/** Sporedna akcija pored glavne: Cancel, Choose apps... */
+/** Sporedna akcija pored glavne: Cancel, Choose apps... Staklena površina. */
 @Composable
 fun SecondaryButton(
     text: String,
@@ -65,20 +78,36 @@ fun SecondaryButton(
     icon: ImageVector? = null,
     contentColor: Color = AppTheme.colors.textPrimary
 ) {
-    Button(
+    val colors = AppTheme.colors
+    ButtonRow(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 50.dp),
         enabled = enabled,
-        shape = MaterialTheme.shapes.medium,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = AppTheme.colors.surfaceRaised,
-            contentColor = contentColor,
-            disabledContainerColor = AppTheme.colors.surfaceRaised,
-            disabledContentColor = AppTheme.colors.textMuted
-        ),
-        contentPadding = ButtonPadding
+        contentColor = if (enabled) contentColor else colors.textMuted,
+        modifier = modifier.glass(colors, MaterialTheme.shapes.medium)
     ) {
         ButtonContent(text = text, icon = icon)
+    }
+}
+
+/** Zajednički kostur dugmadi: visina, klik, centriran sadržaj i boja sadržaja. */
+@Composable
+private fun ButtonRow(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
+        Row(
+            modifier = modifier
+                .defaultMinSize(minHeight = 52.dp)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .padding(ButtonPadding),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
     }
 }
 
@@ -110,7 +139,7 @@ fun TextAction(
 }
 
 /**
- * Okruglo dugme sa ikonicom (nazad, podešavanja, +/-).
+ * Okruglo stakleno dugme sa ikonicom (nazad, podešavanja, +/-).
  * [showBadge] crta tačku upozorenja u uglu (npr. "nedostaju dozvole").
  */
 @Composable
@@ -122,19 +151,19 @@ fun CircleIconButton(
     enabled: Boolean = true,
     showBadge: Boolean = false
 ) {
+    val colors = AppTheme.colors
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(AppTheme.colors.surfaceRaised)
-                .clickable(enabled = enabled, onClick = onClick),
+                .size(42.dp)
+                .glass(colors, CircleShape)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (enabled) AppTheme.colors.textPrimary else AppTheme.colors.textMuted,
+                tint = if (enabled) colors.textPrimary else colors.textMuted,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -142,24 +171,17 @@ fun CircleIconButton(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 1.dp, y = (-1).dp)
-                    .size(11.dp)
+                    .offset(x = (-8).dp, y = 8.dp)
+                    .size(8.dp)
+                    .glow(colors.warning.copy(alpha = 0.8f), blurRadius = 6.dp, offsetY = 0.dp)
                     .clip(CircleShape)
-                    .background(AppTheme.colors.background)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(AppTheme.colors.warning)
-                )
-            }
+                    .background(colors.warning)
+            )
         }
     }
 }
 
-/** Plutajuće dugme za dodavanje nove stavke (alarm). */
+/** Plutajuće dugme za dodavanje nove stavke (alarm): akcentni gradijent sa sjajem. */
 @Composable
 fun AddFab(
     contentDescription: String,
@@ -167,13 +189,16 @@ fun AddFab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-        shape = MaterialTheme.shapes.large,
-        containerColor = AppTheme.colors.accent,
-        contentColor = AppTheme.colors.onAccent
+    val colors = AppTheme.colors
+    Box(
+        modifier = modifier
+            .size(58.dp)
+            .glow(colors.accentStart.copy(alpha = GlowAlpha + 0.1f), FabCorner, blurRadius = 20.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(colors.accentBrush)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(imageVector = icon, contentDescription = contentDescription)
+        Icon(imageVector = icon, contentDescription = contentDescription, tint = colors.onAccent)
     }
 }

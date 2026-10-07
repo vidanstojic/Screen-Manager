@@ -1,6 +1,5 @@
 package com.example.screenmanager.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -38,8 +37,8 @@ val ScreenContentPadding = PaddingValues(
 )
 
 /**
- * Kostur svakog ekrana: pozadina, naslovna traka, sadržaj i (opciono)
- * fiksirana donja traka sa akcijama.
+ * Kostur svakog ekrana: naslovna traka, sadržaj i (opciono) fiksirana donja
+ * traka sa akcijama. Ekran je PROVIDAN — aurora pozadinu crta koren UI-a.
  *
  * @param onBack ako nije null, u naslovu je strelica nazad.
  * @param largeTitle veliki naslov — za "glavne" ekrane (početni ekran, tabovi,
@@ -62,7 +61,6 @@ fun AppScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(AppTheme.colors.background)
             .then(if (hasBottomNav) Modifier else Modifier.navigationBarsPadding().imePadding())
     ) {
         TopBar(title = title, onBack = onBack, largeTitle = largeTitle, actions = actions)

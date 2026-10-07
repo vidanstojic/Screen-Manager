@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
@@ -52,8 +52,9 @@ fun BarChart(
     averageMs: Long? = null,
     chartHeight: Dp = 150.dp
 ) {
-    val barColor = AppTheme.colors.accent
-    val dimmedBarColor = AppTheme.colors.accent.copy(alpha = 0.3f)
+    val barTop = AppTheme.colors.accent
+    val barBottom = AppTheme.colors.accentEnd
+    val selectedTop = AppTheme.colors.highlight
     val emptyBarColor = AppTheme.colors.surfaceRaised
     val gridColor = AppTheme.colors.outline
     val averageColor = AppTheme.colors.textSecondary
@@ -106,18 +107,27 @@ fun BarChart(
                     } else {
                         minBarHeight
                     }
-                    val color = when {
-                        value <= 0 -> emptyBarColor
-                        selectedIndex == null || selectedIndex == index -> barColor
-                        else -> dimmedBarColor
-                    }
                     val left = slotWidth * index + (slotWidth - barWidth) / 2f
-                    drawRoundRect(
-                        color = color,
-                        topLeft = Offset(left, size.height - barHeight),
-                        size = Size(barWidth, barHeight),
-                        cornerRadius = CornerRadius(barWidth / 3f, barWidth / 3f)
-                    )
+                    val top = size.height - barHeight
+                    val corner = CornerRadius(barWidth / 3f, barWidth / 3f)
+                    if (value <= 0) {
+                        drawRoundRect(emptyBarColor, Offset(left, top), Size(barWidth, barHeight), corner)
+                    } else {
+                        // Gradijent ide od vrha do dna SVAKOG stubića; izabrani stubić
+                        // je istaknut drugom bojom, a ostali se tada priguše.
+                        val isSelected = selectedIndex == index
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(if (isSelected) selectedTop else barTop, barBottom),
+                                startY = top,
+                                endY = size.height
+                            ),
+                            topLeft = Offset(left, top),
+                            size = Size(barWidth, barHeight),
+                            cornerRadius = corner,
+                            alpha = if (selectedIndex == null || isSelected) 1f else 0.35f
+                        )
+                    }
                 }
 
                 if (averageMs != null && averageMs > 0) {
@@ -195,14 +205,15 @@ private fun axisLabel(valueMs: Long): String {
     }
 }
 
-/** Tanka traka udela (npr. udeo aplikacije u ukupnom vremenu). */
+/** Tanka traka udela u akcentnom gradijentu (npr. udeo aplikacije u ukupnom vremenu). */
 @Composable
 fun ProportionBar(
     fraction: Float,
-    modifier: Modifier = Modifier,
-    color: Color = AppTheme.colors.accent
+    modifier: Modifier = Modifier
 ) {
     val trackColor = AppTheme.colors.surfaceRaised
+    val startColor = AppTheme.colors.accentStart
+    val endColor = AppTheme.colors.highlight
     Canvas(
         modifier = modifier
             .fillMaxWidth()
@@ -212,9 +223,11 @@ fun ProportionBar(
         drawRoundRect(color = trackColor, size = size, cornerRadius = radius)
         val width = size.width * fraction.coerceIn(0f, 1f)
         if (width > 0f) {
+            val fillWidth = width.coerceAtLeast(size.height)
             drawRoundRect(
-                color = color,
-                size = Size(width.coerceAtLeast(size.height), size.height),
+                // Gradijent je razvučen preko cele trake, pa duža traka stiže do svetlije boje.
+                brush = Brush.horizontalGradient(listOf(startColor, endColor), startX = 0f, endX = size.width),
+                size = Size(fillWidth, size.height),
                 cornerRadius = radius
             )
         }

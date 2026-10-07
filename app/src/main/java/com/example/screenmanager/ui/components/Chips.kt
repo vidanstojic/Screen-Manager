@@ -1,11 +1,13 @@
 package com.example.screenmanager.ui.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
+import com.example.screenmanager.ui.theme.glass
 
 /** Mala obojena oznaka stanja ("Active", "12% less than yesterday"). Nije klikabilna. */
 @Composable
@@ -38,6 +41,7 @@ fun StatusPill(
         modifier = modifier
             .clip(CircleShape)
             .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.30f), CircleShape)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -49,39 +53,10 @@ fun StatusPill(
     }
 }
 
-/** Chip koji se bira/poništava (filter, opcija). */
-@Composable
-fun SelectableChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val background by animateColorAsState(
-        targetValue = if (selected) AppTheme.colors.accent else AppTheme.colors.surfaceRaised,
-        label = "chipBackground"
-    )
-    Box(
-        modifier = modifier
-            .height(38.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(background)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleSmall,
-            color = if (selected) AppTheme.colors.onAccent else AppTheme.colors.textSecondary,
-            maxLines = 1
-        )
-    }
-}
-
 /**
  * Izbor JEDNE od nekoliko opcija u jednom redu (Day / Week / Month).
  * Generički je: prima listu vrednosti i funkciju koja daje njihov natpis.
+ * Staklena podloga; izabrana opcija je u akcentnom gradijentu.
  */
 @Composable
 fun <T> SegmentedControl(
@@ -91,33 +66,31 @@ fun <T> SegmentedControl(
     label: (T) -> String,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(AppTheme.colors.surface)
+            .height(46.dp)
+            .glass(colors, MaterialTheme.shapes.medium)
             .padding(4.dp)
     ) {
         options.forEach { option ->
             val isSelected = option == selected
-            val background by animateColorAsState(
-                targetValue = if (isSelected) AppTheme.colors.surfaceRaised else Color.Transparent,
-                label = "segmentBackground"
-            )
+            // Gradijent ne može da se animira kao boja, pa se pretapa njegova providnost.
+            val selection by animateFloatAsState(targetValue = if (isSelected) 1f else 0f, label = "segmentSelection")
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
+                    .fillMaxHeight()
                     .clip(MaterialTheme.shapes.small)
-                    .background(background)
+                    .background(colors.accentBrush, alpha = selection)
                     .clickable { onSelected(option) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label(option),
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (isSelected) AppTheme.colors.textPrimary else AppTheme.colors.textSecondary,
+                    color = if (isSelected) colors.onAccent else colors.textSecondary,
                     maxLines = 1
                 )
             }

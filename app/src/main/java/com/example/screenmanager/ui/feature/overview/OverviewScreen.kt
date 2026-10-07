@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.PermissionState
@@ -199,8 +201,12 @@ private fun ScreenTimeCard(state: OverviewUiState, onClick: () -> Unit) {
         Spacer(Modifier.height(Spacing.sm))
         Text(
             text = formatDuration(state.todayMs),
-            style = MaterialTheme.typography.displayMedium,
-            color = AppTheme.colors.textPrimary
+            // Blagi prelaz bele u ton akcenta daje broju dubinu.
+            style = MaterialTheme.typography.displayMedium.copy(
+                brush = Brush.linearGradient(
+                    listOf(AppTheme.colors.textPrimary, lerp(AppTheme.colors.textPrimary, AppTheme.colors.accent, 0.55f))
+                )
+            )
         )
         Spacer(Modifier.height(Spacing.md))
         TrendPill(todayMs = state.todayMs, yesterdaySameTimeMs = state.yesterdaySameTimeMs)
@@ -241,7 +247,8 @@ private fun TrendPill(todayMs: Long, yesterdaySameTimeMs: Long?) {
 /** Mini grafik: 24 stubića (po jedan za svaki sat), bez osa. */
 @Composable
 private fun HourlySparkBars(hourlyMs: List<Long>, modifier: Modifier = Modifier) {
-    val barColor = AppTheme.colors.accent
+    val barTop = AppTheme.colors.accent
+    val barBottom = AppTheme.colors.accentEnd
     val emptyColor = AppTheme.colors.surfaceRaised
     val maxMs = (hourlyMs.maxOrNull() ?: 0L).coerceAtLeast(1L)
 
@@ -256,12 +263,19 @@ private fun HourlySparkBars(hourlyMs: List<Long>, modifier: Modifier = Modifier)
         val minHeight = 3.dp.toPx()
         hourlyMs.forEachIndexed { index, value ->
             val barHeight = (size.height * value / maxMs).coerceAtLeast(minHeight)
-            drawRoundRect(
-                color = if (value > 0) barColor else emptyColor,
-                topLeft = Offset(slotWidth * index + (slotWidth - barWidth) / 2f, size.height - barHeight),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
-            )
+            val topLeft = Offset(slotWidth * index + (slotWidth - barWidth) / 2f, size.height - barHeight)
+            val barSize = Size(barWidth, barHeight)
+            val corner = CornerRadius(barWidth / 2f, barWidth / 2f)
+            if (value > 0) {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(listOf(barTop, barBottom), startY = topLeft.y, endY = size.height),
+                    topLeft = topLeft,
+                    size = barSize,
+                    cornerRadius = corner
+                )
+            } else {
+                drawRoundRect(emptyColor, topLeft, barSize, corner)
+            }
         }
     }
 }

@@ -19,9 +19,11 @@ enum class NavTransition { Push, Pop, SwitchTab }
  * Jedini izvor istine za navigaciju: back-stack ekrana.
  *
  * Pravila:
- * - Koren stack-a je UVEK [Screen.Home] — jedini ekran sa kog "nazad" izlazi iz aplikacije.
- * - Izbor taba menja ceo stack u `[Home]` ili `[Home, tab]` (nazad sa taba vodi na Home).
- * - Ostali ekrani se dodaju na vrh ([push]) i skidaju sa [back].
+ * - Koren stack-a je UVEK [Screen.Launcher] — jedini ekran sa kog "nazad" izlazi iz aplikacije.
+ * - Iznad korena je najviše jedan "ulaz u deo aplikacije": tab Screen Manager-a
+ *   ili [Screen.Alarms]. Tabovi se međusobno ZAMENJUJU (ne slažu se), pa
+ *   "nazad" sa bilo kog taba vodi na početni ekran.
+ * - Ostali ekrani (detalji, forme) se dodaju na vrh ([push]) i skidaju sa [back].
  *
  * Sistemski back, swipe-back gest i strelica u naslovu zovu isti [back].
  */
@@ -31,9 +33,9 @@ class Navigator internal constructor(private val backStack: SnapshotStateList<Sc
     val current: Screen
         get() = backStack.last()
 
-    /** Tab ispod trenutnog ekrana (označen u donjoj navigaciji). */
-    val currentTab: Screen.Tab
-        get() = backStack.last { it is Screen.Tab } as Screen.Tab
+    /** Tab Screen Manager-a koji je na stack-u, ili null van Screen Manager-a. */
+    val currentTab: Screen.Tab?
+        get() = backStack.lastOrNull { it is Screen.Tab } as Screen.Tab?
 
     val canGoBack: Boolean
         get() = backStack.size > 1
@@ -42,7 +44,7 @@ class Navigator internal constructor(private val backStack: SnapshotStateList<Sc
     val routes: List<String>
         get() = backStack.map { it.route }
 
-    var lastTransition by mutableStateOf(NavTransition.SwitchTab)
+    var lastTransition by mutableStateOf(NavTransition.Push)
         private set
 
     fun push(screen: Screen) {
@@ -52,16 +54,18 @@ class Navigator internal constructor(private val backStack: SnapshotStateList<Sc
         backStack.add(screen)
     }
 
+    /** Ulazak u Screen Manager (sa početnog ekrana) ili prelazak na drugi tab. */
     fun selectTab(tab: Screen.Tab) {
         if (current == tab) return
-        lastTransition = NavTransition.SwitchTab
+        val alreadyInScreenManager = currentTab != null
+        lastTransition = if (alreadyInScreenManager) NavTransition.SwitchTab else NavTransition.Push
         backStack.removeRange(1, backStack.size)
-        if (tab != Screen.Home) backStack.add(tab)
+        backStack.add(tab)
     }
 
     fun back() {
         if (!canGoBack) return
-        lastTransition = if (current is Screen.Tab) NavTransition.SwitchTab else NavTransition.Pop
+        lastTransition = NavTransition.Pop
         backStack.removeAt(backStack.lastIndex)
     }
 }
@@ -74,7 +78,7 @@ fun rememberNavigator(): Navigator {
             restore = { it.toMutableStateList() }
         )
     ) {
-        mutableStateListOf<Screen>(Screen.Home)
+        mutableStateListOf<Screen>(Screen.Launcher)
     }
     return remember(backStack) { Navigator(backStack) }
 }

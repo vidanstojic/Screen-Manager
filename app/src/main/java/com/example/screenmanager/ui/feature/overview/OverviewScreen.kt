@@ -1,4 +1,4 @@
-package com.example.screenmanager.ui.feature.home
+package com.example.screenmanager.ui.feature.overview
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.PauseCircle
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -48,40 +47,36 @@ import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StatusPill
 import com.example.screenmanager.ui.components.TextAction
+import com.example.screenmanager.ui.feature.limits.ProtectionSummary
 import com.example.screenmanager.ui.feature.limits.RuleKind
 import com.example.screenmanager.ui.feature.limits.label
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Stateful ulaz u Home tab. */
+/** Stateful ulaz u Overview tab. */
 @Composable
-fun HomeRoute(
+fun OverviewRoute(
+    onBack: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenLimits: () -> Unit,
-    onOpenAlarms: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenApp: (AppUsageItem) -> Unit,
-    viewModel: HomeViewModel = viewModel(),
+    viewModel: OverviewViewModel = viewModel(),
     appViewModel: AppViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val permissions by appViewModel.permissionState.collectAsState()
     OnResume(viewModel::onResume)
 
-    HomeScreen(
+    OverviewScreen(
         state = state,
         permissions = permissions,
+        onBack = onBack,
         onOpenStats = onOpenStats,
         onOpenLimits = onOpenLimits,
-        onOpenAlarms = onOpenAlarms,
         onOpenSettings = onOpenSettings,
         onOpenApp = onOpenApp,
         onEndEmergencyPause = viewModel::endEmergencyPause
@@ -89,23 +84,26 @@ fun HomeRoute(
 }
 
 /**
- * Home tab: pregled dana na jednom ekranu — današnje vreme, najkorišćenije
- * aplikacije, stanje zaštite i sledeći alarm. Svaka kartica vodi na tab
- * koji tu temu prikazuje detaljno.
+ * Overview tab — prvi ekran Screen Manager-a: današnje vreme, najkorišćenije
+ * aplikacije i stanje zaštite. Svaka kartica vodi na tab koji tu temu
+ * prikazuje detaljno. Strelica nazad vraća na početni ekran aplikacije.
  */
 @Composable
-fun HomeScreen(
-    state: HomeUiState,
+fun OverviewScreen(
+    state: OverviewUiState,
     permissions: PermissionState,
+    onBack: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenLimits: () -> Unit,
-    onOpenAlarms: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenApp: (AppUsageItem) -> Unit,
     onEndEmergencyPause: () -> Unit
 ) {
     AppScreen(
-        title = "Focus Flow",
+        title = "Screen Manager",
+        onBack = onBack,
+        largeTitle = true,
+        hasBottomNav = true,
         actions = {
             CircleIconButton(
                 icon = Icons.Rounded.Settings,
@@ -142,9 +140,6 @@ fun HomeScreen(
                     morningLockUntil = state.morningLockUntil,
                     onManage = onOpenLimits
                 )
-            }
-            item(key = "alarm") {
-                NextAlarmCard(nextAlarmAt = state.nextAlarmAt, onClick = onOpenAlarms)
             }
         }
     }
@@ -190,7 +185,7 @@ private fun EmergencyBanner(until: Long, onEnd: () -> Unit) {
 
 /** Glavna kartica: ukupno vreme danas, poređenje sa jučerašnjim danom i mini grafik po satima. */
 @Composable
-private fun ScreenTimeCard(state: HomeUiState, onClick: () -> Unit) {
+private fun ScreenTimeCard(state: OverviewUiState, onClick: () -> Unit) {
     AppCard(
         onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
@@ -353,32 +348,3 @@ private fun ProtectionRow(kind: RuleKind, status: String, active: Boolean) {
 private fun activeCountLabel(count: Int): String = if (count == 0) "Off" else "$count active"
 
 private fun shortsLabel(mode: ShortsMode?): String = mode?.label ?: "Off"
-
-@Composable
-private fun NextAlarmCard(nextAlarmAt: Long?, onClick: () -> Unit) {
-    AppCard(onClick = onClick, contentPadding = PaddingValues(0.dp)) {
-        ListRow(
-            title = if (nextAlarmAt != null) "Next alarm · ${formatClock(nextAlarmAt)}" else "No alarm set",
-            subtitle = if (nextAlarmAt != null) relativeDayLabel(nextAlarmAt) else "Tap to add a wake-up alarm.",
-            leading = {
-                IconBadge(
-                    icon = Icons.Rounded.Alarm,
-                    tint = if (nextAlarmAt != null) AppTheme.colors.accent else AppTheme.colors.textMuted
-                )
-            },
-            trailing = { ChevronIcon() }
-        )
-    }
-}
-
-/** "Today", "Tomorrow" ili dan u nedelji ("Friday"). */
-private fun relativeDayLabel(epochMillis: Long): String {
-    val zone = ZoneId.systemDefault()
-    val date = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
-    val today = LocalDate.now(zone)
-    return when (date) {
-        today -> "Today"
-        today.plusDays(1) -> "Tomorrow"
-        else -> date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
-    }
-}

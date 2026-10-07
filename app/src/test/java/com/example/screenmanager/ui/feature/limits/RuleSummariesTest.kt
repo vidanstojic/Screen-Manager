@@ -1,10 +1,12 @@
 package com.example.screenmanager.ui.feature.limits
 
+import com.example.screenmanager.domain.rules.RulesSnapshot
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.ShortsMode
+import com.example.screenmanager.model.WakeUpConfig
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.DayOfWeek
@@ -62,6 +64,23 @@ class RuleSummariesTest {
             selectedAppIds = listOf("yt")
         )
         assertEquals("22:00–07:00 · Every day · YouTube", rule.summary(labelFor))
+    }
+
+    @Test
+    fun `protection summary counts only enabled rules`() {
+        val limit = AppLimitRule("1", "Social", listOf("ig"), dailyLimitMinutes = 60, blockDurationMinutes = 0)
+        val rules = RulesSnapshot(
+            appLimits = listOf(limit, limit.copy(id = "2", isEnabled = false)),
+            // Shorts pravilo je uključeno, ali bez aplikacija ne štiti ništa.
+            shortVideo = ShortVideoConfig(selectedAppIds = emptyList(), isEnabled = true),
+            wakeUp = WakeUpConfig(selectedAppIds = listOf("ig"), isEnabled = true)
+        )
+        val summary = rules.toProtectionSummary()
+        assertEquals(1, summary.dailyLimits)
+        assertEquals(null, summary.shortsMode)
+        assertEquals(true, summary.morningLockEnabled)
+        assertEquals(2, summary.activeCount)
+        assertEquals(0, RulesSnapshot.EMPTY.toProtectionSummary().activeCount)
     }
 
     @Test

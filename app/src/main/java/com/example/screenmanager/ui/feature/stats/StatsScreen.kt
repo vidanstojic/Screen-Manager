@@ -43,6 +43,7 @@ import com.example.screenmanager.ui.theme.Spacing
 /** Stateful ulaz u Stats tab. */
 @Composable
 fun StatsRoute(
+    onBack: () -> Unit,
     onOpenApp: (AppUsageItem) -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: StatsViewModel = viewModel(),
@@ -55,6 +56,7 @@ fun StatsRoute(
     StatsScreen(
         state = state,
         hasUsageAccess = permissions.hasUsageAccess,
+        onBack = onBack,
         onRangeSelected = viewModel::selectRange,
         onDaySelected = viewModel::selectDay,
         onOpenApp = onOpenApp,
@@ -70,12 +72,13 @@ fun StatsRoute(
 fun StatsScreen(
     state: StatsUiState,
     hasUsageAccess: Boolean,
+    onBack: () -> Unit,
     onRangeSelected: (UsageRange) -> Unit,
     onDaySelected: (Long) -> Unit,
     onOpenApp: (AppUsageItem) -> Unit,
     onOpenSettings: () -> Unit
 ) {
-    AppScreen(title = "Screen time") {
+    AppScreen(title = "Screen time", onBack = onBack, largeTitle = true, hasBottomNav = true) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = ScreenContentPadding,

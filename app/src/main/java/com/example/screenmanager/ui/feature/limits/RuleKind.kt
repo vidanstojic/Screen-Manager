@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
  * Vrste pravila koje aplikacija nudi — naziv, opis i ikonica na jednom
- * mestu, da se ista vrsta svuda zove i izgleda isto (Limits, Home, izbor
+ * mestu, da se ista vrsta svuda zove i izgleda isto (Limits, Overview, izbor
  * novog pravila).
  */
 enum class RuleKind(

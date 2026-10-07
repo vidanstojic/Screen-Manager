@@ -41,32 +41,31 @@ val ScreenContentPadding = PaddingValues(
  * Kostur svakog ekrana: pozadina, naslovna traka, sadržaj i (opciono)
  * fiksirana donja traka sa akcijama.
  *
- * - [onBack] == null → ekran je TAB (veliki naslov; ispod njega je donja
- *   navigacija koja sama pokriva sistemsku traku).
- * - [onBack] != null → ekran je otvoren PREKO taba (strelica nazad; sam
- *   ostavlja mesto za sistemsku traku i tastaturu).
+ * @param onBack ako nije null, u naslovu je strelica nazad.
+ * @param largeTitle veliki naslov — za "glavne" ekrane (početni ekran, tabovi,
+ *        ulaz u modul); mali naslov za ekrane otvorene preko njih (detalji, forme).
+ * @param hasBottomNav ispod ekrana je donja navigacija, koja sama pokriva
+ *        sistemsku traku. Kad je nema, ekran sam ostavlja mesto za sistemsku
+ *        traku i tastaturu.
  */
 @Composable
 fun AppScreen(
     title: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    largeTitle: Boolean = onBack == null,
+    hasBottomNav: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val isTab = onBack == null
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AppTheme.colors.background)
-            .then(if (isTab) Modifier else Modifier.navigationBarsPadding().imePadding())
+            .then(if (hasBottomNav) Modifier else Modifier.navigationBarsPadding().imePadding())
     ) {
-        if (onBack == null) {
-            TabTopBar(title = title, actions = actions)
-        } else {
-            DetailTopBar(title = title, onBack = onBack, actions = actions)
-        }
+        TopBar(title = title, onBack = onBack, largeTitle = largeTitle, actions = actions)
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -78,54 +77,36 @@ fun AppScreen(
 }
 
 @Composable
-private fun TabTopBar(title: String, actions: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = Spacing.screen)
-            .padding(top = Spacing.lg, bottom = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = AppTheme.colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            content = actions
-        )
-    }
-}
-
-@Composable
-private fun DetailTopBar(
+private fun TopBar(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
+    largeTitle: Boolean,
     actions: @Composable RowScope.() -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = Spacing.lg)
-            .padding(top = Spacing.md, bottom = Spacing.sm),
+            .padding(
+                // Dugme "nazad" ima svoju marginu, pa je traka sa njim malo uvučenija.
+                start = if (onBack != null) Spacing.lg else Spacing.screen,
+                end = Spacing.screen,
+                top = if (largeTitle) Spacing.lg else Spacing.md,
+                bottom = Spacing.sm
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CircleIconButton(
-            icon = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = "Back",
-            onClick = onBack
-        )
-        Spacer(Modifier.width(Spacing.md))
+        if (onBack != null) {
+            CircleIconButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack
+            )
+            Spacer(Modifier.width(Spacing.md))
+        }
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = if (largeTitle) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
             color = AppTheme.colors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

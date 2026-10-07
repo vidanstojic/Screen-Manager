@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 
 /**
@@ -53,6 +54,21 @@ fun formatClock(time: LocalTime): String = CLOCK_FORMAT.format(time)
 /** Trenutak (epoch ms) kao vreme na satu u lokalnoj zoni: "14:35". */
 fun formatClock(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
     CLOCK_FORMAT.format(Instant.ofEpochMilli(epochMillis).atZone(zone))
+
+/** Dan u odnosu na danas: "Today", "Tomorrow" ili dan u nedelji ("Friday"). */
+fun relativeDayLabel(
+    epochMillis: Long,
+    now: Long = System.currentTimeMillis(),
+    zone: ZoneId = ZoneId.systemDefault()
+): String {
+    val date = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
+    val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    return when (date) {
+        today -> "Today"
+        today.plusDays(1) -> "Tomorrow"
+        else -> date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+    }
+}
 
 /** "1 app" / "3 apps". */
 fun pluralize(count: Int, singular: String, plural: String = singular + "s"): String =

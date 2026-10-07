@@ -366,7 +366,7 @@ Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET 
 
 ## 10. UI sloj
 
-UI je refaktorisan na grani `refactor/ui` (07.10.2026): kod je organizovan **po ekranima**, navigacija ima pravu donju traku, a izgled je prečišćena tamna tema. Tekstovi u aplikaciji su na engleskom.
+UI je refaktorisan na grani `refactor/ui` (07.10.2026): kod je organizovan **po ekranima**, aplikacija ima početni ekran sa izborom između dva odvojena dela (Screen Manager i Smart Alarms), a izgled je prečišćena tamna tema. Tekstovi u aplikaciji su na engleskom.
 
 ### 10.1 Gde se šta nalazi
 
@@ -379,11 +379,12 @@ Putanje su relativne u odnosu na `ui/`.
 | `common/` | Bez izgleda: `Formatters.kt` (sva trajanja i vremena), `AppIconLoader`, `OnResume`, `rememberNow` / `tickerFlow` | |
 | `model/` | Modeli koje ekrani prikazuju: `UsageRange`, `AppUsageItem`, `DayOption` + mapiranja iz Room projekcija | Trajanja su u ms; u tekst se pretvaraju tek pri prikazu. |
 | `navigation/` | `Screen` (lista svih ekrana), `Navigator` (back-stack), `AppNavHost` (ekran → composable), `BottomBar`, `SwipeBackContainer` | Novi ekran: dodaj ga u `Screen` i mapiraj u `AppNavHost`. |
-| `feature/home/` | Home tab | |
+| `feature/launcher/` | Početni ekran: izbor Screen Manager / Smart Alarms | Jedino mesto koje čita podatke oba dela. |
+| `feature/overview/` | Overview tab (ulaz u Screen Manager) | |
 | `feature/stats/` | Stats tab (Day / Week / Month) | |
 | `feature/appdetails/` | Detalji jedne aplikacije | |
 | `feature/limits/` | Limits tab + `editor/` (forme za svako pravilo) | |
-| `feature/alarms/` | Alarms tab + forma alarma | |
+| `feature/alarms/` | Smart Alarms: lista alarma + forma alarma | Ne zavisi od Screen Manager ekrana. |
 | `feature/settings/` | Dozvole i „About“ | |
 | `feature/blocking/` | Blok ekran (crta ga servis preko druge aplikacije) | |
 
@@ -394,8 +395,18 @@ Svaki `feature/<x>/` folder ima isti oblik:
 
 ### 10.2 Navigacija
 
-- Donja traka: **Home · Stats · Limits · Alarms**. Settings se otvara ikonicom na Home-u (tačka upozorenja dok fali neka dozvola).
-- `Navigator` drži back-stack (`rememberSaveable`, preživljava rotaciju). Koren je uvek Home; izbor taba daje `[Home]` ili `[Home, tab]`; ostali ekrani se dodaju na vrh.
+Aplikacija ima **dva odvojena dela**, a bira se na početnom ekranu:
+
+```
+Launcher ──► Screen Manager:  Overview · Stats · Limits   (donja traka)
+   │                              └─► App details, forme pravila
+   └──────► Smart Alarms:    lista alarma ─► forma alarma
+```
+
+- `Navigator` drži back-stack (`rememberSaveable`, preživljava rotaciju). Koren je uvek `Launcher`.
+- Iznad korena je najviše jedan „ulaz u deo“: tab Screen Manager-a ili `Alarms`. Tabovi se međusobno **zamenjuju**, pa „nazad“ sa bilo kog taba vodi na početni ekran.
+- Donja traka (Overview · Stats · Limits) pripada Screen Manager-u; u Smart Alarms-u je nema.
+- Settings (dozvole) se otvara ikonicom na početnom ekranu i na Overview-u (tačka upozorenja dok fali neka dozvola).
 - Sistemski back, swipe-back sa leve ivice i strelica u naslovu zovu isti `Navigator.back()`.
 - Stanje ekrana (skrol, izabrani stubić, nesnimljena forma) se čuva dok je ekran na stack-u (`SaveableStateHolder`).
 - Pravila ponašanja back-stack-a su pokrivena testom `ui/navigation/NavigatorTest`.
@@ -404,19 +415,20 @@ Svaki `feature/<x>/` folder ima isti oblik:
 
 | Ekran | Šta prikazuje | ViewModel → izvor podataka |
 |---|---|---|
-| Home | današnje vreme i poređenje sa jučerašnjim danom **do istog doba dana**, mini grafik po satima, 3 najkorišćenije aplikacije, broj uključenih pravila po vrsti, aktivna emergency pauza / jutarnja blokada, sledeći alarm | `HomeViewModel` → `UsageStatsRepository`, `SettingsRepository.observeRulesSnapshot()`, `RuntimeStateRepository`, `AlarmRepository` |
+| Launcher | dve kartice sa statusom: Screen Manager (vreme danas, broj uključenih pravila) i Smart Alarms (sledeći alarm) | `LauncherViewModel` → `UsageStatsRepository`, `SettingsRepository`, `AlarmRepository`, `AlarmScheduler` |
+| Overview | današnje vreme i poređenje sa jučerašnjim danom **do istog doba dana**, mini grafik po satima, 3 najkorišćenije aplikacije, broj uključenih pravila po vrsti, aktivna emergency pauza / jutarnja blokada | `OverviewViewModel` → `UsageStatsRepository`, `SettingsRepository.observeRulesSnapshot()`, `RuntimeStateRepository` |
 | Stats | Day (24 sata, izbor dana) / Week (7 dana) / Month (dani tekućeg meseca): ukupno, dnevni prosek, stubičasti grafik (dodir stubića prikazuje vrednost), lista aplikacija **za isti period** | `StatsViewModel` → `UsageStatsRepository` |
 | App details | potrošnja jedne aplikacije po satu / po danu, **broj otvaranja**, 7-dnevni prosek, pravila koja je pokrivaju, „Limit this app“ | `AppDetailsViewModel` → `UsageStatsRepository`, `SettingsRepository` |
 | Limits | sva pravila grupisana po vrsti: Daily limits, Session limits, Schedules, Shorts & Reels, Morning lock, Emergency pause. Switch uključuje/isključuje, klik otvara formu. | `LimitsViewModel` → `SettingsRepository` |
 | Forme pravila (`limits/editor/`) | jedna forma po vrsti; rade nad radnom kopijom, u bazu upisuju tek na **Save**; brisanje uz potvrdu | `LimitsViewModel` |
-| Alarms | lista alarma, „Next alarm in …“, forma sa točkovima za vreme, danima i nazivom, brisanje | `AlarmsViewModel` → `AlarmRepository`, `AlarmScheduler` |
+| Smart Alarms | lista alarma, „Next alarm in …“, forma sa točkovima za vreme, danima i nazivom, brisanje | `AlarmsViewModel` → `AlarmRepository`, `AlarmScheduler` |
 | Settings | 4 dozvole sa stanjem i dugmetom „Allow“, verzija | `AppViewModel` → `PermissionStateChecker` |
 
 Važni detalji:
-- `ui/AppViewModel` na svaki `ON_RESUME` osvežava dozvole i radi sync potrošnje. `HomeViewModel` i `StatsViewModel` tada proveravaju i da li je prošla ponoć (ViewModel živi koliko i aktivnost).
+- `ui/AppViewModel` na svaki `ON_RESUME` osvežava dozvole i radi sync potrošnje. `LauncherViewModel`, `OverviewViewModel` i `StatsViewModel` tada proveravaju i da li je prošla ponoć (ViewModel živi koliko i aktivnost).
 - `RuleEditorRoute` čeka da se pravila učitaju iz baze pre nego što napravi radnu kopiju — forma nikad ne kreće od podrazumevanih vrednosti umesto stvarnih. Radne kopije preživljavaju rotaciju jer su modeli pravila `Serializable`.
 - Imena aplikacija i lista instaliranih aplikacija dolaze iz `data/apps/InstalledAppsSource` (keširano, van main thread-a). Ikonice učitava `AppIconLoader` na IO niti. Pravila koriste **packageName**.
-- Opis pravila u jednom redu (`feature/limits/RuleSummaries.kt`) je isti na Limits, Home i App details ekranu.
+- Opis pravila u jednom redu (`feature/limits/RuleSummaries.kt`) je isti na Limits, Overview i App details ekranu.
 - `AlarmScheduler.nextTriggerAt()` je javan da bi UI („Next alarm“) i stvarno zakazivanje koristili isti račun.
 - Shorts & Reels forma nudi samo YouTube i Instagram (`ShortsApps.supported`), jer samo njih detektor podržava.
 
@@ -457,7 +469,7 @@ Važni detalji:
 
 ## 13. Testovi i verifikacija
 
-JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (57 testova: 27 za engine u `domain/`, 30 za UI logiku u `ui/`):
+JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (60 testova: 27 za engine u `domain/`, 33 za UI logiku u `ui/`):
 
 | Test | Pokriva |
 |---|---|
@@ -466,7 +478,7 @@ JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (57 testova: 27
 | `rules/RulesEngineTest` | noćni schedule, grupni dnevni limit do ponoći, emergency preko ponoći, prioritet najrestriktivnijeg, interval pauza i iscrpljen pool |
 | `rules/ShortsPolicyTest` | BLOCKED uvek izbacuje; BUDGET prepušten servisu; SESSIONS: M minuta dozvoljeno, pa pauza K, pa nova sesija; posle N-te sesije zaključano do ponoći |
 | `rules/SessionLimitTrackerTest` | istek M → pauza K, nema nove sesije tokom pauze, izlazak duži od grace perioda, povratak posle duge rupe, iscrpljenje N i reset sledećeg dana |
-| `ui/navigation/NavigatorTest` | back-stack: koren Home, tabovi se zamenjuju a ne slažu, push/pop, bez duplih ekrana |
+| `ui/navigation/NavigatorTest` | back-stack: koren Launcher, tabovi se zamenjuju pa „nazad“ vodi na početni ekran, Smart Alarms je odvojen od tabova, push/pop, bez duplih ekrana |
 | `ui/common/FormattersTest` | format trajanja, odbrojavanja i vremena |
 | `ui/feature/limits/RuleSummariesTest` | opisi pravila u jednom redu, nazivi grupa dana |
 | `ui/feature/alarms/AlarmFormatTest` | zapis dana alarma ↔ `DayOfWeek` (isti tokeni koje čita `AlarmScheduler`), „in 7h 20m“ |

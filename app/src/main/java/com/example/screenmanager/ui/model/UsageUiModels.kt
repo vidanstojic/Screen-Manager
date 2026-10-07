@@ -8,7 +8,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * Modeli koje ekrani potrošnje (Home, Stats, App details) prikazuju, i
+ * Modeli koje ekrani potrošnje (Overview, Stats, App details) prikazuju, i
  * mapiranja iz Room projekcija u njih. Sva trajanja su u milisekundama;
  * u tekst se pretvaraju tek pri prikazu (ui/common/Formatters.kt).
  */

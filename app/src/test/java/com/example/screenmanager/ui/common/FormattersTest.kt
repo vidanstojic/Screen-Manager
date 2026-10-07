@@ -2,7 +2,9 @@ package com.example.screenmanager.ui.common
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 
 class FormattersTest {
 
@@ -31,6 +33,16 @@ class FormattersTest {
     fun `clock is always two digits`() {
         assertEquals("07:05", formatClock(7, 5))
         assertEquals("22:00", formatClock(LocalTime.of(22, 0)))
+    }
+
+    @Test
+    fun `relative day label names today and tomorrow`() {
+        val zone = ZoneId.of("Europe/Belgrade")
+        fun at(text: String) = LocalDateTime.parse(text).atZone(zone).toInstant().toEpochMilli()
+        val now = at("2026-10-07T22:30:00") // sreda uveče
+        assertEquals("Today", relativeDayLabel(at("2026-10-07T23:00:00"), now, zone))
+        assertEquals("Tomorrow", relativeDayLabel(at("2026-10-08T07:30:00"), now, zone))
+        assertEquals("Friday", relativeDayLabel(at("2026-10-09T07:30:00"), now, zone))
     }
 
     @Test

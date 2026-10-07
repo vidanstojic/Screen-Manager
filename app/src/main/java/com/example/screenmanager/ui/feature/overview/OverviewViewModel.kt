@@ -1,14 +1,13 @@
-package com.example.screenmanager.ui.feature.home
+package com.example.screenmanager.ui.feature.overview
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
-import com.example.screenmanager.domain.rules.RulesSnapshot
-import com.example.screenmanager.model.AlarmRule
-import com.example.screenmanager.model.ShortsMode
 import com.example.screenmanager.ui.common.tickerFlow
+import com.example.screenmanager.ui.feature.limits.ProtectionSummary
+import com.example.screenmanager.ui.feature.limits.toProtectionSummary
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.model.toHourlyMs
 import kotlinx.coroutines.Dispatchers
@@ -26,17 +25,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 
-/** Koliko pravila svake vrste je trenutno uključeno. */
-data class ProtectionSummary(
-    val dailyLimits: Int = 0,
-    val sessionLimits: Int = 0,
-    val schedules: Int = 0,
-    /** Mod Shorts/Reels pravila, ili null ako je isključeno. */
-    val shortsMode: ShortsMode? = null,
-    val morningLockEnabled: Boolean = false
-)
-
-data class HomeUiState(
+data class OverviewUiState(
     val todayMs: Long = 0L,
     /** Potrošnja juče do istog doba dana (za poređenje); null ako juče nema podataka. */
     val yesterdaySameTimeMs: Long? = null,
@@ -47,22 +36,18 @@ data class HomeUiState(
     /** Kraj aktivne emergency pauze, ili null. */
     val emergencyPauseUntil: Long? = null,
     /** Kraj aktivne jutarnje blokade, ili null. */
-    val morningLockUntil: Long? = null,
-    /** Trenutak sledećeg uključenog alarma, ili null. */
-    val nextAlarmAt: Long? = null
+    val morningLockUntil: Long? = null
 )
 
 /**
- * ViewModel Home ekrana: sažetak današnje potrošnje, stanja zaštite i
- * sledećeg alarma. Sve vrednosti su stvarni podaci iz repozitorijuma.
+ * ViewModel Overview taba (ulaz u Screen Manager): sažetak današnje
+ * potrošnje i stanja zaštite. Sve vrednosti su stvarni podaci iz repozitorijuma.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
+class OverviewViewModel(application: Application) : AndroidViewModel(application) {
     private val usageRepository = ServiceLocator.usageStatsRepository(application)
     private val settings = ServiceLocator.settingsRepository(application)
     private val runtimeState = ServiceLocator.runtimeStateRepository(application)
-    private val alarmRepository = ServiceLocator.alarmRepository(application)
-    private val alarmScheduler = ServiceLocator.alarmScheduler(application)
     private val installedApps = ServiceLocator.installedApps(application)
 
     private val today = MutableStateFlow(TimeBuckets.startOfToday())
@@ -92,25 +77,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.flowOn(Dispatchers.Default)
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    val uiState: StateFlow<OverviewUiState> = combine(
         usage,
         settings.observeRulesSnapshot(),
         runtimeState.observeWakeUpBlockedUntil(),
-        alarmRepository.observeAll(),
         // Poređenje sa jučerašnjim danom i "aktivno do" zavise od trenutnog vremena.
         tickerFlow()
-    ) { usage, rules, morningLockUntil, alarms, now ->
-        HomeUiState(
+    ) { usage, rules, morningLockUntil, now ->
+        OverviewUiState(
             todayMs = usage.todayHourlyMs.sum(),
             yesterdaySameTimeMs = usageUntilTimeOfDay(usage.yesterdayHourlyMs, now).takeIf { it > 0 },
             hourlyMs = usage.todayHourlyMs,
             topApps = usage.topApps,
             protection = rules.toProtectionSummary(),
             emergencyPauseUntil = rules.emergency?.activeUntilMillis?.takeIf { it > now },
-            morningLockUntil = morningLockUntil?.takeIf { it > now },
-            nextAlarmAt = nextAlarmAt(alarms, now)
+            morningLockUntil = morningLockUntil?.takeIf { it > now }
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OverviewUiState())
 
     /** Posle ponoći pređi na novi dan (ViewModel živi koliko i aktivnost). */
     fun onResume() {
@@ -123,17 +106,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             settings.updateEmergencySessionConfig(config.ended())
         }
     }
-
-    private fun RulesSnapshot.toProtectionSummary() = ProtectionSummary(
-        dailyLimits = appLimits.count { it.isEnabled },
-        sessionLimits = sessionLimits.count { it.isEnabled },
-        schedules = schedules.count { it.isEnabled },
-        shortsMode = shortVideo?.takeIf { it.isEnabled && it.selectedAppIds.isNotEmpty() }?.mode,
-        morningLockEnabled = wakeUp?.let { it.isEnabled && it.selectedAppIds.isNotEmpty() } ?: false
-    )
-
-    private fun nextAlarmAt(alarms: List<AlarmRule>, now: Long): Long? =
-        alarms.filter { it.enabled }.minOfOrNull { alarmScheduler.nextTriggerAt(it, now) }
 
     /** Zbir sati pre trenutnog doba dana + srazmeran deo tekućeg sata. */
     private fun usageUntilTimeOfDay(hourlyMs: List<Long>, now: Long): Long {

@@ -18,16 +18,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.node.Ref
 import com.example.screenmanager.ui.feature.alarms.AlarmEditorRoute
 import com.example.screenmanager.ui.feature.alarms.AlarmsRoute
 import com.example.screenmanager.ui.feature.appdetails.AppDetailsRoute
-import com.example.screenmanager.ui.feature.home.HomeRoute
+import com.example.screenmanager.ui.feature.overview.OverviewRoute
+import com.example.screenmanager.ui.feature.launcher.LauncherRoute
 import com.example.screenmanager.ui.feature.limits.LimitsRoute
 import com.example.screenmanager.ui.feature.limits.editor.RuleEditorRoute
 import com.example.screenmanager.ui.feature.settings.SettingsRoute
@@ -37,8 +40,8 @@ import com.example.screenmanager.ui.theme.AppTheme
 /**
  * Koren UI-a: prikazuje ekran sa vrha back-stack-a i donju navigaciju.
  *
- * - Donja navigacija je vidljiva samo na tabovima.
- * - Ekrani otvoreni preko taba podržavaju swipe-back sa leve ivice.
+ * - Donja navigacija pripada Screen Manager-u i vidljiva je samo na njegovim tabovima.
+ * - Svi ekrani osim početnog i tabova podržavaju swipe-back sa leve ivice.
  * - Stanje ekrana (skrol, izbor) se čuva dok je ekran na stack-u, a briše
  *   kad se ekran zatvori; tabovi svoje stanje zadržavaju stalno.
  */
@@ -46,7 +49,7 @@ import com.example.screenmanager.ui.theme.AppTheme
 fun AppNavHost(navigator: Navigator = rememberNavigator()) {
     val stateHolder = rememberSaveableStateHolder()
 
-    // Sistemski back; na Home je isključen pa Android sam izlazi iz aplikacije.
+    // Sistemski back; na početnom ekranu je isključen pa Android sam izlazi iz aplikacije.
     BackHandler(enabled = navigator.canGoBack) { navigator.back() }
 
     // Zaboravi sačuvano stanje ekrana koji više nisu na stack-u (osim tabova).
@@ -58,6 +61,11 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
             .forEach(stateHolder::removeState)
         knownRoutes = routes
     }
+
+    // Traka se još vidi dok nestaje (izlazak iz Screen Manager-a), pa pamti poslednji tab.
+    val lastTabRef = remember { Ref<Screen.Tab>() }
+    val shownTab = navigator.currentTab ?: lastTabRef.value ?: Screen.Overview
+    SideEffect { navigator.currentTab?.let { lastTabRef.value = it } }
 
     Column(
         modifier = Modifier
@@ -71,7 +79,7 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
             label = "screen"
         ) { screen ->
             stateHolder.SaveableStateProvider(screen.route) {
-                if (screen is Screen.Tab) {
+                if (screen is Screen.Tab || screen is Screen.Launcher) {
                     ScreenContent(screen = screen, navigator = navigator)
                 } else {
                     SwipeBackContainer(onBack = navigator::back) {
@@ -86,7 +94,7 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
             enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
             exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180))
         ) {
-            AppBottomBar(selected = navigator.currentTab, onSelect = navigator::selectTab)
+            AppBottomBar(selected = shownTab, onSelect = navigator::selectTab)
         }
     }
 }
@@ -95,24 +103,33 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
 @Composable
 private fun ScreenContent(screen: Screen, navigator: Navigator) {
     when (screen) {
-        Screen.Home -> HomeRoute(
+        Screen.Launcher -> LauncherRoute(
+            onOpenScreenManager = { navigator.selectTab(Screen.Overview) },
+            onOpenAlarms = { navigator.push(Screen.Alarms) },
+            onOpenSettings = { navigator.push(Screen.Settings) }
+        )
+
+        Screen.Overview -> OverviewRoute(
+            onBack = navigator::back,
             onOpenStats = { navigator.selectTab(Screen.Stats) },
             onOpenLimits = { navigator.selectTab(Screen.Limits) },
-            onOpenAlarms = { navigator.selectTab(Screen.Alarms) },
             onOpenSettings = { navigator.push(Screen.Settings) },
             onOpenApp = { navigator.push(Screen.AppDetails(it.packageName, it.label)) }
         )
 
         Screen.Stats -> StatsRoute(
+            onBack = navigator::back,
             onOpenApp = { navigator.push(Screen.AppDetails(it.packageName, it.label)) },
             onOpenSettings = { navigator.push(Screen.Settings) }
         )
 
         Screen.Limits -> LimitsRoute(
+            onBack = navigator::back,
             onEditRule = { navigator.push(Screen.RuleEditor(it)) }
         )
 
         Screen.Alarms -> AlarmsRoute(
+            onBack = navigator::back,
             onEditAlarm = { navigator.push(Screen.AlarmEditor(it)) }
         )
 
@@ -133,7 +150,7 @@ private fun ScreenContent(screen: Screen, navigator: Navigator) {
 
 private const val TAB_ROUTE_PREFIX = "tab/"
 
-/** Animacija prelaza: tabovi se pretapaju, ekrani preko taba klize sa strane. */
+/** Animacija prelaza: tabovi se pretapaju, ostali ekrani klize sa strane. */
 private fun AnimatedContentTransitionScope<Screen>.screenTransition(kind: NavTransition): ContentTransform =
     when (kind) {
         NavTransition.SwitchTab ->

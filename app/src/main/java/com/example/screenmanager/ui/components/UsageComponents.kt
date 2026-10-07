@@ -26,7 +26,7 @@ import com.example.screenmanager.ui.theme.Spacing
 
 /**
  * Red liste potrošnje: ikonica, ime, vreme i traka udela u odnosu na
- * najkorišćeniju aplikaciju ([maxDurationMs]). Koriste ga Home i Stats.
+ * najkorišćeniju aplikaciju ([maxDurationMs]). Koriste ga Overview i Stats.
  */
 @Composable
 fun AppUsageRow(

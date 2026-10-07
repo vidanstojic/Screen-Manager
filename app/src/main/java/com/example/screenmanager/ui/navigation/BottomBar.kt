@@ -2,11 +2,9 @@ package com.example.screenmanager.ui.navigation
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Shield
@@ -29,14 +27,14 @@ private data class TabItem(
     val selectedIcon: ImageVector
 )
 
-/** Redosled i izgled tabova u donjoj navigaciji. */
+/** Redosled i izgled tabova Screen Manager-a (alarmi su zaseban deo aplikacije). */
 private val TabItems = listOf(
-    TabItem(Screen.Home, "Home", Icons.Outlined.Home, Icons.Rounded.Home),
+    TabItem(Screen.Overview, "Overview", Icons.Outlined.Home, Icons.Rounded.Home),
     TabItem(Screen.Stats, "Stats", Icons.Outlined.BarChart, Icons.Rounded.BarChart),
-    TabItem(Screen.Limits, "Limits", Icons.Outlined.Shield, Icons.Rounded.Shield),
-    TabItem(Screen.Alarms, "Alarms", Icons.Outlined.Alarm, Icons.Rounded.Alarm)
+    TabItem(Screen.Limits, "Limits", Icons.Outlined.Shield, Icons.Rounded.Shield)
 )
 
+/** Donja navigacija Screen Manager-a. */
 @Composable
 fun AppBottomBar(
     selected: Screen.Tab,

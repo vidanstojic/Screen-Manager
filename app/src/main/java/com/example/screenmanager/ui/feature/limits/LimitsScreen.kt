@@ -49,6 +49,7 @@ import com.example.screenmanager.ui.theme.Spacing
 /** Stateful ulaz u Limits tab: povezuje [LimitsViewModel] sa [LimitsScreen]. */
 @Composable
 fun LimitsRoute(
+    onBack: () -> Unit,
     onEditRule: (RuleTarget) -> Unit,
     viewModel: LimitsViewModel = viewModel()
 ) {
@@ -56,6 +57,7 @@ fun LimitsRoute(
     LimitsScreen(
         state = state,
         labelFor = viewModel::appLabel,
+        onBack = onBack,
         onEditRule = onEditRule,
         actions = LimitsActions(
             onToggleAppLimit = { rule, enabled -> viewModel.saveAppLimit(rule.copy(isEnabled = enabled)) },
@@ -80,10 +82,11 @@ fun LimitsRoute(
 fun LimitsScreen(
     state: LimitsUiState?,
     labelFor: (String) -> String,
+    onBack: () -> Unit,
     onEditRule: (RuleTarget) -> Unit,
     actions: LimitsActions
 ) {
-    AppScreen(title = "Limits") {
+    AppScreen(title = "Limits", onBack = onBack, largeTitle = true, hasBottomNav = true) {
         if (state == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AppTheme.colors.accent)

@@ -14,7 +14,7 @@ import java.util.Locale
 
 /**
  * Kratki opisi pravila u jednom redu ("1h per day · Instagram, YouTube").
- * Koriste ih lista pravila (Limits), Home i ekran detalja aplikacije, pa
+ * Koriste ih lista pravila (Limits), Overview i ekran detalja aplikacije, pa
  * je isto pravilo svuda opisano istim rečima.
  */
 

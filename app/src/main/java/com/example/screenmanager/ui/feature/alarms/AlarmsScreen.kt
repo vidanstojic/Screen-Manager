@@ -36,9 +36,10 @@ import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
-/** Stateful ulaz u Alarms tab. */
+/** Stateful ulaz u Smart Alarms (zaseban deo aplikacije, bez donje navigacije). */
 @Composable
 fun AlarmsRoute(
+    onBack: () -> Unit,
     onEditAlarm: (alarmId: Long?) -> Unit,
     viewModel: AlarmsViewModel = viewModel()
 ) {
@@ -51,22 +52,24 @@ fun AlarmsRoute(
         isLoading = alarms == null,
         nextAlarmAt = loadedAlarms.filter { it.enabled }.minOfOrNull { viewModel.nextTriggerAt(it, now) },
         now = now,
+        onBack = onBack,
         onToggle = viewModel::setAlarmEnabled,
         onEditAlarm = onEditAlarm
     )
 }
 
-/** Alarms tab: lista alarma; klik otvara formu, "+" dodaje novi. */
+/** Lista alarma; klik otvara formu, "+" dodaje novi. Strelica nazad vraća na početni ekran. */
 @Composable
 fun AlarmsScreen(
     alarms: List<AlarmRule>,
     isLoading: Boolean,
     nextAlarmAt: Long?,
     now: Long,
+    onBack: () -> Unit,
     onToggle: (AlarmRule, Boolean) -> Unit,
     onEditAlarm: (alarmId: Long?) -> Unit
 ) {
-    AppScreen(title = "Alarms") {
+    AppScreen(title = "Smart Alarms", onBack = onBack, largeTitle = true) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = ScreenContentPadding,

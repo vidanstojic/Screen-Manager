@@ -30,7 +30,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.PermissionState
@@ -60,6 +62,7 @@ import com.example.screenmanager.ui.feature.limits.label
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
+import java.time.LocalTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -297,7 +300,7 @@ private fun HourlySparkBars(hourlyMs: List<Long>, modifier: Modifier = Modifier)
     val nowTop = AppTheme.colors.highlight
     val emptyColor = AppTheme.colors.surfaceRaised
     val maxMs = (hourlyMs.maxOrNull() ?: 0L).coerceAtLeast(1L)
-    val currentHour = remember { java.time.LocalTime.now().hour }
+    val currentHour = remember { LocalTime.now().hour }
     val growth = rememberCountUp(1f, durationMillis = 800)
 
     Canvas(
@@ -359,56 +362,85 @@ private fun TopAppsSection(
     }
 }
 
-/** Sažetak uključenih pravila po vrsti; cela kartica vodi na Limits tab. */
+/** Sažetak uključenih pravila po vrsti, kao mreža pločica; svaka vodi na Limits tab. */
 @Composable
 private fun ProtectionSection(
     protection: ProtectionSummary,
     morningLockUntil: Long?,
     onManage: () -> Unit
 ) {
+    val tiles = listOf(
+        ProtectionTileModel(RuleKind.DailyLimit, "Daily", activeCountLabel(protection.dailyLimits), protection.dailyLimits > 0),
+        ProtectionTileModel(
+            RuleKind.SessionLimit, "Sessions", activeCountLabel(protection.sessionLimits), protection.sessionLimits > 0
+        ),
+        ProtectionTileModel(RuleKind.Schedule, "Schedule", activeCountLabel(protection.schedules), protection.schedules > 0),
+        ProtectionTileModel(RuleKind.Shorts, "Shorts", shortsLabel(protection.shortsMode), protection.shortsMode != null),
+        ProtectionTileModel(
+            kind = RuleKind.MorningLock,
+            title = "Morning",
+            status = when {
+                morningLockUntil != null -> "Until ${formatClock(morningLockUntil)}"
+                protection.morningLockEnabled -> "On"
+                else -> "Off"
+            },
+            active = protection.morningLockEnabled
+        )
+    )
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         SectionHeader(title = "Protection", actionLabel = "Manage", onAction = onManage)
-        AppCard(onClick = onManage, contentPadding = PaddingValues(0.dp)) {
-            ProtectionRow(RuleKind.DailyLimit, activeCountLabel(protection.dailyLimits), protection.dailyLimits > 0)
-            CardDivider()
-            ProtectionRow(RuleKind.SessionLimit, activeCountLabel(protection.sessionLimits), protection.sessionLimits > 0)
-            CardDivider()
-            ProtectionRow(RuleKind.Schedule, activeCountLabel(protection.schedules), protection.schedules > 0)
-            CardDivider()
-            ProtectionRow(RuleKind.Shorts, shortsLabel(protection.shortsMode), protection.shortsMode != null)
-            CardDivider()
-            ProtectionRow(
-                kind = RuleKind.MorningLock,
-                status = when {
-                    morningLockUntil != null -> "Locked until ${formatClock(morningLockUntil)}"
-                    protection.morningLockEnabled -> "On"
-                    else -> "Off"
-                },
-                active = protection.morningLockEnabled
-            )
+        // 3 + 2 pločice: prvi red su vremenska pravila, drugi sadržaj i jutro.
+        listOf(tiles.take(3), tiles.drop(3)).forEach { rowTiles ->
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                rowTiles.forEach { tile ->
+                    ProtectionTile(tile = tile, onClick = onManage, modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
 
+private class ProtectionTileModel(
+    val kind: RuleKind,
+    val title: String,
+    val status: String,
+    val active: Boolean
+)
+
 @Composable
-private fun ProtectionRow(kind: RuleKind, status: String, active: Boolean) {
-    ListRow(
-        title = kind.title,
-        leading = {
-            IconBadge(
-                icon = kind.icon,
-                tint = if (active) AppTheme.colors.accent else AppTheme.colors.textMuted,
-                size = 36.dp
-            )
+private fun ProtectionTile(tile: ProtectionTileModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = AppTheme.colors
+    AppCard(
+        modifier = modifier,
+        onClick = onClick,
+        tint = if (tile.active) {
+            Brush.verticalGradient(listOf(colors.accentStart.copy(alpha = 0.16f), Color.Transparent))
+        } else {
+            null
         },
-        trailing = {
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (active) AppTheme.colors.textPrimary else AppTheme.colors.textMuted
-            )
-        }
-    )
+        contentPadding = PaddingValues(Spacing.md)
+    ) {
+        IconBadge(
+            icon = tile.kind.icon,
+            tint = if (tile.active) colors.accent else colors.textMuted,
+            size = 32.dp
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            text = tile.title,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = tile.status,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (tile.active) colors.textPrimary else colors.textMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 private fun activeCountLabel(count: Int): String = if (count == 0) "Off" else "$count active"

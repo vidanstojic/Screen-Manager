@@ -38,8 +38,8 @@ import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.ChevronIcon
 import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.IconBadge
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.StatusPill
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 import java.time.Instant
@@ -96,7 +96,7 @@ fun LauncherScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(ScreenContentPadding),
+                .padding(screenContentPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             Text(

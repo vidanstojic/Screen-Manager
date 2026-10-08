@@ -37,11 +37,11 @@ import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StepperRow
 import com.example.screenmanager.ui.components.SwitchRow
 import com.example.screenmanager.ui.components.TextAction
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -83,7 +83,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(ScreenContentPadding),
+                .padding(screenContentPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             SectionHeader(title = "Daily goal")

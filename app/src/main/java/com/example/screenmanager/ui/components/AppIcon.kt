@@ -13,6 +13,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
@@ -58,4 +59,17 @@ fun AppIcon(
             )
         }
     }
+}
+
+/**
+ * Prepoznatljiva boja aplikacije (iz ikonice), ili `null` dok se ne izračuna
+ * odnosno ako ikonica nema izraženu boju.
+ */
+@Composable
+fun rememberAppAccent(packageName: String): Color? {
+    val context = LocalContext.current
+    val accent by produceState(initialValue = AppIconLoader.cachedAccent(packageName), key1 = packageName) {
+        value = AppIconLoader.loadAccent(context, packageName)
+    }
+    return accent
 }

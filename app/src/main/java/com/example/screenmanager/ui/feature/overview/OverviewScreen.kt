@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -49,10 +50,10 @@ import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.ProgressRing
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StatusPill
 import com.example.screenmanager.ui.components.TextAction
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.feature.limits.ProtectionSummary
 import com.example.screenmanager.ui.feature.limits.RuleKind
 import com.example.screenmanager.ui.feature.limits.label
@@ -121,7 +122,7 @@ fun OverviewScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = ScreenContentPadding,
+            contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             if (!permissions.allCriticalGranted) {
@@ -288,13 +289,16 @@ private fun TrendPill(todayMs: Long, yesterdaySameTimeMs: Long?) {
     }
 }
 
-/** Mini grafik: 24 stubića (po jedan za svaki sat), bez osa. */
+/** Mini grafik: 24 stubića (po jedan za svaki sat), bez osa; trenutni sat je istaknut. */
 @Composable
 private fun HourlySparkBars(hourlyMs: List<Long>, modifier: Modifier = Modifier) {
     val barTop = AppTheme.colors.accent
     val barBottom = AppTheme.colors.accentEnd
+    val nowTop = AppTheme.colors.highlight
     val emptyColor = AppTheme.colors.surfaceRaised
     val maxMs = (hourlyMs.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val currentHour = remember { java.time.LocalTime.now().hour }
+    val growth = rememberCountUp(1f, durationMillis = 800)
 
     Canvas(
         modifier = modifier
@@ -306,13 +310,17 @@ private fun HourlySparkBars(hourlyMs: List<Long>, modifier: Modifier = Modifier)
         val barWidth = slotWidth * 0.6f
         val minHeight = 3.dp.toPx()
         hourlyMs.forEachIndexed { index, value ->
-            val barHeight = (size.height * value / maxMs).coerceAtLeast(minHeight)
+            val barHeight = (size.height * value / maxMs * growth).coerceAtLeast(minHeight)
             val topLeft = Offset(slotWidth * index + (slotWidth - barWidth) / 2f, size.height - barHeight)
             val barSize = Size(barWidth, barHeight)
             val corner = CornerRadius(barWidth / 2f, barWidth / 2f)
             if (value > 0) {
                 drawRoundRect(
-                    brush = Brush.verticalGradient(listOf(barTop, barBottom), startY = topLeft.y, endY = size.height),
+                    brush = Brush.verticalGradient(
+                        listOf(if (index == currentHour) nowTop else barTop, barBottom),
+                        startY = topLeft.y,
+                        endY = size.height
+                    ),
                     topLeft = topLeft,
                     size = barSize,
                     cornerRadius = corner

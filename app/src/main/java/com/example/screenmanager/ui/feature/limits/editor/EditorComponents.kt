@@ -28,8 +28,8 @@ import com.example.screenmanager.ui.components.AppSelectionField
 import com.example.screenmanager.ui.components.BottomActionBar
 import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.PrimaryButton
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.TextAction
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -70,7 +70,7 @@ fun RuleEditorScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(ScreenContentPadding),
+                .padding(screenContentPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             content = content
         )

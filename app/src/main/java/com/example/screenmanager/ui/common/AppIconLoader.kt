@@ -4,11 +4,16 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Učitava i kešira ikonice instaliranih aplikacija.
@@ -19,11 +24,21 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object AppIconLoader {
     private const val MAX_ICON_PX = 144
+    private const val SAMPLE_SIZE = 24
+    private const val HUE_BUCKETS = 12
+
+    /** Najmanje "obojenih" piksela (zbir težina) da bi se boja uopšte prihvatila. */
+    private const val MIN_COLORFUL_WEIGHT = 12f
 
     /** `Entry(null)` znači "već probano, paket nema ikonicu" (npr. deinstaliran). */
     private class Entry(val bitmap: ImageBitmap?)
 
     private val cache = ConcurrentHashMap<String, Entry>()
+
+    /** `AccentEntry(null)` znači "ikonica nema izraženu boju" (npr. crno-bela). */
+    private class AccentEntry(val color: Color?)
+
+    private val accents = ConcurrentHashMap<String, AccentEntry>()
 
     /** Već učitana ikonica, bez čekanja — da se pri skrolovanju ne vidi treptaj. */
     fun cached(packageName: String): ImageBitmap? = cache[packageName]?.bitmap
@@ -38,6 +53,61 @@ object AppIconLoader {
             cache[packageName] = Entry(bitmap)
             bitmap
         }
+    }
+
+    /** Već izračunata boja aplikacije, bez čekanja. */
+    fun cachedAccent(packageName: String): Color? = accents[packageName]?.color
+
+    /**
+     * Prepoznatljiva boja aplikacije iz njene ikonice (Instagram roze, YouTube
+     * crvena...), posvetljena da se dobro vidi na tamnoj pozadini.
+     * `null` ako ikonica nema izraženu boju.
+     */
+    suspend fun loadAccent(context: Context, packageName: String): Color? {
+        accents[packageName]?.let { return it.color }
+        val icon = load(context, packageName)
+        return withContext(Dispatchers.Default) {
+            val color = icon?.let { dominantColor(it.asAndroidBitmap()) }
+            accents[packageName] = AccentEntry(color)
+            color
+        }
+    }
+
+    /**
+     * Dominantna "živa" boja: pikseli se grupišu po nijansi (12 grupa po 30°),
+     * a svaki piksel vredi koliko je zasićen i svetao — siva, bela i crna
+     * pozadina ikonice se tako ne računaju.
+     */
+    private fun dominantColor(bitmap: Bitmap): Color? {
+        val small = Bitmap.createScaledBitmap(bitmap, SAMPLE_SIZE, SAMPLE_SIZE, true)
+        val pixels = IntArray(SAMPLE_SIZE * SAMPLE_SIZE)
+        small.getPixels(pixels, 0, SAMPLE_SIZE, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE)
+
+        val weight = FloatArray(HUE_BUCKETS)
+        val sinSum = FloatArray(HUE_BUCKETS)
+        val cosSum = FloatArray(HUE_BUCKETS)
+        val satSum = FloatArray(HUE_BUCKETS)
+        val hsv = FloatArray(3)
+        for (pixel in pixels) {
+            if (android.graphics.Color.alpha(pixel) < 200) continue
+            android.graphics.Color.colorToHSV(pixel, hsv)
+            val (hue, saturation, value) = Triple(hsv[0], hsv[1], hsv[2])
+            if (saturation < 0.25f || value < 0.3f) continue
+            val bucket = (hue / (360f / HUE_BUCKETS)).toInt().coerceIn(0, HUE_BUCKETS - 1)
+            val w = saturation * value
+            val radians = Math.toRadians(hue.toDouble())
+            weight[bucket] += w
+            sinSum[bucket] += (sin(radians) * w).toFloat()
+            cosSum[bucket] += (cos(radians) * w).toFloat()
+            satSum[bucket] += saturation * w
+        }
+        val best = weight.indices.maxByOrNull { weight[it] } ?: return null
+        if (weight[best] < MIN_COLORFUL_WEIGHT) return null
+
+        var hue = Math.toDegrees(atan2(sinSum[best].toDouble(), cosSum[best].toDouble())).toFloat()
+        if (hue < 0f) hue += 360f
+        val saturation = (satSum[best] / weight[best]).coerceIn(0.55f, 0.85f)
+        return Color.hsv(hue, saturation, 0.95f)
     }
 
     private fun Drawable.toBitmap(): Bitmap {

@@ -39,9 +39,9 @@ import com.example.screenmanager.ui.components.DayStrip
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.PrimaryButton
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.SegmentedControl
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.feature.limits.NewLimitSheet
 import com.example.screenmanager.ui.feature.limits.RuleTarget
 import com.example.screenmanager.ui.model.UsageRange
@@ -103,7 +103,7 @@ fun AppDetailsScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = ScreenContentPadding,
+            contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             item(key = "header") { AppHeader(packageName = packageName, appName = appName) }
@@ -247,7 +247,14 @@ private fun AppUsageChart(state: AppDetailsUiState, range: UsageRange, modifier:
             },
             selectedIndex = selectedIndex,
             onSelect = { selectedBar = it },
-            averageMs = if (isDay) null else values.sum() / 7
+            averageMs = if (isDay) null else values.sum() / 7,
+            highlightIndex = when {
+                !isDay -> 6
+                state.days.firstOrNull { it.dayStart == state.selectedDayStart }?.isToday == true ->
+                    java.time.LocalTime.now().hour
+                else -> null
+            },
+            animationKey = range to state.selectedDayStart
         )
     }
 }

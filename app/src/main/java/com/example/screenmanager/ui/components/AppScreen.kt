@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,6 +24,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,12 +33,26 @@ import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
-/** Margine skrolujućeg sadržaja ekrana (LazyColumn `contentPadding`). */
-val ScreenContentPadding = PaddingValues(
+/**
+ * Koliko mesta na dnu sadržaja zauzima plutajuća donja traka (0 kad je nema).
+ * Postavlja ga [AppScreen] sa `hasBottomNav = true`.
+ */
+val LocalBottomBarClearance = compositionLocalOf { 0.dp }
+
+/** Visina plutajuće donje trake i njen razmak od dna ekrana (ui/navigation/BottomBar.kt). */
+val FloatingBarHeight = 64.dp
+val FloatingBarBottomMargin = 16.dp
+
+/**
+ * Margine skrolujućeg sadržaja ekrana (LazyColumn `contentPadding`). Na
+ * tabovima dno sadržaja može da se odskroluje iznad plutajuće trake.
+ */
+@Composable
+fun screenContentPadding(): PaddingValues = PaddingValues(
     start = Spacing.screen,
     end = Spacing.screen,
     top = Spacing.sm,
-    bottom = Spacing.xl
+    bottom = Spacing.xl + LocalBottomBarClearance.current
 )
 
 /**
@@ -43,9 +62,10 @@ val ScreenContentPadding = PaddingValues(
  * @param onBack ako nije null, u naslovu je strelica nazad.
  * @param largeTitle veliki naslov — za "glavne" ekrane (početni ekran, tabovi,
  *        ulaz u modul); mali naslov za ekrane otvorene preko njih (detalji, forme).
- * @param hasBottomNav ispod ekrana je donja navigacija, koja sama pokriva
- *        sistemsku traku. Kad je nema, ekran sam ostavlja mesto za sistemsku
- *        traku i tastaturu.
+ * @param hasBottomNav preko dna ekrana pluta donja navigacija: sadržaj ide do
+ *        dna (vidi se kroz traku), a [screenContentPadding] ostavlja mesto da se
+ *        poslednja stavka odskroluje iznad nje. Kad trake nema, ekran sam ostavlja
+ *        mesto za sistemsku traku i tastaturu.
  */
 @Composable
 fun AppScreen(
@@ -64,12 +84,20 @@ fun AppScreen(
             .then(if (hasBottomNav) Modifier else Modifier.navigationBarsPadding().imePadding())
     ) {
         TopBar(title = title, onBack = onBack, largeTitle = largeTitle, actions = actions)
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            content = content
-        )
+        val clearance = if (hasBottomNav) {
+            FloatingBarHeight + FloatingBarBottomMargin + Spacing.sm +
+                WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        } else {
+            0.dp
+        }
+        CompositionLocalProvider(LocalBottomBarClearance provides clearance) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                content = content
+            )
+        }
         bottomBar?.invoke()
     }
 }

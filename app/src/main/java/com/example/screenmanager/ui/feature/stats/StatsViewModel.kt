@@ -43,6 +43,8 @@ data class StatsUiState(
     val totalMs: Long = 0L,
     /** Prosek po danu (samo Week/Month). */
     val dailyAverageMs: Long? = null,
+    /** Stubić "sada": trenutni sat (danas), današnji dan (Week/Month); null za prošle dane. */
+    val highlightIndex: Int? = null,
     val apps: List<AppUsageItem> = emptyList()
 )
 
@@ -100,6 +102,11 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
                 // Prosek samo preko dana koji su do sada prošli u mesecu.
                 UsageRange.Month -> total / todayDate.dayOfMonth
             },
+            highlightIndex = when (q.range) {
+                UsageRange.Day -> if (q.dayStart == q.today) currentHour() else null
+                UsageRange.Week -> 6
+                UsageRange.Month -> todayDate.dayOfMonth - 1
+            },
             apps = apps
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
@@ -153,6 +160,8 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             UsageRange.Week -> days.map { "${it.weekday} ${it.dayOfMonth}" }
             UsageRange.Month -> List(count) { index -> "${today.month.shortName()} ${index + 1}" }
         }
+
+    private fun currentHour(): Int = java.time.LocalTime.now().hour
 
     private fun Long.toLocalDate(): LocalDate = LocalDate.ofEpochDay(TimeBuckets.epochDay(this))
     private fun java.time.DayOfWeek.shortName(): String = getDisplayName(TextStyle.SHORT, Locale.ENGLISH)

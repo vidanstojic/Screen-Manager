@@ -32,7 +32,7 @@ import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.AppSwitch
 import com.example.screenmanager.ui.components.EmptyState
 import com.example.screenmanager.ui.components.FabSpacer
-import com.example.screenmanager.ui.components.ScreenContentPadding
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -72,7 +72,7 @@ fun AlarmsScreen(
     AppScreen(title = "Smart Alarms", onBack = onBack, largeTitle = true) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = ScreenContentPadding,
+            contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             if (alarms.isNotEmpty()) {

@@ -32,9 +32,9 @@ import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.DayStrip
 import com.example.screenmanager.ui.components.EmptyState
 import com.example.screenmanager.ui.components.PrimaryButton
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.SegmentedControl
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.model.UsageRange
 import com.example.screenmanager.ui.theme.AppTheme
@@ -81,7 +81,7 @@ fun StatsScreen(
     AppScreen(title = "Screen time", onBack = onBack, largeTitle = true, hasBottomNav = true) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = ScreenContentPadding,
+            contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             item(key = "range") {
@@ -191,7 +191,9 @@ private fun UsageChartCard(state: StatsUiState, modifier: Modifier = Modifier) {
             slotLabels = state.chartSlotLabels,
             selectedIndex = selectedIndex,
             onSelect = { selectedBar = it },
-            averageMs = state.dailyAverageMs
+            averageMs = state.dailyAverageMs,
+            highlightIndex = state.highlightIndex,
+            animationKey = state.range to state.selectedDayStart
         )
     }
 }

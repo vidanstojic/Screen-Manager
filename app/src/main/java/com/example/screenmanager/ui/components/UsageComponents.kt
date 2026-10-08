@@ -29,7 +29,8 @@ import com.example.screenmanager.ui.theme.glow
 
 /**
  * Red liste potrošnje: ikonica, ime, vreme i traka udela u odnosu na
- * najkorišćeniju aplikaciju ([maxDurationMs]). Koriste ga Overview i Stats.
+ * najkorišćeniju aplikaciju ([maxDurationMs]). Traka i sjaj ikonice su u
+ * boji same aplikacije. Koriste ga Overview i Stats.
  */
 @Composable
 fun AppUsageRow(
@@ -45,7 +46,16 @@ fun AppUsageRow(
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AppIcon(packageName = app.packageName, label = app.label)
+        val appColor = rememberAppAccent(app.packageName)
+        AppIcon(
+            packageName = app.packageName,
+            label = app.label,
+            modifier = if (appColor != null) {
+                Modifier.glow(appColor.copy(alpha = 0.35f), cornerRadius = 11.dp, blurRadius = 10.dp, offsetY = 4.dp)
+            } else {
+                Modifier
+            }
+        )
         Spacer(Modifier.width(Spacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -66,7 +76,8 @@ fun AppUsageRow(
             }
             Spacer(Modifier.height(Spacing.sm))
             ProportionBar(
-                fraction = if (maxDurationMs > 0) app.durationMs.toFloat() / maxDurationMs else 0f
+                fraction = if (maxDurationMs > 0) app.durationMs.toFloat() / maxDurationMs else 0f,
+                color = appColor
             )
         }
     }

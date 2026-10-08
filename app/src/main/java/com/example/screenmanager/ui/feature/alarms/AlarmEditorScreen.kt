@@ -32,8 +32,8 @@ import com.example.screenmanager.ui.components.AppTextField
 import com.example.screenmanager.ui.components.BottomActionBar
 import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.PrimaryButton
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.WeekdaySelector
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 import java.time.DayOfWeek
@@ -132,7 +132,7 @@ fun AlarmEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(ScreenContentPadding),
+                .padding(screenContentPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             AppCard {

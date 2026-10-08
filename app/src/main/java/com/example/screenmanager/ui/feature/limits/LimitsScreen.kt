@@ -39,10 +39,10 @@ import com.example.screenmanager.ui.components.AppSwitch
 import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
-import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SecondaryButton
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StepperRow
+import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -96,7 +96,7 @@ fun LimitsScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = ScreenContentPadding,
+            contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             item(key = "daily") {

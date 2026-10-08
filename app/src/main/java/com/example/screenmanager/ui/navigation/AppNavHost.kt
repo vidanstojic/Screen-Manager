@@ -13,7 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.Ref
 import com.example.screenmanager.ui.feature.alarms.AlarmEditorRoute
@@ -40,7 +41,7 @@ import com.example.screenmanager.ui.theme.AuroraBackground
 /**
  * Koren UI-a: prikazuje ekran sa vrha back-stack-a i donju navigaciju.
  *
- * - Donja navigacija pripada Screen Manager-u i vidljiva je samo na njegovim tabovima.
+ * - Donja navigacija (plutajuća traka) pripada Screen Manager-u i vidljiva je samo na njegovim tabovima.
  * - Svi ekrani osim početnog i tabova podržavaju swipe-back sa leve ivice.
  * - Stanje ekrana (skrol, izbor) se čuva dok je ekran na stack-u, a briše
  *   kad se ekran zatvori; tabovi svoje stanje zadržavaju stalno.
@@ -75,10 +76,11 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
 
 @Composable
 private fun NavContent(navigator: Navigator, shownTab: Screen.Tab, stateHolder: SaveableStateHolder) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Traka pluta PREKO sadržaja (Box), a ne ispod njega.
+    Box(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = navigator.current,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxSize(),
             transitionSpec = { screenTransition(navigator.lastTransition) },
             label = "screen"
         ) { screen ->
@@ -95,6 +97,7 @@ private fun NavContent(navigator: Navigator, shownTab: Screen.Tab, stateHolder: 
 
         AnimatedVisibility(
             visible = navigator.current is Screen.Tab,
+            modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
             exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180))
         ) {

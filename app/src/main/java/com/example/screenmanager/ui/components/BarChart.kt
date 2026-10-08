@@ -1,5 +1,8 @@
 package com.example.screenmanager.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -14,7 +17,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +27,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -41,6 +48,9 @@ private val AxisGutter = 34.dp
  * @param selectedIndex stubić koji je korisnik dodirnuo (ostali se priguše), ili null.
  * @param onSelect dodir stubića; ponovni dodir istog stubića šalje null (poništava izbor).
  * @param averageMs ako nije null, crta isprekidanu liniju proseka.
+ * @param highlightIndex stubić koji je uvek istaknut (npr. trenutni sat ili današnji dan).
+ * @param animationKey kad se promeni (drugi period, drugi dan), stubići ponovo
+ *        "izrastu"; obične promene podataka (novi minut potrošnje) ne pokreću animaciju.
  */
 @Composable
 fun BarChart(
@@ -50,6 +60,8 @@ fun BarChart(
     selectedIndex: Int? = null,
     onSelect: (Int?) -> Unit = {},
     averageMs: Long? = null,
+    highlightIndex: Int? = null,
+    animationKey: Any? = Unit,
     chartHeight: Dp = 150.dp
 ) {
     val barTop = AppTheme.colors.accent
@@ -64,6 +76,13 @@ fun BarChart(
     // Gest živi duže od jedne rekompozicije, pa čita uvek najnovije vrednosti.
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
+
+    // Stubići rastu odozdo, talasom sleva nadesno.
+    val growth = remember { Animatable(0f) }
+    LaunchedEffect(animationKey) {
+        growth.snapTo(0f)
+        growth.animateTo(1f, tween(durationMillis = 700, easing = FastOutSlowInEasing))
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
@@ -101,7 +120,9 @@ fun BarChart(
                 val minBarHeight = 3.dp.toPx()
 
                 valuesMs.forEachIndexed { index, value ->
-                    val fraction = (value.toFloat() / axisMaxMs).coerceIn(0f, 1f)
+                    val delay = 0.35f * index / valuesMs.size
+                    val barGrowth = ((growth.value - delay) / (1f - 0.35f)).coerceIn(0f, 1f)
+                    val fraction = (value.toFloat() / axisMaxMs).coerceIn(0f, 1f) * barGrowth
                     val barHeight = if (value > 0) {
                         (size.height * fraction).coerceAtLeast(minBarHeight)
                     } else {
@@ -113,12 +134,13 @@ fun BarChart(
                     if (value <= 0) {
                         drawRoundRect(emptyBarColor, Offset(left, top), Size(barWidth, barHeight), corner)
                     } else {
-                        // Gradijent ide od vrha do dna SVAKOG stubića; izabrani stubić
-                        // je istaknut drugom bojom, a ostali se tada priguše.
+                        // Gradijent ide od vrha do dna SVAKOG stubića; izabrani (ili stalno
+                        // istaknuti) stubić je u drugoj boji, a ostali se pri izboru priguše.
                         val isSelected = selectedIndex == index
+                        val isHighlighted = isSelected || (selectedIndex == null && highlightIndex == index)
                         drawRoundRect(
                             brush = Brush.verticalGradient(
-                                colors = listOf(if (isSelected) selectedTop else barTop, barBottom),
+                                colors = listOf(if (isHighlighted) selectedTop else barTop, barBottom),
                                 startY = top,
                                 endY = size.height
                             ),
@@ -205,15 +227,19 @@ private fun axisLabel(valueMs: Long): String {
     }
 }
 
-/** Tanka traka udela u akcentnom gradijentu (npr. udeo aplikacije u ukupnom vremenu). */
+/**
+ * Tanka traka udela (npr. udeo aplikacije u ukupnom vremenu).
+ * Sa [color] je u boji aplikacije, inače u akcentnom gradijentu.
+ */
 @Composable
 fun ProportionBar(
     fraction: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    color: Color? = null
 ) {
     val trackColor = AppTheme.colors.surfaceRaised
-    val startColor = AppTheme.colors.accentStart
-    val endColor = AppTheme.colors.highlight
+    val startColor = color ?: AppTheme.colors.accentStart
+    val endColor = color?.let { lerp(it, Color.White, 0.35f) } ?: AppTheme.colors.highlight
     Canvas(
         modifier = modifier
             .fillMaxWidth()

@@ -7,9 +7,11 @@ import com.example.screenmanager.alarm.AlarmModule
 import com.example.screenmanager.alarm.data.AlarmPermission
 import com.example.screenmanager.alarm.data.AlarmPermissions
 import com.example.screenmanager.alarm.data.PendingSnooze
+import com.example.screenmanager.alarm.domain.AlarmDetoxLock
 import com.example.screenmanager.alarm.service.AlarmRingService
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.model.AlarmRule
+import com.example.screenmanager.model.AppOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,11 +29,32 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
     private val alarmScheduler = ServiceLocator.alarmScheduler(application)
     private val runtimeStore = AlarmModule.runtimeStore(application)
     private val permissionChecker = AlarmPermissions(application)
+    private val installedAppsSource = ServiceLocator.installedApps(application)
+    private val screenManagerPermissions = ServiceLocator.permissionStateChecker(application)
+
+    private val _installedApps = MutableStateFlow<List<AppOption>>(emptyList())
+
+    /** Instalirane aplikacije za izbor u wake-up detox-u (učitava se jednom). */
+    val installedApps: StateFlow<List<AppOption>> = _installedApps.asStateFlow()
+
+    private val _detoxReadiness = MutableStateFlow(detoxReadiness())
+
+    /** Da li su uključeni servisi koji sprovode wake-up detox. */
+    val detoxReadiness: StateFlow<DetoxReadiness> = _detoxReadiness.asStateFlow()
+
+    init {
+        viewModelScope.launch { _installedApps.value = installedAppsSource.launchableApps() }
+    }
+
+    fun appLabel(packageName: String): String = installedAppsSource.label(packageName)
 
     /** `null` dok se alarmi prvi put ne učitaju iz baze. */
     val alarms: StateFlow<List<AlarmRule>?> = alarmRepository.observeAll()
         .map { list -> list.sortedWith(compareBy({ it.hour }, { it.minute })) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Aktivni (ili istekli) wake-up detox — lista prikazuje karticu dok traje. */
+    val detoxLock: StateFlow<AlarmDetoxLock?> = AlarmModule.detoxStore(application).lock
 
     /** Odloženi alarmi (po id-ju) — lista prikazuje "Snoozed until". */
     val snoozes: StateFlow<Map<Long, PendingSnooze>> = runtimeStore.snoozes
@@ -42,6 +65,15 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
     /** Poziva se na ON_RESUME — korisnik se vraća iz sistemskih podešavanja. */
     fun refreshPermissions() {
         _permissions.value = permissionChecker.snapshot()
+        _detoxReadiness.value = detoxReadiness()
+    }
+
+    private fun detoxReadiness(): DetoxReadiness {
+        val state = screenManagerPermissions.snapshot()
+        return DetoxReadiness(
+            appsEnforced = state.hasUsageAccess && state.canDrawOverlay,
+            sitesEnforced = state.accessibilityEnabled
+        )
     }
 
     fun permissionIntent(kind: AlarmPermission.Kind) = permissionChecker.settingsIntent(kind)
@@ -78,3 +110,9 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
         AlarmRingService.test(getApplication(), draft)
     }
 }
+
+/**
+ * Aplikacije blokira Screen Manager servis (treba Usage access + prikaz preko
+ * drugih aplikacija), a sajtove Accessibility servis.
+ */
+data class DetoxReadiness(val appsEnforced: Boolean, val sitesEnforced: Boolean)

@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.model.AlarmRule
+import com.example.screenmanager.model.AppOption
+import com.example.screenmanager.ui.common.OnResume
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.AppTextField
@@ -51,6 +53,9 @@ fun AlarmEditorRoute(
     viewModel: AlarmsViewModel = viewModel()
 ) {
     val alarms by viewModel.alarms.collectAsState()
+    val installedApps by viewModel.installedApps.collectAsState()
+    val detoxReadiness by viewModel.detoxReadiness.collectAsState()
+    OnResume { viewModel.refreshPermissions() }
     val loaded = alarms
     if (loaded == null) {
         AppScreen(title = "", onBack = onDone) {
@@ -75,6 +80,9 @@ fun AlarmEditorRoute(
             }
         },
         onTest = viewModel::testAlarm,
+        installedApps = installedApps,
+        labelFor = viewModel::appLabel,
+        detoxReadiness = detoxReadiness,
         onBack = onDone
     )
 }
@@ -90,6 +98,9 @@ fun AlarmEditorScreen(
     onSave: (AlarmRule) -> Unit,
     onDelete: (() -> Unit)?,
     onTest: (AlarmRule) -> Unit,
+    installedApps: List<AppOption>,
+    labelFor: (String) -> String,
+    detoxReadiness: DetoxReadiness,
     onBack: () -> Unit
 ) {
     var draft by rememberSaveable {
@@ -158,6 +169,13 @@ fun AlarmEditorScreen(
             AlarmSoundSection(sound = draft.sound, onChange = { draft = draft.copy(sound = it) })
             AlarmSnoozeSection(snooze = draft.snooze, onChange = { draft = draft.copy(snooze = it) })
             AlarmMissionSection(mission = draft.mission, onChange = { draft = draft.copy(mission = it) })
+            AlarmDetoxSection(
+                detox = draft.detox,
+                onChange = { draft = draft.copy(detox = it) },
+                installedApps = installedApps,
+                labelFor = labelFor,
+                readiness = detoxReadiness
+            )
         }
     }
 }

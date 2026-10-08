@@ -6,6 +6,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import com.example.screenmanager.alarm.AlarmModule
+import com.example.screenmanager.alarm.service.WebsiteGuard
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
 import com.example.screenmanager.domain.rules.SessionState
@@ -59,6 +61,8 @@ class ShortsAccessibilityService : AccessibilityService() {
     @Volatile
     private var shortsConfig: StateFlow<ShortVideoConfig?> = MutableStateFlow(null)
 
+    private var websiteGuard: WebsiteGuard? = null
+
     private val scanScheduled = AtomicBoolean(false)
     @Volatile private var lastEventPackage: String? = null
     @Volatile private var lastInteractionWriteAt = 0L
@@ -81,11 +85,22 @@ class ShortsAccessibilityService : AccessibilityService() {
         Log.i(TAG, "Service connected")
         shortsConfig = settingsRepository.observeShortVideoConfig()
             .stateIn(serviceScope, SharingStarted.Eagerly, null)
+        // Smart Alarm wake-up detox: blokada sajtova radi u ovom istom servisu.
+        websiteGuard = WebsiteGuard(
+            service = this,
+            scope = serviceScope,
+            scanDispatcher = scanDispatcher,
+            detox = AlarmModule.detoxStore(this).lock,
+            basePackages = ShortsDetector.supportedPackages
+        ).also { it.start() }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
-        if (packageName !in ShortsDetector.supportedPackages) return
+        if (packageName !in ShortsDetector.supportedPackages) {
+            websiteGuard?.takeIf { it.handles(packageName) }?.onEvent(packageName)
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (now - lastInteractionWriteAt > INTERACTION_WRITE_INTERVAL_MS) {

@@ -29,6 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.alarm.data.AlarmPermission
+import com.example.screenmanager.alarm.domain.AlarmDetoxLock
+import com.example.screenmanager.ui.common.pluralize
+import androidx.compose.material.icons.rounded.Block
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.ui.common.OnResume
 import com.example.screenmanager.ui.components.IconBadge
@@ -61,6 +64,7 @@ fun AlarmsRoute(
 ) {
     val alarms by viewModel.alarms.collectAsState()
     val snoozes by viewModel.snoozes.collectAsState()
+    val detoxLock by viewModel.detoxLock.collectAsState()
     val permissions by viewModel.permissions.collectAsState()
     val now by rememberNow()
     val loadedAlarms = alarms.orEmpty()
@@ -73,6 +77,7 @@ fun AlarmsRoute(
         nextAlarmAt = loadedAlarms.filter { it.enabled }.minOfOrNull { viewModel.nextTriggerAt(it, now) },
         now = now,
         snoozedUntil = snoozes.mapValues { it.value.at },
+        activeDetox = detoxLock?.takeIf { it.isActiveAt(now) },
         missingPermissions = permissions.filterNot { it.granted }.map { it.kind },
         onFixPermission = { kind -> runCatching { context.startActivity(viewModel.permissionIntent(kind)) } },
         onBack = onBack,
@@ -89,6 +94,7 @@ fun AlarmsScreen(
     nextAlarmAt: Long?,
     now: Long,
     snoozedUntil: Map<Long, Long>,
+    activeDetox: AlarmDetoxLock?,
     missingPermissions: List<AlarmPermission.Kind>,
     onFixPermission: (AlarmPermission.Kind) -> Unit,
     onBack: () -> Unit,
@@ -103,6 +109,9 @@ fun AlarmsScreen(
         ) {
             if (missingPermissions.isNotEmpty()) {
                 item(key = "permissions") { AlarmPermissionsCard(missingPermissions, onFixPermission) }
+            }
+            if (activeDetox != null) {
+                item(key = "detox") { ActiveDetoxCard(activeDetox) }
             }
             if (alarms.isNotEmpty()) {
                 item(key = "next") { NextAlarmHero(nextAlarmAt = nextAlarmAt, now = now) }
@@ -135,6 +144,33 @@ fun AlarmsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(Spacing.screen)
         )
+    }
+}
+
+/** Wake-up detox koji upravo traje (upaljen gašenjem alarma). */
+@Composable
+private fun ActiveDetoxCard(lock: AlarmDetoxLock) {
+    val parts = listOfNotNull(
+        lock.packages.size.takeIf { it > 0 }?.let { pluralize(it, "app") },
+        lock.domains.size.takeIf { it > 0 }?.let { pluralize(it, "site") }
+    )
+    AppCard(borderColor = AppTheme.colors.accent.copy(alpha = 0.5f)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon = Icons.Rounded.Block, size = 40.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Wake-up detox until ${formatClock(lock.until)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AppTheme.colors.textPrimary
+                )
+                Text(
+                    text = (parts + lock.label).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppTheme.colors.textSecondary
+                )
+            }
+        }
     }
 }
 

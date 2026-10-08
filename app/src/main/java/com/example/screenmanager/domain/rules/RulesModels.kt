@@ -41,12 +41,20 @@ data class SessionState(
     val isSessionRunning: Boolean get() = sessionStartedAt != null
 }
 
-/** Runtime ulaz za engine — sve što nije korisnička konfiguracija. */
+/**
+ * Runtime ulaz za engine — sve što nije korisnička konfiguracija.
+ *
+ * `alarmDetox*`: wake-up detox koji pali Smart Alarm pri gašenju alarma
+ * (aplikacije su izabrane u samom alarmu, ne u Screen Manager pravilima).
+ */
 data class RuntimeState(
     val todayUsageMs: Map<String, Long> = emptyMap(),
     val wakeUpBlockedUntil: Long = 0L,
     val shortsPenaltyUntil: Map<String, Long> = emptyMap(),
-    val sessionStates: Map<String, SessionState> = emptyMap()
+    val sessionStates: Map<String, SessionState> = emptyMap(),
+    val alarmDetoxUntil: Long = 0L,
+    val alarmDetoxPackages: Set<String> = emptySet(),
+    val alarmDetoxLabel: String? = null
 )
 
 enum class BlockReason(val message: String) {
@@ -55,7 +63,8 @@ enum class BlockReason(val message: String) {
     SESSION_COOLDOWN("Break between sessions"),
     SESSION_POOL_EXHAUSTED("All sessions for today are used up"),
     SHORTS_PENALTY("Shorts/Reels limit reached"),
-    WAKE_UP("Morning lock is active")
+    WAKE_UP("Morning lock is active"),
+    ALARM_DETOX("Wake-up detox is active")
 }
 
 data class BlockDecision(

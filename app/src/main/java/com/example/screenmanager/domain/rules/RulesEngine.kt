@@ -68,6 +68,11 @@ class RulesEngine {
             }
         }
 
+        // Wake-up detox iz Smart Alarm-a (Phase 2): aplikacije su izabrane u alarmu.
+        if (state.alarmDetoxUntil > now && packageName in state.alarmDetoxPackages) {
+            candidates += BlockDecision(packageName, BlockReason.ALARM_DETOX, state.alarmDetoxUntil, state.alarmDetoxLabel)
+        }
+
         return candidates.maxByOrNull { it.blockedUntil }
     }
 

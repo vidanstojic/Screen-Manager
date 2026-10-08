@@ -17,6 +17,7 @@ import android.util.Log
 import com.example.screenmanager.MainActivity
 import com.example.screenmanager.R
 import com.example.screenmanager.data.usage.UsageEventSource
+import com.example.screenmanager.alarm.AlarmModule
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
 import com.example.screenmanager.domain.rules.RulesSnapshot
@@ -75,6 +76,9 @@ class FocusMonitorService : Service() {
     private lateinit var rules: StateFlow<RulesSnapshot>
     private lateinit var wakeUpBlockedUntil: StateFlow<Long?>
     private lateinit var shortsPenalties: StateFlow<Map<String, Long>>
+
+    /** Wake-up detox iz Smart Alarm-a (StateFlow u memoriji — bez upita po tick-u). */
+    private val alarmDetox by lazy { AlarmModule.detoxStore(this).lock }
 
     // Stanje monitor petlje — menja se samo iz monitor korutine.
     private val foreground = ForegroundResolver()
@@ -194,7 +198,10 @@ class FocusMonitorService : Service() {
                     todayUsageMs = liveUsage(pkg, now),
                     wakeUpBlockedUntil = wakeUpBlockedUntil.value ?: 0L,
                     shortsPenaltyUntil = shortsPenalties.value,
-                    sessionStates = sessionMutex.withLock { HashMap(sessionStates) }
+                    sessionStates = sessionMutex.withLock { HashMap(sessionStates) },
+                    alarmDetoxUntil = alarmDetox.value?.until ?: 0L,
+                    alarmDetoxPackages = alarmDetox.value?.packages.orEmpty(),
+                    alarmDetoxLabel = alarmDetox.value?.label
                 )
                 rulesEngine.evaluate(pkg, now, zone, snapshot, state)
             }

@@ -431,7 +431,19 @@ Važni detalji:
 - Imena aplikacija i lista instaliranih aplikacija dolaze iz `data/apps/InstalledAppsSource` (keširano, van main thread-a). Ikonice učitava `AppIconLoader` na IO niti. Pravila koriste **packageName**.
 - Opis pravila u jednom redu (`feature/limits/RuleSummaries.kt`) je isti na Limits, Overview i App details ekranu.
 - `AlarmScheduler.nextTriggerAt()` je javan da bi UI („Next alarm“) i stvarno zakazivanje koristili isti račun.
-- Shorts & Reels forma nudi samo YouTube i Instagram (`ShortsApps.supported`), jer samo njih detektor podržava.
+- Shorts & Reels forma nudi samo YouTube i Instagram (`ShortsApps.supported`), jer samo njih detektor podržava. Na Limits ekranu red tog pravila prikazuje njihove ikonice (sistemske ikonice instaliranih aplikacija, `AppIconStack`); neizabrana aplikacija ili isključeno pravilo su prigušeni.
+
+### 10.4 Vizuelni sistem
+
+- **Delovi aplikacije imaju svoje boje** (`ui/theme/Sections.kt`): `AppSection` Launcher / ScreenManager / Alarms, `AppColors.forSection()`. `AppNavHost` obavija svaki ekran u `SectionTheme(sectionOf(screen))`; aurora pozadina pretapa boje pri prelazu (700 ms). Alarmi su u toplim (narandžasto–crvenim) tonovima, Screen Manager u ljubičasto–plavim.
+- **Plutajuća donja traka** (`ui/navigation/BottomBar.kt`): kapsula iznad dna ekrana sa animiranim indikatorom. Sadržaj tabova ide ispod nje; `screenContentPadding()` čita `LocalBottomBarClearance` da se poslednja stavka može odskrolovati iznad trake.
+- **Dnevni cilj** (`data/preferences/UiPreferences`, SharedPreferences `ui_preferences`): uključuje se i podešava u Settings (30 min – 12 h). Overview tada prikazuje `ProgressRing` (preko cilja prelazi u boju upozorenja i piše „+Xm over goal“).
+- **Boja aplikacije**: `AppIconLoader.loadAccent()` izvlači dominantnu boju ikonice; koriste je redovi potrošnje (traka udela, sjaj ikonice).
+- **Grafici** rastu pri promeni perioda/dana (`BarChart.animationKey`), trenutni sat / današnji dan je stalno istaknut (`highlightIndex`).
+- **Launcher**: gradijentne kartice modula u bojama dela + pozdrav prema dobu dana. **Alarmi**: veliki sat sledećeg alarma; kartice obojene prema dobu dana (`timeOfDayColors`).
+- **Blok ekran**: prsten odbrojavanja se prazni od trenutka prikaza; iza njega „diše“ sjaj (4 s udah / 4 s izdah).
+- **Mikrointerakcije** (`ui/common/Interaction.kt`): klikabilne kartice se blago utisnu (`pressScale`); switch, segmentni izbor, dani i izbor dana u nedelji daju kratak haptički „tik“ (`rememberTickHaptic`, poštuje sistemsko podešavanje).
+- **Font**: Manrope (`res/font/manrope_*.ttf`, SIL OFL — `docs/licenses/Manrope-OFL.txt`), display stilovi ExtraBold sa tabularnim ciframa.
 
 **Uklonjeno iz starog UI-a** (lažni ili nefunkcionalni elementi): Menu ekran, donja traka bez funkcije na Home-u, hardkodovane vrednosti („4h 12m“, „82%“, „Sleep quality“), Apps/Categories prekidač, „Mobile Web / Desktop App“ legenda, „Reset Filters“, Stats/Settings tabovi u detaljima, Sound/Vibration/Snooze prekidači u alarmu (nisu se čuvali — `AlarmRule` nema ta polja), prekidač „Manual override“ (engine ga ne koristi).
 

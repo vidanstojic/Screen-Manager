@@ -157,6 +157,7 @@ fun AlarmEditorScreen(
             )
             AlarmSoundSection(sound = draft.sound, onChange = { draft = draft.copy(sound = it) })
             AlarmSnoozeSection(snooze = draft.snooze, onChange = { draft = draft.copy(snooze = it) })
+            AlarmMissionSection(mission = draft.mission, onChange = { draft = draft.copy(mission = it) })
         }
     }
 }

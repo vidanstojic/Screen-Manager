@@ -10,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,6 +38,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.alarm.domain.RingReason
+import com.example.screenmanager.alarm.domain.effectiveMissionType
+import com.example.screenmanager.alarm.service.StepSensor
+import com.example.screenmanager.model.AlarmMission
+import com.example.screenmanager.model.MissionType
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
 import com.example.screenmanager.alarm.service.ActiveRing
 import com.example.screenmanager.ui.common.formatClock
 import com.example.screenmanager.ui.common.pluralize
@@ -72,17 +80,43 @@ fun AlarmRingRoute(
             delay(1_000)
         }
     }
-    AlarmRingScreen(ring = ring, now = now, onSnooze = onSnooze, onDismiss = onDismiss)
+    val context = LocalContext.current
+    val missionType = remember(ring.startedAt) {
+        effectiveMissionType(ring.alarm.mission, stepsAvailable = StepSensor(context).isAvailable)
+    }
+    var missionStarted by rememberSaveable(ring.startedAt) { mutableStateOf(false) }
+    AlarmRingScreen(
+        ring = ring,
+        now = now,
+        missionType = missionType,
+        missionStarted = missionStarted,
+        onStartMission = {
+            missionStarted = true
+            onMissionInteraction()
+        },
+        onSnooze = onSnooze,
+        onDismiss = onDismiss,
+        onMissionInteraction = onMissionInteraction
+    )
 }
 
-/** Sat, naziv alarma, pulsirajući krugovi i dugmad Snooze / Dismiss. */
+/**
+ * Sat, naziv alarma i dugmad. Bez misije: Snooze / Dismiss. Sa misijom:
+ * Snooze / "Start mission"; posle starta misija zauzima sredinu ekrana, a
+ * alarm se gasi tek kad je rešena.
+ */
 @Composable
 fun AlarmRingScreen(
     ring: ActiveRing,
     now: Long,
+    missionType: MissionType,
+    missionStarted: Boolean,
+    onStartMission: () -> Unit,
     onSnooze: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onMissionInteraction: () -> Unit
 ) {
+    val hasMission = missionType != MissionType.NONE
     val colors = AppTheme.colors
     AuroraBackground {
         Column(
@@ -112,12 +146,37 @@ fun AlarmRingScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.weight(1f))
-            Box(contentAlignment = Alignment.Center) {
-                PulseRings(size = 240.dp)
-                IconBadge(icon = Icons.Rounded.Alarm, size = 88.dp)
+            if (hasMission && missionStarted) {
+                Spacer(Modifier.height(Spacing.xl))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (missionType != ring.alarm.mission.type) {
+                        Text(
+                            text = "Step counting isn't available, so here's a math mission instead.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textMuted,
+                            modifier = Modifier.padding(bottom = Spacing.sm)
+                        )
+                    }
+                    MissionPanel(
+                        mission = ring.alarm.mission,
+                        type = missionType,
+                        onSolved = onDismiss,
+                        onInteraction = onMissionInteraction
+                    )
+                }
+                Spacer(Modifier.height(Spacing.lg))
+            } else {
+                Spacer(Modifier.weight(1f))
+                Box(contentAlignment = Alignment.Center) {
+                    PulseRings(size = 240.dp)
+                    IconBadge(icon = Icons.Rounded.Alarm, size = 88.dp)
+                }
+                Spacer(Modifier.weight(1f))
             }
-            Spacer(Modifier.weight(1f))
 
             if (ring.reason == RingReason.TEST) {
                 Text(
@@ -137,12 +196,24 @@ fun AlarmRingScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                Row {
-                    PrimaryButton(text = "Dismiss", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+                when {
+                    !hasMission -> PrimaryButton(text = "Dismiss", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+                    !missionStarted -> PrimaryButton(
+                        text = "Start mission · ${missionLabel(ring.alarm.mission, missionType)}",
+                        onClick = onStartMission,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
     }
+}
+
+private fun missionLabel(mission: AlarmMission, type: MissionType): String = when (type) {
+    MissionType.MATH -> pluralize(mission.count, "problem")
+    MissionType.TYPING -> if (mission.customText.isNotBlank()) "type your text" else pluralize(mission.count, "sentence")
+    MissionType.STEPS -> "${mission.steps} steps"
+    MissionType.NONE -> ""
 }
 
 private fun ringTitle(ring: ActiveRing): String {

@@ -12,9 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.example.screenmanager.ui.feature.alarms.ring.AlarmRingRoute
 import com.example.screenmanager.ui.theme.AppSection
+import com.example.screenmanager.ui.theme.AuroraBackground
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 import com.example.screenmanager.ui.theme.SectionTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Ekran alarma koji zvoni. Prikazuje se preko zaključanog ekrana i pali
@@ -36,19 +39,22 @@ class AlarmRingActivity : ComponentActivity() {
             override fun handleOnBackPressed() = Unit
         })
 
-        if (AlarmRingSession.active.value == null) {
-            finish()
-            return
-        }
+        // Full-screen notifikacija može da otvori ekran pre nego što servis
+        // učita alarm iz baze — sačekaj kratko, pa se zatvori kad zvonjenje prestane.
         lifecycleScope.launch {
-            AlarmRingSession.active.collect { if (it == null) finishAndRemoveTask() }
+            val started = withTimeoutOrNull(START_TIMEOUT_MS) { AlarmRingSession.active.first { it != null } }
+            if (started != null) AlarmRingSession.active.first { it == null }
+            finishAndRemoveTask()
         }
 
         setContent {
             val ring by AlarmRingSession.active.collectAsState()
             ScreenManagerTheme {
                 SectionTheme(AppSection.Alarms) {
-                    ring?.let { active ->
+                    val active = ring
+                    if (active == null) {
+                        AuroraBackground {}
+                    } else {
                         AlarmRingRoute(
                             ring = active,
                             onSnooze = { AlarmRingService.command(this, AlarmRingService.ACTION_SNOOZE) },
@@ -59,5 +65,9 @@ class AlarmRingActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val START_TIMEOUT_MS = 5_000L
     }
 }

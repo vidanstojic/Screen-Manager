@@ -9,6 +9,7 @@ import com.example.screenmanager.alarm.data.AlarmPermissions
 import com.example.screenmanager.alarm.data.PendingSnooze
 import com.example.screenmanager.alarm.domain.AlarmDetoxLock
 import com.example.screenmanager.alarm.domain.PendingWakeCheck
+import com.example.screenmanager.alarm.service.AlarmNotifications
 import com.example.screenmanager.alarm.service.WakeCheckController
 import com.example.screenmanager.alarm.service.AlarmRingService
 import com.example.screenmanager.domain.ServiceLocator
@@ -94,6 +95,7 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 alarmScheduler.cancelAlarm(alarm.id)
                 runtimeStore.removeSnooze(alarm.id)
+                AlarmNotifications(getApplication()).cancelSnoozed(alarm.id)
             }
         }
     }
@@ -107,6 +109,7 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
             alarmRepository.deleteById(alarmId)
             alarmScheduler.cancelAlarm(alarmId)
             runtimeStore.removeSnooze(alarmId)
+            AlarmNotifications(getApplication()).cancelSnoozed(alarmId)
             WakeCheckController(getApplication()).cancel(alarmId)
         }
     }

@@ -155,6 +155,8 @@ fun AlarmEditorScreen(
                 onValueChange = { draft = draft.copy(label = it) },
                 label = "Name (optional)"
             )
+            AlarmSoundSection(sound = draft.sound, onChange = { draft = draft.copy(sound = it) })
+            AlarmSnoozeSection(snooze = draft.snooze, onChange = { draft = draft.copy(snooze = it) })
         }
     }
 }

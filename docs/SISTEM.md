@@ -1,6 +1,6 @@
 # ScreenManager (Focus Flow) — kako sistem radi
 
-> Dokument opisuje stanje grane `refactor/ui` (engine: `refactor/phase1-engine`, commit-i `f18f733`, `e61ca36`, `2d199e3`, `fcfdb9c`; UI: poglavlje 10).
+> Dokument opisuje stanje grane `feature/smart-alarm` (engine: `refactor/phase1-engine`, commit-i `f18f733`, `e61ca36`, `2d199e3`, `fcfdb9c`; UI: poglavlje 10, grana `refactor/ui`; Smart Alarm Phase 2: poglavlje 9).
 > Za svaki deo: **šta** radi, **gde** je u kodu, **zašto** je tako urađeno i **kako** radi iznutra.
 > Putanje su relativne u odnosu na `app/src/main/java/com/example/screenmanager/`.
 
@@ -16,7 +16,7 @@
 6. [FocusMonitorService — sprovođenje pravila](#6-focusmonitorservice--sprovođenje-pravila)
 7. [Blok ekran (overlay)](#7-blok-ekran-overlay)
 8. [Shorts/Reels blocker (AccessibilityService)](#8-shortsreels-blocker-accessibilityservice)
-9. [Jutarnja blokada i veza sa Smart Alarm-om](#9-jutarnja-blokada-i-veza-sa-smart-alarm-om)
+9. [Smart Alarm (Phase 2) i jutarnja blokada](#9-smart-alarm-phase-2-i-jutarnja-blokada)
 10. [UI sloj](#10-ui-sloj)
 11. [Pokretanje, dozvole i životni ciklus](#11-pokretanje-dozvole-i-životni-ciklus)
 12. [Vreme, dani i DST](#12-vreme-dani-i-dst)
@@ -171,9 +171,10 @@ Room Flow-ovi se sami osvežavaju posle svakog sync-a (invalidacija tabele), pa 
 
 ## 4. Baza podataka (Room v5)
 
-Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version = 6`.
+Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version = 7`.
 
 - **5 → 6:** prava migracija `MIGRATION_5_6` (4× `ALTER TABLE short_video_configs ADD COLUMN ...` za `mode`, `sessionLengthMinutes`, `maxSessions`, `cooldownMinutes`), pa se pravila i istorija čuvaju. Default vrednosti u SQL-u moraju biti iste kao `@ColumnInfo(defaultValue)` u `ShortVideoConfigEntity`, inače Room pri otvaranju baze prijavi da migracija nije ispravna. Provereno: `PRAGMA table_info` posle migracije je jednak Room-ovom očekivanom `TableInfo`.
+- **6 → 7:** prava migracija `MIGRATION_6_7` (19× `ALTER TABLE alarms ADD COLUMN ...`, lista `ALARM_V7_COLUMNS`): podešavanja po alarmu (zvuk, odlaganje, misija, wake-up detox, wake-up check). Postojeći alarmi dobijaju podrazumevane vrednosti. Provereno: `PRAGMA table_info` posle migracije stare v6 tabele je jednak tabeli koju pravi SQL iz Room-ovog generisanog koda (kapt).
 - **Starije od 5:** `fallbackToDestructiveMigration(dropAllTables = true)`. Pravila se ponovo seed-uju, a istorija se povlači iz UsageStats.
 
 | Tabela | Entitet | Sadržaj | Ključ |
@@ -188,7 +189,7 @@ Fajl: `data/local/ScreenManagerDatabase.kt`, ime `screen_manager.db`, `version =
 | `short_video_configs` | `ShortVideoConfigEntity` | Shorts/Reels pravilo (jedan red): mod i parametri | `"shorts_global"` |
 | `wake_up_configs` | `WakeUpConfigEntity` | jutarnja blokada (jedan red) | `"wakeup_global"` |
 | `emergency_sessions` | `EmergencySessionConfigEntity` | emergency sesija (`activeUntilMillis`) | `"emergency_global"` |
-| `alarms` | `AlarmEntity` | Smart Alarm | — |
+| `alarms` | `AlarmEntity` | Smart Alarm: vreme, dani, naziv + podešavanja po alarmu (v7) | `id` |
 
 **Ključevi u `app_internal_state`** (`domain/AppStateKeys.kt`):
 
@@ -354,13 +355,95 @@ Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET 
 
 ---
 
-## 9. Jutarnja blokada i veza sa Smart Alarm-om
+## 9. Smart Alarm (Phase 2) i jutarnja blokada
 
-- **Ugovor:** `domain/wakeup/WakeUpLockout.kt`, `interface WakeUpLockoutTrigger { suspend fun trigger(source: WakeUpSource, now): Long? }`, sa izvorima `SCREEN_HEURISTIC`, `ALARM_DISMISSED`, `MANUAL`.
-- **Implementacija:** `data/repository/WakeUpLockoutController.kt`. Čita `WakeUpConfig` i, ako je uključen i ima aplikacija, upisuje `wakeup_blocked_until = now + blockDurationMinutes`. Već aktivnu dužu blokadu ne skraćuje.
-- **Heuristika** (u `FocusMonitorService`): ekran se upalio posle ≥ `inactivityHours` mraka. Posle `triggerDelayMinutes`, ako je ekran i dalje upaljen i korisnik koristi neku aplikaciju, poziva se `trigger(SCREEN_HEURISTIC)`.
-- **Smart Alarm (Phase 2):** notifikacija alarma ima akciju „Dismiss“ → `AlarmReceiver.ACTION_DISMISS_ALARM` → `trigger(ALARM_DISMISSED)`. Alarm modul zavisi samo od interfejsa, ne od engine-a (TRS 2.5).
-- **Sprovođenje:** `RulesEngine` vraća `WAKE_UP` za pakete iz `WakeUpConfig.selectedAppIds` dok blokada traje.
+Smart Alarm je drugi deo aplikacije (ulaz sa početnog ekrana). Phase 2 (grana `feature/smart-alarm`, 08.10.2026) donosi pravo zvonjenje, zvuke, misije, wake-up detox i wake-up check. Sav nov kod je u paketu **`alarm/`** i u `ui/feature/alarms/`; Screen Manager zna samo za ugovor wake-up detox-a (§9.6).
+
+### 9.1 Gde se šta nalazi
+
+| Fajl | Uloga | Android? |
+|---|---|---|
+| `model/AlarmRule.kt` | alarm + `AlarmSound`, `SnoozeConfig`, `AlarmMission`, `WakeUpDetox`, `WakeCheckConfig` (Serializable — radna kopija u formi) | Ne |
+| `alarm/domain/NextAlarmCalculator.kt` | sledeći termin (java.time, `now` i zona spolja, DST) | Ne |
+| `alarm/domain/RingPolicy.kt` | `RingReason`, odlaganje, postepeno pojačavanje, utišavanje tokom misije, jačina toka | Ne |
+| `alarm/domain/Missions.kt` | računi, rečenice, koraci, zamena koraka računom | Ne |
+| `alarm/domain/WakeUpDetoxPolicy.kt` | `AlarmDetoxLock`, spajanje blokada, `SiteRules` (domeni) | Ne |
+| `alarm/domain/WakeCheckPolicy.kt` | runde provere, rok, „da li ponovo zvoniti“ | Ne |
+| `alarm/AlarmModule.kt` | fabrika alarm singletona (odvojena od `ServiceLocator`) | Da |
+| `alarm/data/` | `AlarmRuntimeStore` (odlaganja, provere), `AlarmDetoxStore`, `AlarmTones` (katalog), `TonePreview` + `CustomTones`, `AlarmPermissions` | Da |
+| `alarm/service/` | `AlarmRingService`, `AlarmRingActivity`, `AlarmPlayer`, `AlarmNotifications`, `AlarmRingSession`, `AlarmDismissFlow`, `StepSensor`, `WebsiteGuard`, `WakeCheckController` / `Receiver` / `Activity`, `AlarmSystemEventsReceiver` | Da |
+| `domain/AlarmScheduler.kt`, `service/AlarmReceiver.kt` | zakazivanje (redovan termin + odlaganje) i prijem okidača | Da |
+| `ui/feature/alarms/` | lista, forma (`Alarm*Section.kt` — jedna grupa podešavanja po fajlu), `ring/` (ekran alarma, misije, „Are you awake?“) | Da |
+
+### 9.2 Tok jednog jutra
+
+```
+setAlarmClock ──► AlarmReceiver.FIRE ──► AlarmRingService (FGS, zvuk) ──► AlarmRingActivity
+                     └─ zakazuje sledeći termin                 │              (preko lock screen-a)
+                                                                │
+           Snooze ◄──────────────────────────────────────────── ┤ (ako je dozvoljeno)
+             └─ setAlarmClock(+N min) ─► AlarmReceiver.SNOOZE ─► ponovo zvoni
+                                                                │
+           Dismiss (odmah, ili tek posle rešene misije) ◄────────┘
+             └─ AlarmDismissFlow
+                  ├─ wake-up detox: AlarmDetoxStore.start(lock) ─► RulesEngine (aplikacije) + WebsiteGuard (sajtovi)
+                  └─ wake-up check: posle 5/10 min „Are you awake?“ ─► bez potvrde 2 min ─► ponovo zvoni (RingReason.WAKE_CHECK)
+```
+
+### 9.3 Zvonjenje
+
+- **`AlarmRingService`** (foreground, tip `mediaPlayback`): `startForeground` odmah (rok 5 s), pa čitanje alarma iz baze. Pokretanje iz pozadine je dozvoljeno jer ga pokreće tačan alarm. Novi alarm prekida onaj koji već zvoni. Posle **10 min** bez reakcije alarm se sam odloži (ili utiša i ostavi „Missed alarm“ ako odlaganje nije moguće).
+- **`AlarmPlayer`**: `MediaPlayer` na `USAGE_ALARM` (čuje se i na nečujnom); za vreme zvonjenja postavlja jačinu ALARM toka na podešenu (nikad 0) i posle je vraća. Pojačavanje od 10 % do 100 % za 0/15/30/60 s. Vibracija sa `USAGE_ALARM`. Ako izabrani zvuk ne može da se pusti (obrisan fajl), redom pokušava: podrazumevani zvuk aplikacije → sistemski alarm → melodiju zvona.
+- **Ekran alarma** (`AlarmRingActivity`, `showWhenLocked` + `turnScreenOn`, bez „nazad“): otvara ga full-screen notifikacija na zaključanom telefonu; kad je telefon u upotrebi, servis ga otvara direktno (dozvoljeno uz „Display over other apps“). Ekran čeka do 5 s da servis učita alarm, a zatvara se čim zvonjenje prestane (bilo kojim putem). Stanje deli preko `AlarmRingSession` (StateFlow u procesu).
+- **Odlaganje**: trajanje 1–30 min, najviše 1–10 puta zaredom; zakazuje se sa `setAlarmClock` i pamti u `AlarmRuntimeStore` (preživljava restart). Odloženi alarm bez misije ima „Dismiss now“ na notifikaciji.
+- **Test** u formi: zvoni odmah sa podešavanjima iz forme (i pre čuvanja); bez odlaganja, detox-a i provere.
+- **`AlarmSystemEventsReceiver`**: posle restarta vraća odlaganja i provere; posle promene vremena ili zone ponovo računa sve termine.
+
+### 9.4 Zvuci
+
+- Šest zvukova aplikacije (`res/raw/alarm_*.ogg`: Sunrise, Marimba, Wind chimes, Morning birds, Pulse, Classic beep) — **sintetizovani za projekat** (`tools/generate_alarm_tones.py`, numpy + ffmpeg), bez tuđih snimaka i licenci.
+- „System default“ — sistemski zvuk alarma.
+- „Choose a file…“ — bilo koji audio fajl (Storage Access Framework); aplikacija uzima trajnu dozvolu za čitanje i pamti ime fajla.
+- `toneId` u bazi: `builtin:<ime>`, `system` ili `custom:<uri>`. Proba u formi ide preko MEDIA toka (ne trešti punom jačinom alarma).
+
+### 9.5 Misije
+
+| Misija | Podešavanja | Gašenje |
+|---|---|---|
+| None | — | jedan dodir |
+| Math | težina (Easy `47 + 38`, Medium `7 × 14 + 23`, Hard `13 × 7 + 16 × 8`), 1–10 računa | svi tačni |
+| Typing | 1–5 rečenica iz liste ili sopstveni tekst | prekucano (velika/mala slova, višak razmaka i tačka na kraju se ne računaju) |
+| Steps | 10–300 koraka | senzor `TYPE_STEP_DETECTOR` |
+
+- Sa misijom alarm **ne može da se ugasi bez rešavanja** — samo da se odloži (ako je odlaganje uključeno). Notifikacija tada nema „Dismiss“.
+- Dok korisnik rešava, zvuk je utišan na 15 %; posle 30 s bez unosa vraća se puna jačina.
+- Koraci traže dozvolu „Physical activity“ (traži se iz forme). Bez senzora ili dozvole koristi se Math, da alarm ne postane nemoguć za gašenje.
+- Zadaci se prave iz semena u `rememberSaveable` — rotacija ne menja račun.
+
+### 9.6 Wake-up detox (posle gašenja alarma)
+
+- Po alarmu: uključeno, trajanje 5 min – 4 h, **aplikacije** i **sajtovi** (domeni; blokiraju se i poddomeni).
+- Pali ga gašenje alarma (i posle odlaganja), ali ne ponovno zvonjenje zbog wake-up check-a. Drugi alarm ne skraćuje aktivnu blokadu — kraj je kasniji od dva, liste se spajaju.
+- **Aplikacije** — jedine izmene na Screen Manager strani: `RuntimeState.alarmDetox*` + `BlockReason.ALARM_DETOX` u `RulesEngine`; `FocusMonitorService` prosleđuje `AlarmDetoxStore.lock` (StateFlow, bez upita po tick-u). Overlay pokazuje „Wake-up detox is active · <naziv alarma>“. Emergency pauza ukida i detox.
+- **Sajtovi** — `WebsiteGuard` radi unutar postojećeg Accessibility servisa: čita adresnu traku poznatih browsera (Chrome, Samsung Internet, Firefox, Edge, Brave, Opera, Vivaldi, Kiwi, DuckDuckGo) i šalje korisnika na Home uz poruku do kada traje detox. **Browseri se dodaju u filter paketa servisa samo dok traje detox sa sajtovima** — ostatak dana servis ne dobija nijedan događaj iz browsera.
+- Forma upozorava ako servisi koji sprovode detox nisu uključeni; lista alarma prikazuje aktivan detox.
+
+### 9.7 Wake-up check
+
+- Po alarmu: uključeno, pitanje 5 ili 10 min posle gašenja.
+- U tom trenutku: full-screen „Are you awake?“ sa odbrojavanjem od 2 min (i notifikacija sa „I'm awake“). Bez potvrde → alarm ponovo zvoni (sa misijom). Posle njegovog gašenja → nova provera; najviše 3 po jutru.
+- Okidači su tačni i rade u Doze-u (`setExactAndAllowWhileIdle`); stanje je u `AlarmRuntimeStore` i vraća se posle restarta. Brisanje alarma otkazuje proveru.
+
+### 9.8 Jutarnja blokada (Screen Manager) i „detox bez alarma“
+
+- **Ugovor:** `domain/wakeup/WakeUpLockout.kt`, `WakeUpLockoutTrigger.trigger(source)`; **implementacija:** `data/repository/WakeUpLockoutController.kt` (upisuje `wakeup_blocked_until`).
+- **Heuristika** (`FocusMonitorService`): ekran se upalio posle ≥ `inactivityHours` mraka; posle `triggerDelayMinutes`, ako je ekran i dalje upaljen i korisnik koristi neku aplikaciju → `trigger(SCREEN_HEURISTIC)`; `RulesEngine` vraća `WAKE_UP` za aplikacije iz `WakeUpConfig`.
+- **Odluka (08.10.2026):** stavka specifikacije „Detox bez alarma“ (sistem prepozna da je korisnik ustao i blokira izabrane aplikacije na izabrano vreme) je **preskočena**, jer je to upravo ova postojeća Morning lock funkcija (Limits → Morning lock).
+- Ranije je „Dismiss“ na notifikaciji alarma palio Morning lock (`ALARM_DISMISSED`). To je zamenjeno detox-om po alarmu (§9.6); izvor `ALARM_DISMISSED` ostaje u ugovoru, ali ga alarm više ne koristi.
+
+### 9.9 Dozvole za alarme
+
+Lista alarma prikazuje karticu sa dozvolama koje fale (svaka vodi na svoj sistemski ekran): **Notifications**, **Alarms & reminders** (tačni alarmi), **Full-screen alarm** (`USE_FULL_SCREEN_INTENT`, Android 14+ može biti isključena), **Display over other apps**. Misija „Steps“ traži **Physical activity**, a detox sa sajtovima **Accessibility** servis.
 
 ---
 
@@ -460,6 +543,9 @@ Važni detalji:
 | `FOREGROUND_SERVICE(_SPECIAL_USE)` | monitoring servis | manifest |
 | `RECEIVE_BOOT_COMPLETED` | restart posle boot-a | manifest (`BootReceiver`) |
 | `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` | Smart Alarm | manifest |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`, `VIBRATE` | zvonjenje (`AlarmRingService`) | manifest |
+| `USE_FULL_SCREEN_INTENT` | ekran alarma preko zaključanog telefona | Smart Alarms → kartica dozvola |
+| `ACTIVITY_RECOGNITION` | misija „Steps“ | forma alarma (runtime zahtev) |
 | `QUERY_ALL_PACKAGES` | lista instaliranih aplikacija, launcher-i | manifest |
 
 **Tok pri pokretanju aplikacije:**
@@ -482,7 +568,7 @@ Važni detalji:
 
 ## 13. Testovi i verifikacija
 
-JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (60 testova: 27 za engine u `domain/`, 33 za UI logiku u `ui/`):
+JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (106 testova: 27 za engine u `domain/`, 33 za UI logiku u `ui/`, 46 za Smart Alarm u `alarm/` i `data/local/`):
 
 | Test | Pokriva |
 |---|---|
@@ -496,6 +582,13 @@ JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (60 testova: 27
 | `ui/feature/limits/RuleSummariesTest` | opisi pravila u jednom redu, nazivi grupa dana |
 | `ui/feature/alarms/AlarmFormatTest` | zapis dana alarma ↔ `DayOfWeek` (isti tokeni koje čita `AlarmScheduler`), „in 7h 20m“ |
 | `ui/model/UsageUiModelsTest` | popunjavanje sati/dana nulama, poslednjih 7 dana |
+| `alarm/domain/NextAlarmCalculatorTest` | jednokratni i ponavljajući alarm, „isti dan sledeće nedelje“, `now` spolja, **DST rupa (29.03.) i preklapanje (25.10.)** |
+| `alarm/domain/RingPolicyTest` | granica odlaganja, pojačavanje, utišavanje tokom misije, jačina toka nikad 0 |
+| `alarm/domain/MissionsTest` | rezultat računa odgovara prikazanom izrazu (500 primera po težini), težine rastu, isto seme = isti računi, poređenje teksta, zamena koraka računom |
+| `alarm/domain/WakeUpDetoxPolicyTest` | blokada, spajanje bez skraćivanja, normalizacija i poklapanje domena, `RulesEngine` → `ALARM_DETOX`, emergency ukida detox |
+| `alarm/domain/WakeCheckPolicyTest` | runde, rok od 2 min, ponovno zvonjenje samo za nepotvrđenu proveru iste runde |
+| `alarm/data/AlarmTonesTest` | katalog zvukova i prikazna imena |
+| `data/local/AlarmEntityMappingTest` | entitet ↔ model bez gubitka, red iz v6 → podrazumevane opcije, nepoznat enum, serijalizacija radne kopije |
 | `ui/feature/limits/RuleDraftSerializationTest` | radne kopije pravila (sa listama i skupovima kakve pravi baza) preživljavaju serijalizaciju → forme ne padaju pri rotaciji |
 
 Pokretanje: `./gradlew testDebugUnitTest`.
@@ -553,6 +646,15 @@ Rezervna kopija stanja pre refaktora: `git stash apply refs/backup/pre-refactor`
 1. `AppLimitRule.blockDurationMinutes`: dati mu značenje (npr. kazna, pa novi budžet) ili ga ukloniti iz modela i UI-ja?
 2. Dnevni limit: **grupni** (sada) ili po aplikaciji?
 3. Pauza K: da li važi i kad korisnik sam izađe iz aplikacije (sada važi)?
+
+**Smart Alarm (Phase 2) — provera na uređaju:**
+- zvonjenje na zaključanom i otključanom telefonu (full-screen ekran; na Android 14+ proveriti dozvolu „Full-screen alarm“ na kartici u Smart Alarms);
+- zvuci aplikacije i fajl sa telefona, jačina i pojačavanje, vibracija;
+- misije (posebno Steps na S25 FE), odlaganje i „Dismiss now“;
+- wake-up detox: blokada aplikacija (overlay) i sajtova u Chrome/Samsung Internet (ID-jevi adresne trake se mogu razlikovati po verziji browsera — u logcat-u tag `WebsiteGuard`);
+- wake-up check: pitanje posle 5/10 min i ponovno zvonjenje.
+
+**Smart Alarm — kasnija faza (nije rađeno, po specifikaciji):** Sleep cycle alarm, Smart house alarm (switch bot), zvuci za spavanje. Arhitektura ostavlja mesta: novi `RingReason`/izvor zvonjenja, nova grupa podešavanja u `AlarmRule` + kolona u bazi, nova sekcija forme.
 
 **Nije urađeno:**
 - UI refaktor (grana `refactor/ui`) je kompajliran i pokriven testovima logike, ali **izgled i ponašanje na uređaju još nisu provereni**.

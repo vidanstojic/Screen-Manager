@@ -47,6 +47,7 @@ import com.example.screenmanager.ui.feature.limits.RuleTarget
 import com.example.screenmanager.ui.model.UsageRange
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
+import java.time.LocalTime
 
 /** Stateful ulaz u ekran detalja aplikacije. */
 @Composable
@@ -251,7 +252,7 @@ private fun AppUsageChart(state: AppDetailsUiState, range: UsageRange, modifier:
             highlightIndex = when {
                 !isDay -> 6
                 state.days.firstOrNull { it.dayStart == state.selectedDayStart }?.isToday == true ->
-                    java.time.LocalTime.now().hour
+                    LocalTime.now().hour
                 else -> null
             },
             animationKey = range to state.selectedDayStart

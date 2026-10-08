@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -161,7 +162,7 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
             UsageRange.Month -> List(count) { index -> "${today.month.shortName()} ${index + 1}" }
         }
 
-    private fun currentHour(): Int = java.time.LocalTime.now().hour
+    private fun currentHour(): Int = LocalTime.now().hour
 
     private fun Long.toLocalDate(): LocalDate = LocalDate.ofEpochDay(TimeBuckets.epochDay(this))
     private fun java.time.DayOfWeek.shortName(): String = getDisplayName(TextStyle.SHORT, Locale.ENGLISH)

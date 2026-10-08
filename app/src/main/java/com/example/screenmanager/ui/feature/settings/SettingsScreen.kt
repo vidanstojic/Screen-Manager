@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.PermissionState
 import com.example.screenmanager.domain.PermissionStateChecker
 import com.example.screenmanager.ui.AppViewModel
+import com.example.screenmanager.ui.common.formatMinutes
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.CardDivider
@@ -37,6 +39,8 @@ import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
+import com.example.screenmanager.ui.components.StepperRow
+import com.example.screenmanager.ui.components.SwitchRow
 import com.example.screenmanager.ui.components.TextAction
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
@@ -45,19 +49,33 @@ import com.example.screenmanager.ui.theme.Spacing
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
-    appViewModel: AppViewModel = viewModel()
+    appViewModel: AppViewModel = viewModel(),
+    viewModel: SettingsViewModel = viewModel()
 ) {
     val permissions by appViewModel.permissionState.collectAsState()
-    SettingsScreen(permissions = permissions, onBack = onBack)
+    val dailyGoalMinutes by viewModel.dailyGoalMinutes.collectAsState()
+    SettingsScreen(
+        permissions = permissions,
+        dailyGoalMinutes = dailyGoalMinutes,
+        onDailyGoalEnabledChange = viewModel::setDailyGoalEnabled,
+        onDailyGoalChange = viewModel::setDailyGoalMinutes,
+        onBack = onBack
+    )
 }
 
 /**
- * Settings: sistemske dozvole (TRS §3) i informacije o aplikaciji.
+ * Settings: dnevni cilj, sistemske dozvole (TRS §3) i informacije o aplikaciji.
  * Stanje dozvola se osvežava samo po povratku iz sistemskih podešavanja
  * (ON_RESUME → AppViewModel).
  */
 @Composable
-fun SettingsScreen(permissions: PermissionState, onBack: () -> Unit) {
+fun SettingsScreen(
+    permissions: PermissionState,
+    dailyGoalMinutes: Int?,
+    onDailyGoalEnabledChange: (Boolean) -> Unit,
+    onDailyGoalChange: (Int) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
 
     AppScreen(title = "Settings", onBack = onBack) {
@@ -68,7 +86,29 @@ fun SettingsScreen(permissions: PermissionState, onBack: () -> Unit) {
                 .padding(ScreenContentPadding),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            SectionHeader(title = "Permissions")
+            SectionHeader(title = "Daily goal")
+            AppCard(contentPadding = PaddingValues(0.dp)) {
+                SwitchRow(
+                    title = "Screen time goal",
+                    subtitle = "Shows a ring on the Screen Manager overview: how much of your daily goal you have used.",
+                    checked = dailyGoalMinutes != null,
+                    onCheckedChange = onDailyGoalEnabledChange,
+                    leading = { IconBadge(icon = Icons.Rounded.TrackChanges) }
+                )
+                if (dailyGoalMinutes != null) {
+                    CardDivider()
+                    StepperRow(
+                        label = "Goal per day",
+                        value = dailyGoalMinutes,
+                        onValueChange = onDailyGoalChange,
+                        range = 30..720,
+                        step = 30,
+                        valueLabel = ::formatMinutes
+                    )
+                }
+            }
+
+            SectionHeader(title = "Permissions", modifier = Modifier.padding(top = Spacing.md))
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 PermissionRow(
                     icon = Icons.Rounded.QueryStats,

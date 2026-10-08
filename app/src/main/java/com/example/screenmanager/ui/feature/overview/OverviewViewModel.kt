@@ -36,7 +36,9 @@ data class OverviewUiState(
     /** Kraj aktivne emergency pauze, ili null. */
     val emergencyPauseUntil: Long? = null,
     /** Kraj aktivne jutarnje blokade, ili null. */
-    val morningLockUntil: Long? = null
+    val morningLockUntil: Long? = null,
+    /** Dnevni cilj iz podešavanja, u ms; null ako cilj nije postavljen. */
+    val dailyGoalMs: Long? = null
 )
 
 /**
@@ -49,6 +51,7 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
     private val settings = ServiceLocator.settingsRepository(application)
     private val runtimeState = ServiceLocator.runtimeStateRepository(application)
     private val installedApps = ServiceLocator.installedApps(application)
+    private val preferences = ServiceLocator.uiPreferences(application)
 
     private val today = MutableStateFlow(TimeBuckets.startOfToday())
 
@@ -81,9 +84,10 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
         usage,
         settings.observeRulesSnapshot(),
         runtimeState.observeWakeUpBlockedUntil(),
+        preferences.observeDailyGoalMinutes(),
         // Poređenje sa jučerašnjim danom i "aktivno do" zavise od trenutnog vremena.
         tickerFlow()
-    ) { usage, rules, morningLockUntil, now ->
+    ) { usage, rules, morningLockUntil, goalMinutes, now ->
         OverviewUiState(
             todayMs = usage.todayHourlyMs.sum(),
             yesterdaySameTimeMs = usageUntilTimeOfDay(usage.yesterdayHourlyMs, now).takeIf { it > 0 },
@@ -91,7 +95,8 @@ class OverviewViewModel(application: Application) : AndroidViewModel(application
             topApps = usage.topApps,
             protection = rules.toProtectionSummary(),
             emergencyPauseUntil = rules.emergency?.activeUntilMillis?.takeIf { it > now },
-            morningLockUntil = morningLockUntil?.takeIf { it > now }
+            morningLockUntil = morningLockUntil?.takeIf { it > now },
+            dailyGoalMs = goalMinutes?.let { it * 60_000L }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OverviewUiState())
 

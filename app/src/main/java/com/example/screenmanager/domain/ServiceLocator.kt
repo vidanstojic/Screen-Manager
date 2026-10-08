@@ -6,6 +6,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.screenmanager.data.apps.InstalledAppsSource
 import com.example.screenmanager.data.local.ScreenManagerDatabase
+import com.example.screenmanager.data.preferences.UiPreferences
 import com.example.screenmanager.data.repository.AlarmRepository
 import com.example.screenmanager.data.repository.AppLimitRulesRepository
 import com.example.screenmanager.data.repository.EmergencySessionConfigRepository
@@ -33,6 +34,9 @@ object ServiceLocator {
 
     @Volatile
     private var installedApps: InstalledAppsSource? = null
+
+    @Volatile
+    private var uiPreferences: UiPreferences? = null
 
     fun database(context: Context) = ScreenManagerDatabase.getInstance(context)
 
@@ -82,6 +86,13 @@ object ServiceLocator {
     }
 
     fun permissionStateChecker(context: Context) = PermissionStateChecker(context.applicationContext)
+
+    /** Keširano: podešavanja prikaza (dnevni cilj) dele Settings i Overview. */
+    fun uiPreferences(context: Context): UiPreferences {
+        return uiPreferences ?: synchronized(this) {
+            uiPreferences ?: UiPreferences(context).also { uiPreferences = it }
+        }
+    }
 
     /** Keširano: imena i lista instaliranih aplikacija se dele između ekrana. */
     fun installedApps(context: Context): InstalledAppsSource {

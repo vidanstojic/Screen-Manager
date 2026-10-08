@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
@@ -22,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -37,6 +39,7 @@ import com.example.screenmanager.ui.common.OnResume
 import com.example.screenmanager.ui.common.formatClock
 import com.example.screenmanager.ui.common.formatDuration
 import com.example.screenmanager.ui.common.pluralize
+import com.example.screenmanager.ui.common.rememberCountUp
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.AppUsageRow
@@ -45,6 +48,7 @@ import com.example.screenmanager.ui.components.ChevronIcon
 import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
+import com.example.screenmanager.ui.components.ProgressRing
 import com.example.screenmanager.ui.components.ScreenContentPadding
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StatusPill
@@ -131,7 +135,7 @@ fun OverviewScreen(
                 }
             }
             item(key = "today") {
-                ScreenTimeCard(state = state, onClick = onOpenStats)
+                ScreenTimeCard(state = state, onClick = onOpenStats, onSetGoal = onOpenSettings)
             }
             item(key = "top-apps") {
                 TopAppsSection(apps = state.topApps, onOpenApp = onOpenApp, onSeeAll = onOpenStats)
@@ -185,59 +189,99 @@ private fun EmergencyBanner(until: Long, onEnd: () -> Unit) {
     }
 }
 
-/** Glavna kartica: ukupno vreme danas, poređenje sa jučerašnjim danom i mini grafik po satima. */
+/**
+ * Glavna kartica: ukupno vreme danas (odbrojava se pri otvaranju), prsten
+ * dnevnog cilja, poređenje sa jučerašnjim danom i mini grafik po satima.
+ * Bez postavljenog cilja umesto prstena nudi link ka podešavanju cilja.
+ */
 @Composable
-private fun ScreenTimeCard(state: OverviewUiState, onClick: () -> Unit) {
+private fun ScreenTimeCard(state: OverviewUiState, onClick: () -> Unit, onSetGoal: () -> Unit) {
+    val colors = AppTheme.colors
+    val shownMs = rememberCountUp(state.todayMs)
+    val goalMs = state.dailyGoalMs
+    val numberStyle = (if (goalMs != null) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayMedium)
+        .copy(brush = Brush.linearGradient(listOf(colors.textPrimary, lerp(colors.textPrimary, colors.accent, 0.55f))))
+
     AppCard(
         onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
         contentPadding = PaddingValues(Spacing.xl)
     ) {
-        Text(
-            text = "SCREEN TIME TODAY",
-            style = MaterialTheme.typography.labelSmall,
-            color = AppTheme.colors.textMuted
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            text = formatDuration(state.todayMs),
-            // Blagi prelaz bele u ton akcenta daje broju dubinu.
-            style = MaterialTheme.typography.displayMedium.copy(
-                brush = Brush.linearGradient(
-                    listOf(AppTheme.colors.textPrimary, lerp(AppTheme.colors.textPrimary, AppTheme.colors.accent, 0.55f))
-                )
-            )
-        )
-        Spacer(Modifier.height(Spacing.md))
-        TrendPill(todayMs = state.todayMs, yesterdaySameTimeMs = state.yesterdaySameTimeMs)
-        Spacer(Modifier.height(Spacing.xl))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (goalMs != null) {
+                GoalRing(todayMs = state.todayMs, goalMs = goalMs)
+                Spacer(Modifier.width(Spacing.lg))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "SCREEN TIME TODAY", style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
+                Spacer(Modifier.height(Spacing.xs))
+                Text(text = formatDuration(shownMs), style = numberStyle, maxLines = 1)
+                Spacer(Modifier.height(Spacing.sm))
+                TrendPill(todayMs = state.todayMs, yesterdaySameTimeMs = state.yesterdaySameTimeMs)
+            }
+        }
+        if (goalMs == null) {
+            Spacer(Modifier.height(Spacing.sm))
+            TextAction(text = "Set a daily goal", onClick = onSetGoal)
+        }
+        Spacer(Modifier.height(Spacing.lg))
         HourlySparkBars(hourlyMs = state.hourlyMs)
         Spacer(Modifier.height(6.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             listOf("00", "06", "12", "18", "24").forEach { label ->
-                Text(text = label, style = MaterialTheme.typography.bodySmall, color = AppTheme.colors.textMuted)
+                Text(text = label, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
             }
         }
     }
 }
 
-/** "12% less than yesterday" — poredi se sa jučerašnjim danom DO ISTOG doba dana. */
+/** Prsten: koliko je dnevnog cilja potrošeno. Preko cilja prelazi u boje upozorenja. */
+@Composable
+private fun GoalRing(todayMs: Long, goalMs: Long) {
+    val colors = AppTheme.colors
+    val ratio = todayMs.toFloat() / goalMs
+    val overGoal = ratio > 1f
+    val progress = rememberCountUp(ratio.coerceAtMost(1f))
+    ProgressRing(
+        progress = progress,
+        size = 118.dp,
+        strokeWidth = 12.dp,
+        colors = if (overGoal) listOf(colors.warning, colors.danger) else listOf(colors.accent, colors.highlight)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = if (overGoal) "+${formatDuration(todayMs - goalMs)}" else "${(ratio * 100).roundToInt()}%",
+                style = MaterialTheme.typography.titleLarge,
+                color = if (overGoal) colors.warning else colors.textPrimary,
+                maxLines = 1
+            )
+            Text(
+                text = if (overGoal) "over goal" else "of ${formatDuration(goalMs)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/** "↓18% vs yesterday" — poredi se sa jučerašnjim danom DO ISTOG doba dana. */
 @Composable
 private fun TrendPill(todayMs: Long, yesterdaySameTimeMs: Long?) {
     if (yesterdaySameTimeMs == null) {
-        StatusPill(text = "No data from yesterday to compare")
+        StatusPill(text = "No data from yesterday")
         return
     }
     val changePercent = ((todayMs - yesterdaySameTimeMs) * 100.0 / yesterdaySameTimeMs).roundToInt()
     when {
-        abs(changePercent) < 3 -> StatusPill(text = "About the same as yesterday by now")
+        abs(changePercent) < 3 -> StatusPill(text = "Same as yesterday")
         changePercent < 0 -> StatusPill(
-            text = "${-changePercent}% less than yesterday by now",
+            text = "${-changePercent}% vs yesterday",
             color = AppTheme.colors.success,
             icon = Icons.AutoMirrored.Rounded.TrendingDown
         )
         else -> StatusPill(
-            text = "$changePercent% more than yesterday by now",
+            text = "$changePercent% vs yesterday",
             color = AppTheme.colors.warning,
             icon = Icons.AutoMirrored.Rounded.TrendingUp
         )

@@ -13,6 +13,12 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- Smart Alarm: zvonjenje (FGS sa zvukom), ekran preko zaključanog telefona, vibracija -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- DODATO: Neophodno za dobijanje liste svih instaliranih aplikacija -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -77,6 +83,34 @@
             android:name=".service.AlarmReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- ===== Smart Alarm ===== -->
+        <service
+            android:name=".alarm.service.AlarmRingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <activity
+            android:name=".alarm.service.AlarmRingActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ScreenManager"
+            android:turnScreenOn="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <receiver
+            android:name=".alarm.service.AlarmSystemEventsReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -28,7 +28,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.alarm.data.AlarmPermission
 import com.example.screenmanager.model.AlarmRule
+import com.example.screenmanager.ui.common.OnResume
+import com.example.screenmanager.ui.components.IconBadge
+import com.example.screenmanager.ui.components.ListRow
+import com.example.screenmanager.ui.components.StatusPill
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.ui.platform.LocalContext
 import com.example.screenmanager.ui.common.formatClock
 import com.example.screenmanager.ui.common.relativeDayLabel
 import com.example.screenmanager.ui.common.rememberNow
@@ -52,14 +60,21 @@ fun AlarmsRoute(
     viewModel: AlarmsViewModel = viewModel()
 ) {
     val alarms by viewModel.alarms.collectAsState()
+    val snoozes by viewModel.snoozes.collectAsState()
+    val permissions by viewModel.permissions.collectAsState()
     val now by rememberNow()
     val loadedAlarms = alarms.orEmpty()
+    val context = LocalContext.current
+    OnResume { viewModel.refreshPermissions() }
 
     AlarmsScreen(
         alarms = loadedAlarms,
         isLoading = alarms == null,
         nextAlarmAt = loadedAlarms.filter { it.enabled }.minOfOrNull { viewModel.nextTriggerAt(it, now) },
         now = now,
+        snoozedUntil = snoozes.mapValues { it.value.at },
+        missingPermissions = permissions.filterNot { it.granted }.map { it.kind },
+        onFixPermission = { kind -> runCatching { context.startActivity(viewModel.permissionIntent(kind)) } },
         onBack = onBack,
         onToggle = viewModel::setAlarmEnabled,
         onEditAlarm = onEditAlarm
@@ -73,6 +88,9 @@ fun AlarmsScreen(
     isLoading: Boolean,
     nextAlarmAt: Long?,
     now: Long,
+    snoozedUntil: Map<Long, Long>,
+    missingPermissions: List<AlarmPermission.Kind>,
+    onFixPermission: (AlarmPermission.Kind) -> Unit,
     onBack: () -> Unit,
     onToggle: (AlarmRule, Boolean) -> Unit,
     onEditAlarm: (alarmId: Long?) -> Unit
@@ -83,12 +101,16 @@ fun AlarmsScreen(
             contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
+            if (missingPermissions.isNotEmpty()) {
+                item(key = "permissions") { AlarmPermissionsCard(missingPermissions, onFixPermission) }
+            }
             if (alarms.isNotEmpty()) {
                 item(key = "next") { NextAlarmHero(nextAlarmAt = nextAlarmAt, now = now) }
             }
             items(alarms, key = { it.id }) { alarm ->
                 AlarmCard(
                     alarm = alarm,
+                    snoozedUntil = snoozedUntil[alarm.id],
                     onToggle = { onToggle(alarm, it) },
                     onClick = { onEditAlarm(alarm.id) }
                 )
@@ -98,7 +120,7 @@ fun AlarmsScreen(
                     EmptyState(
                         icon = Icons.Rounded.Alarm,
                         title = "No alarms yet",
-                        message = "Add a wake-up alarm. Dismissing it can start your morning lock."
+                        message = "Add a wake-up alarm with a tone, a wake-up mission and a morning detox."
                     )
                 }
             }
@@ -113,6 +135,31 @@ fun AlarmsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(Spacing.screen)
         )
+    }
+}
+
+/** Dozvole bez kojih alarm kasni ili se ne vidi; svaka vodi na svoj sistemski ekran. */
+@Composable
+private fun AlarmPermissionsCard(
+    missing: List<AlarmPermission.Kind>,
+    onFix: (AlarmPermission.Kind) -> Unit
+) {
+    AppCard(borderColor = AppTheme.colors.warning.copy(alpha = 0.6f), contentPadding = PaddingValues(vertical = Spacing.sm)) {
+        Text(
+            text = "Alarms need a few permissions",
+            style = MaterialTheme.typography.titleSmall,
+            color = AppTheme.colors.textPrimary,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+        )
+        missing.forEach { kind ->
+            ListRow(
+                title = kind.title,
+                subtitle = kind.reason,
+                onClick = { onFix(kind) },
+                leading = { IconBadge(icon = Icons.Rounded.WarningAmber, tint = AppTheme.colors.warning, size = 32.dp) },
+                trailing = { Text("Allow", style = MaterialTheme.typography.titleSmall, color = AppTheme.colors.accent) }
+            )
+        }
     }
 }
 
@@ -155,6 +202,7 @@ private fun NextAlarmHero(nextAlarmAt: Long?, now: Long) {
 @Composable
 private fun AlarmCard(
     alarm: AlarmRule,
+    snoozedUntil: Long?,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit
 ) {
@@ -197,6 +245,30 @@ private fun AlarmCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                val badges = alarmBadges(alarm)
+                if (snoozedUntil != null || badges.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (snoozedUntil != null) {
+                            StatusPill(
+                                text = "Snoozed · ${formatClock(snoozedUntil)}",
+                                color = colors.accent,
+                                icon = Icons.Rounded.Snooze
+                            )
+                        }
+                        badges.forEach { (icon, description) ->
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = description,
+                                tint = if (alarm.enabled) colors.textSecondary else colors.textMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
             AppSwitch(checked = alarm.enabled, onCheckedChange = onToggle)

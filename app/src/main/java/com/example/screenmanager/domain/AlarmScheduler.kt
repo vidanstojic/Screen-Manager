@@ -4,16 +4,22 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.example.screenmanager.MainActivity
+import com.example.screenmanager.alarm.domain.NextAlarmCalculator
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.service.AlarmReceiver
-import com.example.screenmanager.alarm.domain.NextAlarmCalculator
 import java.time.DayOfWeek
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * Zakazivanje alarma kod sistema ([AlarmManager.setAlarmClock]: tačno vreme,
+ * ikonica alarma u statusnoj traci, budi telefon iz Doze-a).
+ *
+ * Svaki alarm ima do dva zakazana okidača sa istim request kodom a različitom
+ * akcijom (PendingIntent ih razlikuje po akciji): redovan termin i odlaganje.
+ */
 class AlarmScheduler(
     private val context: Context
 ) {
@@ -25,59 +31,61 @@ class AlarmScheduler(
             cancelAlarm(alarm.id)
             return
         }
-        val triggerAt = nextTriggerAt(alarm)
-        val alarmIntent = alarmPendingIntent(alarm.id, alarm.label)
-        val openAppIntent = PendingIntent.getActivity(
-            context,
-            requestCode(alarm.id) + 99_999,
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setWindow(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    60_000L,
-                    alarmIntent
-                )
-                return
-            }
-            val info = AlarmManager.AlarmClockInfo(triggerAt, openAppIntent)
-            alarmManager.setAlarmClock(info, alarmIntent)
-        } catch (securityException: SecurityException) {
-            alarmManager.setWindow(
-                AlarmManager.RTC_WAKEUP,
-                triggerAt,
-                60_000L,
-                alarmIntent
-            )
-        }
+        setExact(nextTriggerAt(alarm), firePendingIntent(alarm.id, AlarmReceiver.ACTION_FIRE_ALARM, snoozeCount = 0))
     }
 
+    /** Odlaganje: [alarmId] ponovo zvoni u [at]; [snoozeCount] = koje je ovo odlaganje zaredom. */
+    fun scheduleSnooze(alarmId: Long, at: Long, snoozeCount: Int) {
+        setExact(at, firePendingIntent(alarmId, AlarmReceiver.ACTION_SNOOZE_ALARM, snoozeCount))
+    }
+
+    fun cancelSnooze(alarmId: Long) {
+        alarmManager.cancel(firePendingIntent(alarmId, AlarmReceiver.ACTION_SNOOZE_ALARM, 0))
+    }
+
+    /** Otkazuje redovan termin I odlaganje (brisanje ili isključivanje alarma). */
     fun cancelAlarm(alarmId: Long) {
-        alarmManager.cancel(alarmPendingIntent(alarmId, null))
+        alarmManager.cancel(firePendingIntent(alarmId, AlarmReceiver.ACTION_FIRE_ALARM, 0))
+        cancelSnooze(alarmId)
     }
 
     fun rescheduleAll(alarms: List<AlarmRule>) {
         alarms.forEach { alarm ->
-            cancelAlarm(alarm.id)
-            if (alarm.enabled) {
-                scheduleAlarm(alarm)
-            }
+            alarmManager.cancel(firePendingIntent(alarm.id, AlarmReceiver.ACTION_FIRE_ALARM, 0))
+            if (alarm.enabled) scheduleAlarm(alarm)
         }
     }
 
-    private fun alarmPendingIntent(alarmId: Long, label: String?): PendingIntent {
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = AlarmReceiver.ACTION_FIRE_ALARM
-            putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
-            if (!label.isNullOrBlank()) {
-                putExtra(AlarmReceiver.EXTRA_ALARM_LABEL, label)
+    /**
+     * Tačan okidač u [triggerAt]. Bez dozvole za tačne alarme (korisnik ju je
+     * oduzeo) pada na prozor od 1 min — alarm kasni najviše minut, ali zvoni.
+     */
+    fun setExact(triggerAt: Long, operation: PendingIntent) {
+        try {
+            if (!alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000L, operation)
+                return
             }
+            alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showAppIntent()), operation)
+        } catch (securityException: SecurityException) {
+            alarmManager.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000L, operation)
+        }
+    }
+
+    private fun showAppIntent(): PendingIntent = PendingIntent.getActivity(
+        context,
+        SHOW_APP_REQUEST_CODE,
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun firePendingIntent(alarmId: Long, action: String, snoozeCount: Int): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            this.action = action
+            putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
+            putExtra(AlarmReceiver.EXTRA_SNOOZE_COUNT, snoozeCount)
         }
         return PendingIntent.getBroadcast(
             context,
@@ -85,10 +93,6 @@ class AlarmScheduler(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-    }
-
-    private fun requestCode(alarmId: Long): Int {
-        return (alarmId xor (alarmId ushr 32)).toInt()
     }
 
     /**
@@ -107,4 +111,10 @@ class AlarmScheduler(
 
     private fun dayTokenToDayOfWeek(token: String): DayOfWeek? =
         DayOfWeek.entries.firstOrNull { it.getDisplayName(TextStyle.SHORT, Locale.ENGLISH) == token }
+
+    companion object {
+        private const val SHOW_APP_REQUEST_CODE = 99_999
+
+        fun requestCode(alarmId: Long): Int = (alarmId xor (alarmId ushr 32)).toInt()
+    }
 }

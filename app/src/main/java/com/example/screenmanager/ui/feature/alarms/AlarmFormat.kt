@@ -7,6 +7,12 @@ import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.screenmanager.model.AlarmRule
+import com.example.screenmanager.model.MissionType
+import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.NotificationsActive
 import com.example.screenmanager.ui.feature.limits.daysSummary
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -27,6 +33,21 @@ fun Set<DayOfWeek>.toRepeatTokens(): Set<String> = map { it.token() }.toSet()
 fun AlarmRule.repeatSummary(): String {
     val days = repeatDays.toDaysOfWeek()
     return if (days.isEmpty()) "Once" else daysSummary(days)
+}
+
+/**
+ * Kratke oznake opcija alarma za karticu u listi (ikonica + opis za čitač
+ * ekrana): misija, wake-up detox, wake-up check.
+ */
+fun alarmBadges(alarm: AlarmRule): List<Pair<ImageVector, String>> = buildList {
+    when (alarm.mission.type) {
+        MissionType.NONE -> Unit
+        MissionType.MATH -> add(Icons.Rounded.Calculate to "Math mission")
+        MissionType.TYPING -> add(Icons.Rounded.Keyboard to "Typing mission")
+        MissionType.STEPS -> add(Icons.AutoMirrored.Rounded.DirectionsWalk to "Steps mission")
+    }
+    if (alarm.detox.enabled) add(Icons.Rounded.Block to "Wake-up detox")
+    if (alarm.wakeCheck.enabled) add(Icons.Rounded.NotificationsActive to "Wake-up check")
 }
 
 /** "in 7h 20m", "in 2d 3h", "in less than a minute". */

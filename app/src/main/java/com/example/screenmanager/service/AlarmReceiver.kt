@@ -1,56 +1,82 @@
 package com.example.screenmanager.service
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import com.example.screenmanager.MainActivity
-import com.example.screenmanager.R
+import com.example.screenmanager.alarm.AlarmModule
+import com.example.screenmanager.alarm.domain.RingReason
+import com.example.screenmanager.alarm.service.AlarmDismissFlow
+import com.example.screenmanager.alarm.service.AlarmNotifications
+import com.example.screenmanager.alarm.service.AlarmRingService
 import com.example.screenmanager.domain.ServiceLocator
-import com.example.screenmanager.domain.wakeup.WakeUpSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * Prima okidače iz [com.example.screenmanager.domain.AlarmScheduler]:
+ * - [ACTION_FIRE_ALARM]: redovan termin → pokreće zvonjenje i zakazuje
+ *   sledeći termin (ili gasi alarm koji zvoni jednom);
+ * - [ACTION_SNOOZE_ALARM]: isteklo odlaganje → ponovo zvoni isti alarm;
+ * - [ACTION_DISMISS_SNOOZED]: "Dismiss now" na notifikaciji odloženog alarma
+ *   (samo za alarme bez misije) → otkazuje odlaganje i gasi alarm.
+ *
+ * Samo zvonjenje (zvuk, ekran, misija) radi [AlarmRingService].
+ */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_DISMISS_ALARM) {
-            onAlarmDismissed(context, intent)
-            return
-        }
-        if (intent.action != ACTION_FIRE_ALARM) return
-
         val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1L)
         if (alarmId <= 0L) return
 
-        val label = intent.getStringExtra(EXTRA_ALARM_LABEL).orEmpty().ifBlank { "Alarm" }
-        showNotification(context, alarmId, label)
+        when (intent.action) {
+            ACTION_FIRE_ALARM -> {
+                AlarmRingService.ring(context, alarmId, RingReason.SCHEDULED)
+                rescheduleAfterFire(context, alarmId)
+            }
 
+            ACTION_SNOOZE_ALARM -> {
+                AlarmModule.runtimeStore(context).removeSnooze(alarmId)
+                AlarmRingService.ring(
+                    context,
+                    alarmId,
+                    RingReason.SNOOZE,
+                    snoozeCount = intent.getIntExtra(EXTRA_SNOOZE_COUNT, 0)
+                )
+            }
+
+            ACTION_DISMISS_SNOOZED -> dismissSnoozed(context, alarmId)
+        }
+    }
+
+    private fun dismissSnoozed(context: Context, alarmId: Long) {
+        ServiceLocator.alarmScheduler(context).cancelSnooze(alarmId)
+        AlarmModule.runtimeStore(context).removeSnooze(alarmId)
+        AlarmNotifications(context).cancelSnoozed(alarmId)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                ServiceLocator.alarmRepository(context).findById(alarmId)?.let { alarm ->
+                    AlarmDismissFlow.onDismissed(context, alarm, RingReason.SNOOZE, wakeCheckRound = 0)
+                }
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun rescheduleAfterFire(context: Context, alarmId: Long) {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val alarmRepository = ServiceLocator.alarmRepository(context)
                 val alarmScheduler = ServiceLocator.alarmScheduler(context)
                 val alarm = alarmRepository.findById(alarmId)
-                if (alarm == null) {
-                    alarmScheduler.cancelAlarm(alarmId)
-                    return@launch
-                }
-
-                if (!alarm.enabled) {
-                    alarmScheduler.cancelAlarm(alarmId)
-                    return@launch
-                }
-
-                if (alarm.repeatDays.isEmpty()) {
-                    alarmRepository.upsert(alarm.copy(enabled = false))
-                    alarmScheduler.cancelAlarm(alarmId)
-                } else {
-                    alarmScheduler.scheduleAlarm(alarm)
+                when {
+                    alarm == null || !alarm.enabled -> alarmScheduler.cancelAlarm(alarmId)
+                    // Alarm koji zvoni jednom se gasi; odlaganje (ako ga bude) i dalje radi.
+                    alarm.repeatDays.isEmpty() -> alarmRepository.upsert(alarm.copy(enabled = false))
+                    else -> alarmScheduler.scheduleAlarm(alarm)
                 }
             } catch (error: IllegalStateException) {
                 Log.e(TAG, "Alarm processing failed due to invalid state", error)
@@ -62,76 +88,12 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    /**
-     * Phase 2 veza sa screen-time engine-om (TRS 2.5): gašenje alarma pali
-     * jutarnju blokadu preko [com.example.screenmanager.domain.wakeup.WakeUpLockoutTrigger].
-     */
-    private fun onAlarmDismissed(context: Context, intent: Intent) {
-        val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1L)
-        if (alarmId > 0L) {
-            context.getSystemService(NotificationManager::class.java).cancel(alarmId.toInt())
-        }
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                ServiceLocator.wakeUpLockoutTrigger(context).trigger(WakeUpSource.ALARM_DISMISSED)
-            } catch (error: IllegalStateException) {
-                Log.e(TAG, "Wake-up lockout after alarm failed", error)
-            } finally {
-                pendingResult.finish()
-            }
-        }
-    }
-
-    private fun showNotification(context: Context, alarmId: Long, label: String) {
-        val channelId = CHANNEL_ID
-        val notificationManager = context.getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                channelId,
-                "Smart Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            )
-        )
-
-        val openIntent = PendingIntent.getActivity(
-            context,
-            alarmId.toInt(),
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val dismissIntent = PendingIntent.getBroadcast(
-            context,
-            alarmId.toInt(),
-            Intent(context, AlarmReceiver::class.java).apply {
-                action = ACTION_DISMISS_ALARM
-                putExtra(EXTRA_ALARM_ID, alarmId)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(label)
-            .setContentText("Alarm is active")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(openIntent)
-            .addAction(0, "Dismiss", dismissIntent)
-            .build()
-
-        notificationManager.notify(alarmId.toInt(), notification)
-    }
-
     companion object {
         const val ACTION_FIRE_ALARM = "com.example.screenmanager.action.FIRE_ALARM"
-        const val ACTION_DISMISS_ALARM = "com.example.screenmanager.action.DISMISS_ALARM"
+        const val ACTION_SNOOZE_ALARM = "com.example.screenmanager.action.SNOOZE_ALARM"
+        const val ACTION_DISMISS_SNOOZED = "com.example.screenmanager.action.DISMISS_SNOOZED"
         const val EXTRA_ALARM_ID = "extra_alarm_id"
-        const val EXTRA_ALARM_LABEL = "extra_alarm_label"
-        private const val CHANNEL_ID = "smart_alarms_channel"
+        const val EXTRA_SNOOZE_COUNT = "extra_snooze_count"
         private const val TAG = "AlarmReceiver"
     }
 }

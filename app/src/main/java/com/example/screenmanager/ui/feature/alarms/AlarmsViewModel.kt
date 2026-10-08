@@ -8,6 +8,8 @@ import com.example.screenmanager.alarm.data.AlarmPermission
 import com.example.screenmanager.alarm.data.AlarmPermissions
 import com.example.screenmanager.alarm.data.PendingSnooze
 import com.example.screenmanager.alarm.domain.AlarmDetoxLock
+import com.example.screenmanager.alarm.domain.PendingWakeCheck
+import com.example.screenmanager.alarm.service.WakeCheckController
 import com.example.screenmanager.alarm.service.AlarmRingService
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.model.AlarmRule
@@ -56,6 +58,9 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
     /** Aktivni (ili istekli) wake-up detox — lista prikazuje karticu dok traje. */
     val detoxLock: StateFlow<AlarmDetoxLock?> = AlarmModule.detoxStore(application).lock
 
+    /** Zakazane wake-up check provere (po id-ju alarma). */
+    val wakeChecks: StateFlow<Map<Long, PendingWakeCheck>> = runtimeStore.wakeChecks
+
     /** Odloženi alarmi (po id-ju) — lista prikazuje "Snoozed until". */
     val snoozes: StateFlow<Map<Long, PendingSnooze>> = runtimeStore.snoozes
 
@@ -102,6 +107,7 @@ class AlarmsViewModel(application: Application) : AndroidViewModel(application) 
             alarmRepository.deleteById(alarmId)
             alarmScheduler.cancelAlarm(alarmId)
             runtimeStore.removeSnooze(alarmId)
+            WakeCheckController(getApplication()).cancel(alarmId)
         }
     }
 

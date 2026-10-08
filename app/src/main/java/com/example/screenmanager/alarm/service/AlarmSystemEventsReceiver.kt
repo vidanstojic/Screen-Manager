@@ -12,7 +12,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Vraća runtime stanje alarma posle događaja sistema:
- * - restart telefona / nova verzija aplikacije: zakazana odlaganja (redovne
+ * - restart telefona / nova verzija aplikacije: zakazana odlaganja i
+ *   wake-up check provere (redovne
  *   termine vraća postojeći [com.example.screenmanager.service.BootReceiver]);
  * - promena vremena ili vremenske zone: ponovo računa sve termine — alarm
  *   u 07:00 treba da zvoni u 07:00 po NOVOM lokalnom vremenu.
@@ -34,6 +35,7 @@ class AlarmSystemEventsReceiver : BroadcastReceiver() {
                 AlarmModule.runtimeStore(context).snoozes.value.values.forEach { snooze ->
                     scheduler.scheduleSnooze(snooze.alarmId, maxOf(snooze.at, now + MISSED_DELAY_MS), snooze.count)
                 }
+                WakeCheckController(context).restoreAll(now)
             } catch (error: RuntimeException) {
                 Log.e(TAG, "Restoring alarm state after $action failed", error)
             } finally {

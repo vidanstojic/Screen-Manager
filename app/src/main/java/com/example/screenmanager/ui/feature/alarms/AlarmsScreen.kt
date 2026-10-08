@@ -38,6 +38,7 @@ import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.StatusPill
 import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.ui.platform.LocalContext
 import com.example.screenmanager.ui.common.formatClock
@@ -65,6 +66,7 @@ fun AlarmsRoute(
     val alarms by viewModel.alarms.collectAsState()
     val snoozes by viewModel.snoozes.collectAsState()
     val detoxLock by viewModel.detoxLock.collectAsState()
+    val wakeChecks by viewModel.wakeChecks.collectAsState()
     val permissions by viewModel.permissions.collectAsState()
     val now by rememberNow()
     val loadedAlarms = alarms.orEmpty()
@@ -77,6 +79,7 @@ fun AlarmsRoute(
         nextAlarmAt = loadedAlarms.filter { it.enabled }.minOfOrNull { viewModel.nextTriggerAt(it, now) },
         now = now,
         snoozedUntil = snoozes.mapValues { it.value.at },
+        wakeCheckAt = wakeChecks.mapValues { it.value.deadline ?: it.value.askAt },
         activeDetox = detoxLock?.takeIf { it.isActiveAt(now) },
         missingPermissions = permissions.filterNot { it.granted }.map { it.kind },
         onFixPermission = { kind -> runCatching { context.startActivity(viewModel.permissionIntent(kind)) } },
@@ -94,6 +97,7 @@ fun AlarmsScreen(
     nextAlarmAt: Long?,
     now: Long,
     snoozedUntil: Map<Long, Long>,
+    wakeCheckAt: Map<Long, Long>,
     activeDetox: AlarmDetoxLock?,
     missingPermissions: List<AlarmPermission.Kind>,
     onFixPermission: (AlarmPermission.Kind) -> Unit,
@@ -120,6 +124,7 @@ fun AlarmsScreen(
                 AlarmCard(
                     alarm = alarm,
                     snoozedUntil = snoozedUntil[alarm.id],
+                    wakeCheckAt = wakeCheckAt[alarm.id],
                     onToggle = { onToggle(alarm, it) },
                     onClick = { onEditAlarm(alarm.id) }
                 )
@@ -239,6 +244,7 @@ private fun NextAlarmHero(nextAlarmAt: Long?, now: Long) {
 private fun AlarmCard(
     alarm: AlarmRule,
     snoozedUntil: Long?,
+    wakeCheckAt: Long?,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit
 ) {
@@ -283,7 +289,7 @@ private fun AlarmCard(
                     )
                 }
                 val badges = alarmBadges(alarm)
-                if (snoozedUntil != null || badges.isNotEmpty()) {
+                if (snoozedUntil != null || wakeCheckAt != null || badges.isNotEmpty()) {
                     Spacer(Modifier.height(Spacing.sm))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -294,6 +300,13 @@ private fun AlarmCard(
                                 text = "Snoozed · ${formatClock(snoozedUntil)}",
                                 color = colors.accent,
                                 icon = Icons.Rounded.Snooze
+                            )
+                        }
+                        if (wakeCheckAt != null) {
+                            StatusPill(
+                                text = "Check · ${formatClock(wakeCheckAt)}",
+                                color = colors.accent,
+                                icon = Icons.Rounded.NotificationsActive
                             )
                         }
                         badges.forEach { (icon, description) ->

@@ -176,6 +176,7 @@ fun AlarmEditorScreen(
                 labelFor = labelFor,
                 readiness = detoxReadiness
             )
+            AlarmWakeCheckSection(config = draft.wakeCheck, onChange = { draft = draft.copy(wakeCheck = it) })
         }
     }
 }

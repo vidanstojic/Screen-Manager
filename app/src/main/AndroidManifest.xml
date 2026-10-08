@@ -103,6 +103,20 @@
             android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".alarm.service.WakeCheckActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ScreenManager"
+            android:turnScreenOn="true" />
+
+        <receiver
+            android:name=".alarm.service.WakeCheckReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".alarm.service.AlarmSystemEventsReceiver"
             android:exported="true">

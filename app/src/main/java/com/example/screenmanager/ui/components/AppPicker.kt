@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,19 +76,7 @@ fun AppSelectionField(
                 )
             }
         } else {
-            val shown = selectedIds.take(MAX_STACKED_ICONS)
-            Box {
-                shown.forEachIndexed { index, id ->
-                    AppIcon(
-                        packageName = id,
-                        label = labelFor(id),
-                        size = 32.dp,
-                        modifier = Modifier.offset(x = 22.dp * index)
-                    )
-                }
-                // Zauzima širinu naslaganih ikonica (offset ne utiče na layout).
-                Spacer(Modifier.width(32.dp + 22.dp * (shown.size - 1)))
-            }
+            AppIconStack(packageNames = selectedIds.take(MAX_STACKED_ICONS), labelFor = labelFor)
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

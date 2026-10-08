@@ -34,6 +34,7 @@ import com.example.screenmanager.ui.common.formatClock
 import com.example.screenmanager.ui.common.formatMinutes
 import com.example.screenmanager.ui.common.rememberNow
 import com.example.screenmanager.ui.components.AppCard
+import com.example.screenmanager.ui.components.AppIconStack
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.AppSwitch
 import com.example.screenmanager.ui.components.CardDivider
@@ -158,7 +159,16 @@ fun LimitsScreen(
                             summary = "${state.shorts.summary()} · ${appsSummary(state.shorts.selectedAppIds, labelFor)}",
                             enabled = state.shorts.isEnabled,
                             onToggle = actions.onToggleShorts,
-                            onClick = { onEditRule(RuleTarget.Shorts()) }
+                            onClick = { onEditRule(RuleTarget.Shorts()) },
+                            // Ikonice YouTube-a i Instagrama odmah pokazuju na šta se pravilo odnosi;
+                            // aplikacija koja nije izabrana (ili ceo red kad je isključen) je prigušena.
+                            leading = {
+                                ShortsAppIcons(
+                                    selectedIds = state.shorts.selectedAppIds,
+                                    enabled = state.shorts.isEnabled,
+                                    labelFor = labelFor
+                                )
+                            }
                         )
                     )
                 )
@@ -211,7 +221,9 @@ private class RuleRowModel(
     val summary: String,
     val enabled: Boolean,
     val onToggle: (Boolean) -> Unit,
-    val onClick: () -> Unit
+    val onClick: () -> Unit,
+    /** Umesto ikonice vrste pravila (npr. ikonice aplikacija). */
+    val leading: (@Composable () -> Unit)? = null
 )
 
 /**
@@ -249,7 +261,7 @@ private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
         title = row.title,
         subtitle = row.summary,
         onClick = row.onClick,
-        leading = {
+        leading = row.leading ?: {
             IconBadge(
                 icon = kind.icon,
                 tint = if (row.enabled) AppTheme.colors.accent else AppTheme.colors.textMuted
@@ -257,6 +269,25 @@ private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
         },
         trailing = { AppSwitch(checked = row.enabled, onCheckedChange = row.onToggle) }
     )
+}
+
+/** YouTube i Instagram jedan pored drugog; neizabrana aplikacija je prigušena. */
+@Composable
+private fun ShortsAppIcons(
+    selectedIds: List<String>,
+    enabled: Boolean,
+    labelFor: (String) -> String
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+        ShortsApps.supported.forEach { packageName ->
+            AppIconStack(
+                packageNames = listOf(packageName),
+                labelFor = labelFor,
+                size = 30.dp,
+                dimmed = !enabled || packageName !in selectedIds
+            )
+        }
+    }
 }
 
 @Composable

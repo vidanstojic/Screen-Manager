@@ -3,7 +3,10 @@ package com.example.screenmanager.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -72,4 +76,34 @@ fun rememberAppAccent(packageName: String): Color? {
         value = AppIconLoader.loadAccent(context, packageName)
     }
     return accent
+}
+
+/**
+ * Ikonice više aplikacija naslagane jedna preko druge (npr. YouTube + Instagram
+ * kod Shorts/Reels pravila, izabrane aplikacije u formi).
+ *
+ * @param dimmed priguši ikonice (npr. pravilo je isključeno).
+ */
+@Composable
+fun AppIconStack(
+    packageNames: List<String>,
+    labelFor: (String) -> String,
+    modifier: Modifier = Modifier,
+    size: Dp = 32.dp,
+    overlap: Float = 0.32f,
+    dimmed: Boolean = false
+) {
+    val step = size * (1f - overlap)
+    Box(modifier = modifier.alpha(if (dimmed) 0.4f else 1f)) {
+        packageNames.forEachIndexed { index, id ->
+            AppIcon(
+                packageName = id,
+                label = labelFor(id),
+                size = size,
+                modifier = Modifier.offset(x = step * index)
+            )
+        }
+        // Zauzima širinu naslaganih ikonica (offset ne utiče na layout).
+        Spacer(Modifier.width(size + step * (packageNames.size - 1).coerceAtLeast(0)))
+    }
 }

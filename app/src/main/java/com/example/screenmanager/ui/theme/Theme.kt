@@ -6,7 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-private val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
+internal val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
 
 /**
  * Pristup temi iz composable-a:

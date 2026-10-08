@@ -1,5 +1,11 @@
 package com.example.screenmanager.ui.feature.alarms
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.WbTwilight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.ui.feature.limits.daysSummary
 import java.time.DayOfWeek
@@ -35,4 +41,23 @@ fun formatTimeUntil(remainingMs: Long): String {
         minutes > 0 -> "in ${minutes}m"
         else -> "in less than a minute"
     }
+}
+
+/**
+ * Boje doba dana za alarm u [hour] časova: izlazak sunca (topla), dan (plava),
+ * zalazak (narandžasto-ljubičasta), noć (indigo). Prva boja je svetlija.
+ */
+fun timeOfDayColors(hour: Int): List<Color> = when (hour) {
+    in 5..10 -> listOf(Color(0xFFFCD34D), Color(0xFFF43F5E))
+    in 11..16 -> listOf(Color(0xFF7DD3FC), Color(0xFF22D3EE))
+    in 17..20 -> listOf(Color(0xFFFDBA74), Color(0xFFA855F7))
+    else -> listOf(Color(0xFFA5B4FC), Color(0xFF4F46E5))
+}
+
+/** Ikonica doba dana (sunce, oblak/dan, zalazak, mesec). */
+fun timeOfDayIcon(hour: Int): ImageVector = when (hour) {
+    in 5..10 -> Icons.Rounded.WbTwilight
+    in 11..16 -> Icons.Rounded.WbSunny
+    in 17..20 -> Icons.Rounded.WbTwilight
+    else -> Icons.Rounded.Bedtime
 }

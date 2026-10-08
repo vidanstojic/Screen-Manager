@@ -26,6 +26,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
@@ -43,6 +44,7 @@ import com.example.screenmanager.ui.theme.glass
  * Sa [onClick] cela kartica postaje klikabilna (sa ripple efektom).
  *
  * @param borderColor obojena ivica umesto podrazumevane (npr. kartica upozorenja).
+ * @param tint obojeni sloj preko stakla (npr. gradijent dela aplikacije ili doba dana).
  */
 @Composable
 fun AppCard(
@@ -50,6 +52,7 @@ fun AppCard(
     onClick: (() -> Unit)? = null,
     shape: Shape = MaterialTheme.shapes.large,
     borderColor: Color? = null,
+    tint: Brush? = null,
     contentPadding: PaddingValues = PaddingValues(Spacing.lg),
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -60,6 +63,7 @@ fun AppCard(
             modifier = modifier
                 .fillMaxWidth()
                 .glass(colors, shape, border)
+                .then(if (tint != null) Modifier.background(tint) else Modifier)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(contentPadding),
             content = content

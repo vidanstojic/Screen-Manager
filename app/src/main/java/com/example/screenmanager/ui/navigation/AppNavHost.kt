@@ -36,7 +36,9 @@ import com.example.screenmanager.ui.feature.limits.editor.RuleEditorRoute
 import com.example.screenmanager.ui.feature.overview.OverviewRoute
 import com.example.screenmanager.ui.feature.settings.SettingsRoute
 import com.example.screenmanager.ui.feature.stats.StatsRoute
+import com.example.screenmanager.ui.theme.AppSection
 import com.example.screenmanager.ui.theme.AuroraBackground
+import com.example.screenmanager.ui.theme.SectionTheme
 
 /**
  * Koren UI-a: prikazuje ekran sa vrha back-stack-a i donju navigaciju.
@@ -69,8 +71,11 @@ fun AppNavHost(navigator: Navigator = rememberNavigator()) {
     val shownTab = navigator.currentTab ?: lastTabRef.value ?: Screen.Overview
     SideEffect { navigator.currentTab?.let { lastTabRef.value = it } }
 
-    AuroraBackground {
-        NavContent(navigator = navigator, shownTab = shownTab, stateHolder = stateHolder)
+    // Pozadina prati deo aplikacije u kome je korisnik SADA.
+    SectionTheme(sectionOf(navigator.current)) {
+        AuroraBackground {
+            NavContent(navigator = navigator, shownTab = shownTab, stateHolder = stateHolder)
+        }
     }
 }
 
@@ -84,12 +89,15 @@ private fun NavContent(navigator: Navigator, shownTab: Screen.Tab, stateHolder: 
             transitionSpec = { screenTransition(navigator.lastTransition) },
             label = "screen"
         ) { screen ->
-            stateHolder.SaveableStateProvider(screen.route) {
-                if (screen is Screen.Tab || screen is Screen.Launcher) {
-                    ScreenContent(screen = screen, navigator = navigator)
-                } else {
-                    SwipeBackContainer(onBack = navigator::back) {
+            // Svaki ekran zadržava boje SVOG dela i dok animirano odlazi.
+            SectionTheme(sectionOf(screen)) {
+                stateHolder.SaveableStateProvider(screen.route) {
+                    if (screen is Screen.Tab || screen is Screen.Launcher) {
                         ScreenContent(screen = screen, navigator = navigator)
+                    } else {
+                        SwipeBackContainer(onBack = navigator::back) {
+                            ScreenContent(screen = screen, navigator = navigator)
+                        }
                     }
                 }
             }
@@ -101,7 +109,9 @@ private fun NavContent(navigator: Navigator, shownTab: Screen.Tab, stateHolder: 
             enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
             exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180))
         ) {
-            AppBottomBar(selected = shownTab, onSelect = navigator::selectTab)
+            SectionTheme(AppSection.ScreenManager) {
+                AppBottomBar(selected = shownTab, onSelect = navigator::selectTab)
+            }
         }
     }
 }
@@ -156,6 +166,13 @@ private fun ScreenContent(screen: Screen, navigator: Navigator) {
 }
 
 private const val TAB_ROUTE_PREFIX = "tab/"
+
+/** Kom delu aplikacije ekran pripada — određuje boje (ui/theme/Sections.kt). */
+private fun sectionOf(screen: Screen): AppSection = when (screen) {
+    Screen.Launcher, Screen.Settings -> AppSection.Launcher
+    Screen.Overview, Screen.Stats, Screen.Limits, is Screen.AppDetails, is Screen.RuleEditor -> AppSection.ScreenManager
+    Screen.Alarms, is Screen.AlarmEditor -> AppSection.Alarms
+}
 
 /** Animacija prelaza: tabovi se pretapaju, ostali ekrani klize sa strane. */
 private fun AnimatedContentTransitionScope<Screen>.screenTransition(kind: NavTransition): ContentTransform =

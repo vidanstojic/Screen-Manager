@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.common.formatClock
+import com.example.screenmanager.ui.common.rememberTickHaptic
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 import java.time.DayOfWeek
@@ -52,9 +53,10 @@ fun AppSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val tick = rememberTickHaptic()
     Switch(
         checked = checked,
-        onCheckedChange = onCheckedChange,
+        onCheckedChange = { tick(); onCheckedChange(it) },
         modifier = modifier,
         enabled = enabled,
         colors = SwitchDefaults.colors(
@@ -78,11 +80,12 @@ fun SwitchRow(
     subtitle: String? = null,
     leading: (@Composable () -> Unit)? = null
 ) {
+    val tick = rememberTickHaptic()
     ListRow(
         title = title,
         subtitle = subtitle,
         modifier = modifier,
-        onClick = { onCheckedChange(!checked) },
+        onClick = { tick(); onCheckedChange(!checked) },
         leading = leading,
         trailing = { AppSwitch(checked = checked, onCheckedChange = onCheckedChange) }
     )
@@ -231,6 +234,7 @@ fun WeekdaySelector(
     onToggle: (DayOfWeek) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val tick = rememberTickHaptic()
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -243,7 +247,7 @@ fun WeekdaySelector(
                     .aspectRatio(1f)
                     .clip(CircleShape)
                     .background(if (isSelected) AppTheme.colors.accentBrush else SolidColor(AppTheme.colors.surfaceRaised))
-                    .clickable { onToggle(day) },
+                    .clickable { tick(); onToggle(day) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(

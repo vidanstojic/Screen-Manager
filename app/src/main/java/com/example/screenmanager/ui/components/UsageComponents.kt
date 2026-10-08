@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.ui.common.formatDuration
+import com.example.screenmanager.ui.common.rememberTickHaptic
 import com.example.screenmanager.ui.model.AppUsageItem
 import com.example.screenmanager.ui.model.DayOption
 import com.example.screenmanager.ui.theme.AppTheme
@@ -92,6 +93,7 @@ fun DayStrip(
     modifier: Modifier = Modifier
 ) {
     val colors = AppTheme.colors
+    val tick = rememberTickHaptic()
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -112,7 +114,10 @@ fun DayStrip(
                             Modifier.glass(colors, shape)
                         }
                     )
-                    .clickable { onDaySelected(day.dayStart) }
+                    .clickable {
+                        if (!isSelected) tick()
+                        onDaySelected(day.dayStart)
+                    }
                     .padding(vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.example.screenmanager.ui.common.rememberTickHaptic
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 import com.example.screenmanager.ui.theme.glass
@@ -67,6 +68,7 @@ fun <T> SegmentedControl(
     modifier: Modifier = Modifier
 ) {
     val colors = AppTheme.colors
+    val tick = rememberTickHaptic()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -84,7 +86,10 @@ fun <T> SegmentedControl(
                     .fillMaxHeight()
                     .clip(MaterialTheme.shapes.small)
                     .background(colors.accentBrush, alpha = selection)
-                    .clickable { onSelected(option) },
+                    .clickable {
+                        if (option != selected) tick()
+                        onSelected(option)
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text(

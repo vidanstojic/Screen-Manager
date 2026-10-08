@@ -8,7 +8,11 @@ import android.os.Build
 import com.example.screenmanager.MainActivity
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.service.AlarmReceiver
-import java.util.Calendar
+import com.example.screenmanager.alarm.domain.NextAlarmCalculator
+import java.time.DayOfWeek
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 class AlarmScheduler(
     private val context: Context
@@ -90,70 +94,17 @@ class AlarmScheduler(
     /**
      * Sledeći trenutak kada [alarm] treba da zazvoni. Javno jer isti račun
      * koristi i UI ("Next alarm"), da prikaz i stvarno zakazivanje ne odstupe.
+     * Račun je u [NextAlarmCalculator] (čist, testiran, DST-safe).
      */
-    fun nextTriggerAt(alarm: AlarmRule, now: Long = System.currentTimeMillis()): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            set(Calendar.HOUR_OF_DAY, alarm.hour)
-            set(Calendar.MINUTE, alarm.minute)
-        }
+    fun nextTriggerAt(alarm: AlarmRule, now: Long = System.currentTimeMillis()): Long =
+        NextAlarmCalculator.nextTrigger(
+            hour = alarm.hour,
+            minute = alarm.minute,
+            repeatDays = alarm.repeatDays.mapNotNull(::dayTokenToDayOfWeek).toSet(),
+            now = now,
+            zone = ZoneId.systemDefault()
+        )
 
-        val repeatDays = alarm.repeatDays.mapNotNull { dayTokenToCalendarValue(it) }.toSet()
-        if (repeatDays.isEmpty()) {
-            if (calendar.timeInMillis <= now) {
-                calendar.add(Calendar.DAY_OF_YEAR, 1)
-            }
-            return calendar.timeInMillis
-        }
-
-        val today = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-        val nowMinutes = Calendar.getInstance().run {
-            get(Calendar.HOUR_OF_DAY) * 60 + get(Calendar.MINUTE)
-        }
-        val alarmMinutes = alarm.hour * 60 + alarm.minute
-        val currentDayIndex = calendarDayToIndex(today)
-        var bestOffset = Int.MAX_VALUE
-
-        repeatDays.forEach { day ->
-            val targetIndex = calendarDayToIndex(day)
-            var offset = (targetIndex - currentDayIndex + 7) % 7
-            if (offset == 0 && alarmMinutes <= nowMinutes) {
-                offset = 7
-            }
-            if (offset < bestOffset) {
-                bestOffset = offset
-            }
-        }
-
-        calendar.add(Calendar.DAY_OF_YEAR, bestOffset)
-        return calendar.timeInMillis
-    }
-
-    private fun dayTokenToCalendarValue(day: String): Int? {
-        return when (day) {
-            "Mon" -> Calendar.MONDAY
-            "Tue" -> Calendar.TUESDAY
-            "Wed" -> Calendar.WEDNESDAY
-            "Thu" -> Calendar.THURSDAY
-            "Fri" -> Calendar.FRIDAY
-            "Sat" -> Calendar.SATURDAY
-            "Sun" -> Calendar.SUNDAY
-            else -> null
-        }
-    }
-
-    private fun calendarDayToIndex(day: Int): Int {
-        return when (day) {
-            Calendar.MONDAY -> 0
-            Calendar.TUESDAY -> 1
-            Calendar.WEDNESDAY -> 2
-            Calendar.THURSDAY -> 3
-            Calendar.FRIDAY -> 4
-            Calendar.SATURDAY -> 5
-            Calendar.SUNDAY -> 6
-            else -> 0
-        }
-    }
+    private fun dayTokenToDayOfWeek(token: String): DayOfWeek? =
+        DayOfWeek.entries.firstOrNull { it.getDisplayName(TextStyle.SHORT, Locale.ENGLISH) == token }
 }

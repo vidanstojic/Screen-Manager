@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Accessibility
+import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
@@ -139,6 +140,15 @@ fun SettingsScreen(
                     description = "Detects Shorts and Reels inside YouTube and Instagram.",
                     granted = permissions.accessibilityEnabled,
                     onGrant = { context.openSettings(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                )
+                CardDivider()
+                PermissionRow(
+                    icon = Icons.Rounded.BatteryAlert,
+                    title = "Unrestricted battery",
+                    description = "Keeps tracking, limits and the morning lock running overnight. " +
+                        "Find Focus Flow in the list and choose \"Don't optimize\" / \"Unrestricted\".",
+                    granted = permissions.batteryUnrestricted,
+                    onGrant = { context.openSettings(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
                 )
                 CardDivider()
                 PermissionRow(

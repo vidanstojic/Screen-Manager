@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.example.screenmanager.service.ShortsAccessibilityService
@@ -15,10 +16,19 @@ data class PermissionState(
     val hasUsageAccess: Boolean,
     val canDrawOverlay: Boolean,
     val accessibilityEnabled: Boolean,
-    val notificationsEnabled: Boolean
+    val notificationsEnabled: Boolean,
+    /** Aplikacija je izuzeta iz optimizacije baterije (Samsung je inače "uspavljuje" preko noći). */
+    val batteryUnrestricted: Boolean = true
 ) {
     val allCriticalGranted: Boolean
         get() = hasUsageAccess && canDrawOverlay && accessibilityEnabled
+
+    /** Sve što treba da praćenje i blokade rade bez prekida, i preko noći. */
+    val setupComplete: Boolean
+        get() = allCriticalGranted && batteryUnrestricted
+
+    val missingSetupSteps: Int
+        get() = listOf(hasUsageAccess, canDrawOverlay, accessibilityEnabled, batteryUnrestricted).count { !it }
 }
 
 class PermissionStateChecker(private val context: Context) {
@@ -27,7 +37,9 @@ class PermissionStateChecker(private val context: Context) {
             hasUsageAccess = hasUsageAccess(),
             canDrawOverlay = Settings.canDrawOverlays(context),
             accessibilityEnabled = isAccessibilityEnabled(),
-            notificationsEnabled = notificationsEnabled()
+            notificationsEnabled = notificationsEnabled(),
+            batteryUnrestricted = context.getSystemService(PowerManager::class.java)
+                ?.isIgnoringBatteryOptimizations(context.packageName) != false
         )
     }
 

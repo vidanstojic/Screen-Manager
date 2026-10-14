@@ -71,7 +71,7 @@ fun LauncherRoute(
 
     LauncherScreen(
         state = state,
-        setupIncomplete = !permissions.allCriticalGranted,
+        setupIncomplete = !permissions.setupComplete,
         onOpenScreenManager = onOpenScreenManager,
         onOpenAlarms = onOpenAlarms,
         onOpenSettings = onOpenSettings

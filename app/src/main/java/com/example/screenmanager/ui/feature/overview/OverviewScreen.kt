@@ -119,7 +119,7 @@ fun OverviewScreen(
                 icon = Icons.Rounded.Settings,
                 contentDescription = "Settings",
                 onClick = onOpenSettings,
-                showBadge = !permissions.allCriticalGranted
+                showBadge = !permissions.setupComplete
             )
         }
     ) {
@@ -128,7 +128,7 @@ fun OverviewScreen(
             contentPadding = screenContentPadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
-            if (!permissions.allCriticalGranted) {
+            if (!permissions.setupComplete) {
                 item(key = "permissions") {
                     PermissionsBanner(permissions = permissions, onClick = onOpenSettings)
                 }
@@ -158,11 +158,7 @@ fun OverviewScreen(
 /** Upozorenje da nedostaju dozvole bez kojih praćenje/blokiranje ne radi. */
 @Composable
 private fun PermissionsBanner(permissions: PermissionState, onClick: () -> Unit) {
-    val missing = listOf(
-        permissions.hasUsageAccess,
-        permissions.canDrawOverlay,
-        permissions.accessibilityEnabled
-    ).count { !it }
+    val missing = permissions.missingSetupSteps
 
     AppCard(
         onClick = onClick,
@@ -171,7 +167,7 @@ private fun PermissionsBanner(permissions: PermissionState, onClick: () -> Unit)
     ) {
         ListRow(
             title = "Finish setup",
-            subtitle = "${pluralize(missing, "permission")} still needed to track and block apps.",
+            subtitle = "${pluralize(missing, "setting")} still needed to track and block apps reliably.",
             leading = { IconBadge(icon = Icons.Rounded.WarningAmber, tint = AppTheme.colors.warning) },
             trailing = { ChevronIcon() }
         )

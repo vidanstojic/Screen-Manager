@@ -259,7 +259,8 @@ advance(rule, previous: SessionState?, foregroundInRule: Boolean, now, zone): Se
 - Novi dan → stanje se resetuje.
 - **Sesija traje:**
   - Ako je od poslednjeg viđenja prošlo više od `RESUME_GRACE_MS = 30 s`, sesija je završena u trenutku poslednjeg viđenja i počinje pauza K. Isto važi kad je ekran bio ugašen ili servis nije radio.
-  - Inače, ako je aplikacija u prvom planu, `activeMs` raste za delta vremena, ograničeno na 10 s po tick-u. Kad `activeMs ≥ M`, sesija se završava i počinje pauza `now + K`.
+  - Inače, ako je aplikacija u prvom planu, `activeMs` raste za delta vremena od prethodnog tick-a, ograničeno na 10 s — ali **samo ako je i prethodni tick bio aktivan** (`SessionState.activeTick`, ne čuva se u bazi). Povratak posle kratkog izlaska zato ne donosi „fantomsko“ vreme (BUG-003). Kad `activeMs ≥ M`, sesija se završava i počinje pauza `now + K`.
+  - Tick bez aplikacije u prvom planu (uključujući gašenje ekrana) ostavlja sesiju otvorenu, ali ne broji vreme.
 - **Sesija ne traje:** ako je aplikacija u prvom planu, nije pauza i `sessionsUsed < N`, počinje nova sesija (`sessionsUsed + 1`).
 
 Engine iz stanja zaključuje:
@@ -320,38 +321,39 @@ Fajlovi: `service/ShortsAccessibilityService.kt`, `service/ShortsDetector.kt`, `
 
 **Konfiguracija servisa:** `packageNames="com.google.android.youtube,com.instagram.android"`, pa sistem uopšte ne budi servis za druge aplikacije. Događaji: window state/content change i view scrolled.
 
-**Detekcija (`ShortsDetector.isShortFormVisible`):**
+**Detekcija (`ShortsDetector.detect`):**
 1. Brza nativna pretraga `findAccessibilityNodeInfosByViewId` po poznatim ID-jevima plejera:
    - YouTube: `reel_player_page_container`, `reel_recycler`, `reel_watch_player`;
    - Instagram: `clips_viewer_view_pager`, `clips_viewer_container`, `root_clips_layout`.
-2. Rezervni BFS, ograničen na 600 čvorova, po ID-jevima koji sadrže ključne reči plejera, uz isključivanje ID-jeva sa `tab`, `shelf`, `nav`, `pivot`, `button`, `icon`.
+2. Rezervni BFS, ograničen na 600 čvorova i **najviše jednom u 3 s**, po ID-jevima koji sadrže ključne reči plejera, uz isključivanje ID-jeva sa `tab`, `shelf`, `nav`, `pivot`, `button`, `icon`. ID nađen ovako se pamti i sledeći put ide brzom pretragom.
 3. Pogodak važi samo ako je čvor vidljiv i pokriva ≥ 60% ekrana.
 
 **Zašto:** staro pravilo („tekst sadrži shorts“) hvatalo je i tab „Shorts“ u donjoj navigaciji, pa se ceo YouTube brojao kao Shorts (B7).
 
 **Performanse (B8):**
-- `onAccessibilityEvent` (main thread) samo zakazuje skeniranje sa debounce-om od 250 ms.
+- Svako čitanje stabla je IPC ka YouTube/Instagram procesu. Zato: **bez skeniranja** kad nema šta da se sprovede (blokada isključena, aplikacija nije izabrana, emergency pauza); promena ekrana se skenira posle 250 ms, a ostali događaji (YouTube ih šalje više puta u sekundi) **najviše jednom u 750 ms**.
 - Skeniranje ide na **serijskom pozadinskom dispatcher-u** (`Dispatchers.Default.limitedParallelism(1)`), pa su sve promenljive stanja jednonitne.
 - Dok je plejer vidljiv, ponovo se skenira na svake 2 s (follow-up), jer pasivno gledanje jednog Short-a ne mora da šalje događaje.
-- `markInteraction` se upisuje najviše jednom u 5 s. Dump stabla u logcat ide samo u debuggable build-u.
+- U logcat ide jedna linija kad Shorts/Reels postanu vidljivi ili nevidljivi (ranije: dump 400 čvorova na 5 s u debug build-u i log svakog skeniranja).
+- Dok traje emergency pauza, plejer se tretira kao nevidljiv: nema BACK-a i vreme se ne broji.
 
 **Modovi** (`ShortVideoConfig.mode`; bira se u Settings → „Shorts and Reels“ ili u AddLimit → Shorts/Reels):
 
 | Mod | Šta se dešava kad je plejer vidljiv | Gde je logika |
 |---|---|---|
 | `BLOCKED` | odmah `GLOBAL_ACTION_BACK` i Toast „Shorts/Reels su blokirani“ | `domain/rules/ShortsPolicy.kt` |
-| `SESSIONS` | `SessionLimitTracker.advance()` sa sintetičkim pravilom `shorts:<paket>`, uz tick samo dok je plejer vidljiv (skeniranje na 2 s). Dok sesija traje, gledanje je dozvoljeno. Tokom pauze K i posle N-te sesije (do ponoći) sledi BACK i Toast sa preostalim vremenom. Stanje se čuva u `session_limit_state` pod `shorts:<paket>`; FocusMonitorService te ključeve ne učitava, da ih ne bi pregazio. | `ShortsPolicy` + `SessionLimitTracker` |
+| `SESSIONS` | `SessionLimitTracker.advance()` sa sintetičkim pravilom `shorts:all` — **jedno stanje za YouTube Shorts i Instagram Reels** (BUG-002). Aktivan tick dok je plejer vidljiv, neaktivan kad nestane. Dok sesija traje, gledanje je dozvoljeno. Tokom pauze K i posle N-te sesije (do ponoći) sledi BACK i Toast sa preostalim vremenom. Stanje se čuva u `session_limit_state` pod `shorts:all`; FocusMonitorService `shorts:*` ključeve ne učitava. | `ShortsPolicy` + `SessionLimitTracker` |
 | `BUDGET` | brojanje vremena gledanja i kazna (opisano ispod) | `ShortsAccessibilityService.onBudgetVisible` |
 
 Kazna za celu aplikaciju (`SHORTS_PENALTY` u `RulesEngine`) važi samo u BUDGET modu.
 
 **BUDGET: brojanje i kazna:**
-- Vreme između dve uzastopne detekcije, ako je razmak ≤ 4 s, dodaje se u `pendingWatchMs`. Na disk (`addShortsWatchedMs`) upisuje se na svakih 5 s.
-- Kad današnji zbir **pređe** budžet, upisuje se `shorts_penalty_until:<paket> = now + fullAppBlockMinutes` i izvršava se `GLOBAL_ACTION_BACK`.
+- Budžet je **zajednički** za sve izabrane aplikacije (ključ `all`): vreme između dve uzastopne detekcije, ako je razmak ≤ 4 s, dodaje se u `pendingWatchMs`, i kad se pređe iz jedne aplikacije u drugu. Na disk (`addShortsWatchedMs`) upisuje se na svakih 5 s.
+- Kad današnji zbir **pređe** budžet, upisuje se `shorts_penalty_until:<paket> = now + fullAppBlockMinutes` za **svaku** izabranu aplikaciju i izvršava se `GLOBAL_ACTION_BACK`.
 - Dok je budžet potrošen, svaki ulazak u Shorts/Reels do kraja dana odmah dobija BACK.
 - Blokadu cele aplikacije tokom kazne ne sprovodi accessibility servis, nego `FocusMonitorService` preko `RulesEngine`-a (`SHORTS_PENALTY`).
 
-**Kalibracija ako YouTube ili Instagram promene ID-jeve:** pusti debug build, otvori Shorts, pogledaj logcat tag `ShortsAccessibility` (ispisuje ID-jeve iz stabla) i dopuni liste u `ShortsDetector`.
+**Ako YouTube ili Instagram promene ID-jeve:** rezervna pretraga ih nalazi u roku od ~3 s i pamti do kraja procesa. Za trajnu ispravku dopuni liste u `ShortsDetector` (ID-jeve daje Android Studio Layout Inspector ili `uiautomator dump`).
 
 ---
 
@@ -413,11 +415,12 @@ setAlarmClock ──► AlarmReceiver.FIRE ──► AlarmRingService (FGS, zvuk
 | None | — | jedan dodir |
 | Math | težina (Easy `47 + 38`, Medium `7 × 14 + 23`, Hard `13 × 7 + 16 × 8`), 1–10 računa | svi tačni |
 | Typing | 1–5 rečenica iz liste ili sopstveni tekst | prekucano (velika/mala slova, višak razmaka i tačka na kraju se ne računaju) |
-| Steps | 10–300 koraka | senzor `TYPE_STEP_DETECTOR` |
+| Steps | 10–300 koraka | senzor `TYPE_STEP_DETECTOR` + provera akcelerometrom (`alarm/domain/StepValidator`) |
 
 - Sa misijom alarm **ne može da se ugasi bez rešavanja** — samo da se odloži (ako je odlaganje uključeno). Notifikacija tada nema „Dismiss“.
 - Dok korisnik rešava, zvuk je utišan na 15 %; posle 30 s bez unosa vraća se puna jačina.
 - Koraci traže dozvolu „Physical activity“ (traži se iz forme). Bez senzora ili dozvole koristi se Math, da alarm ne postane nemoguć za gašenje.
+- Detektor koraka sam broji i njihanje telefona (BUG-001). `StepValidator` prihvata korak samo uz vertikalno poskakivanje (raspon ubrzanja duž gravitacije ≥ 2 m/s², vertikala ne sme biti zanemarljiva prema horizontali) i ritam hoda (0,33–1,5 s između koraka, bez naglih skokova tempa). Koraci se priznaju tek posle 4 dobra zaredom.
 - Zadaci se prave iz semena u `rememberSaveable` — rotacija ne menja račun.
 
 ### 9.6 Wake-up detox (posle gašenja alarma)
@@ -432,12 +435,28 @@ setAlarmClock ──► AlarmReceiver.FIRE ──► AlarmRingService (FGS, zvuk
 
 - Po alarmu: uključeno, pitanje 5 ili 10 min posle gašenja.
 - U tom trenutku: full-screen „Are you awake?“ sa odbrojavanjem od 2 min (i notifikacija sa „I'm awake“). Bez potvrde → alarm ponovo zvoni (sa misijom). Posle njegovog gašenja → nova provera; najviše 3 po jutru.
-- Okidači su tačni i rade u Doze-u (`setExactAndAllowWhileIdle`); stanje je u `AlarmRuntimeStore` i vraća se posle restarta. Brisanje alarma otkazuje proveru.
+- Okidači su tačni i rade u Doze-u (`setExactAndAllowWhileIdle`); stanje je u `AlarmRuntimeStore` (device-protected skladište) i vraća se posle restarta. Brisanje alarma otkazuje proveru.
+
+### 9.7a Restart pre otključavanja (direct boot)
+
+- Room baza je u credential-encrypted skladištu i nije dostupna pre prvog otključavanja posle restarta, a `BOOT_COMPLETED` stiže tek posle otključavanja.
+- `DirectBootAlarmStore` čuva kopiju svakog zakazanog alarma (Java serijalizacija `AlarmRule`) u device-protected skladištu; piše je `AlarmScheduler` pri svakom zakazivanju.
+- `AlarmSystemEventsReceiver` na `LOCKED_BOOT_COMPLETED` zakazuje termine iz kopije. Receiver-i, `AlarmRingService`, `AlarmRingActivity` i wake-up check su `directBootAware`; kad baza nije dostupna, alarm se čita iz kopije.
+- Jednokratni alarm koji zazvoni pre otključavanja se posle otključavanja isključuje i u bazi (`BootReceiver`).
+- Odlaganja i wake-up check (`AlarmRuntimeStore`) su takođe u device-protected skladištu. Wake-up detox i aplikacije se pale tek kad je telefon otključan.
 
 ### 9.8 Jutarnja blokada (Screen Manager) i „detox bez alarma“
 
 - **Ugovor:** `domain/wakeup/WakeUpLockout.kt`, `WakeUpLockoutTrigger.trigger(source)`; **implementacija:** `data/repository/WakeUpLockoutController.kt` (upisuje `wakeup_blocked_until`).
-- **Heuristika** (`FocusMonitorService`): ekran se upalio posle ≥ `inactivityHours` mraka; posle `triggerDelayMinutes`, ako je ekran i dalje upaljen i korisnik koristi neku aplikaciju → `trigger(SCREEN_HEURISTIC)`; `RulesEngine` vraća `WAKE_UP` za aplikacije iz `WakeUpConfig`.
+- **Detekcija buđenja** (`domain/wakeup/WakeUpDetector.kt`, čista logika; stanje u `app_internal_state` pod `wake_*`; `FocusMonitorService` prosleđuje paljenje/gašenje ekrana i zakazuje proveru):
+  1. Noć se meri od kraja poslednjeg **pravog** korišćenja (`darkSince`); upaljen ekran kraći od 90 s je pogled (sat, notifikacija) i ne pomera je.
+  2. Prvo paljenje ekrana posle `inactivityHours` noći je kandidat za buđenje.
+  3. Blokada (`trigger(SCREEN_HEURISTIC)`) se pali kad se od kandidata **nakupi** `triggerDelayMinutes` upaljenog ekrana — i preko više kratkih paljenja (ugasiš alarm, zaključaš, pa posle uzmeš telefon).
+  4. Kandidat stariji od 3 h zastareva; sledeće paljenje posle iste noći postaje novi kandidat.
+  5. Servis pokrenut dok je ekran upaljen računa to kao paljenje ekrana.
+  `RulesEngine` vraća `WAKE_UP` za aplikacije iz `WakeUpConfig`. Logcat: `FocusMonitorService` linije „WakeUp: …“.
+- **Ranije (BUG-004):** blokada je palila samo ako je PRVO paljenje posle noći trajalo neprekidno 2 min uz aplikaciju u prvom planu; svaki kratak pogled je pomerao početak noći i trošio to jutro.
+- **Pouzdanost:** ako Android uspava aplikaciju preko noći, servis ne vidi jutarnje paljenje — zato Settings traži „Unrestricted battery“.
 - **Odluka (08.10.2026):** stavka specifikacije „Detox bez alarma“ (sistem prepozna da je korisnik ustao i blokira izabrane aplikacije na izabrano vreme) je **preskočena**, jer je to upravo ova postojeća Morning lock funkcija (Limits → Morning lock).
 - Ranije je „Dismiss“ na notifikaciji alarma palio Morning lock (`ALARM_DISMISSED`). To je zamenjeno detox-om po alarmu (§9.6); izvor `ALARM_DISMISSED` ostaje u ugovoru, ali ga alarm više ne koristi.
 
@@ -539,6 +558,7 @@ Važni detalji:
 | `PACKAGE_USAGE_STATS` (Usage Access) | statistika + FGS | Settings ekran → `ACTION_USAGE_ACCESS_SETTINGS` |
 | `SYSTEM_ALERT_WINDOW` | blok ekran | Settings ekran → `ACTION_MANAGE_OVERLAY_PERMISSION` |
 | Accessibility servis | Shorts/Reels | Settings ekran → `ACTION_ACCESSIBILITY_SETTINGS` |
+| Izuzetak od optimizacije baterije (nije dozvola) | da Android ne uspava praćenje preko noći (jutarnja blokada) | Settings ekran → `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` |
 | `POST_NOTIFICATIONS` | FGS i alarm notifikacije | runtime zahtev u `MainActivity.onCreate`; kasnije Settings ekran |
 | `FOREGROUND_SERVICE(_SPECIAL_USE)` | monitoring servis | manifest |
 | `RECEIVE_BOOT_COMPLETED` | restart posle boot-a | manifest (`BootReceiver`) |
@@ -568,15 +588,20 @@ Važni detalji:
 
 ## 13. Testovi i verifikacija
 
-JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (106 testova: 27 za engine u `domain/`, 33 za UI logiku u `ui/`, 46 za Smart Alarm u `alarm/` i `data/local/`):
+JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (131 test):
 
 | Test | Pokriva |
 |---|---|
 | `usage/SessionReconstructorTest` | zatvaranje i otvaranje sesija, spajanje aktivnosti, launcher, gašenje ekrana, idempotentnost preko `safeCursor`, **stvarni Samsung redosled događaja**, `ForegroundResolver` |
 | `usage/UsageSplitterTest` | sečenje po satima i danima, **DST 25.10.**, brojanje početaka sesija |
 | `rules/RulesEngineTest` | noćni schedule, grupni dnevni limit do ponoći, emergency preko ponoći, prioritet najrestriktivnijeg, interval pauza i iscrpljen pool |
-| `rules/ShortsPolicyTest` | BLOCKED uvek izbacuje; BUDGET prepušten servisu; SESSIONS: M minuta dozvoljeno, pa pauza K, pa nova sesija; posle N-te sesije zaključano do ponoći |
-| `rules/SessionLimitTrackerTest` | istek M → pauza K, nema nove sesije tokom pauze, izlazak duži od grace perioda, povratak posle duge rupe, iscrpljenje N i reset sledećeg dana |
+| `rules/ShortsPolicyTest` | BLOCKED uvek izbacuje; BUDGET prepušten servisu; SESSIONS: M minuta dozvoljeno, pa pauza K, pa nova sesija; posle N-te sesije zaključano do ponoći; **YouTube i Instagram dele sesiju i budžet** |
+| `rules/SessionLimitTrackerTest` | istek M → pauza K, nema nove sesije tokom pauze, izlazak duži od grace perioda, povratak posle duge rupe, iscrpljenje N i reset sledećeg dana, **bez fantomskog vremena posle kratkog izlaska** |
+| `wakeup/WakeUpDetectorTest` | početak noći, okidanje ujutru, pogledi noću ne pomeraju noć, sabiranje više kratkih paljenja, kratka noć, zastareo kandidat, posle okidanja, delay 0, dnevno korišćenje |
+| `domain/PermissionStateTest` | baterija kao korak podešavanja, broj koraka koji fale |
+| `alarm/domain/StepValidatorTest` | hod se broji; njihanje levo-desno, naginjanje i brzo tresenje ne; usamljeni koraci se ne priznaju; niz od 4 |
+| `alarm/data/AlarmSnapshotCodecTest` | kopija alarma za direct boot bez gubitka; oštećen zapis → null |
+| `data/local/MigrationCoverageTest` | svaka verzija baze od 5 do trenutne ima migraciju |
 | `ui/navigation/NavigatorTest` | back-stack: koren Launcher, tabovi se zamenjuju pa „nazad“ vodi na početni ekran, Smart Alarms je odvojen od tabova, push/pop, bez duplih ekrana |
 | `ui/common/FormattersTest` | format trajanja, odbrojavanja i vremena |
 | `ui/feature/limits/RuleSummariesTest` | opisi pravila u jednom redu, nazivi grupa dana |
@@ -604,7 +629,7 @@ Folder `diag/` (isključen iz git-a preko `.git/info/exclude`):
 - `run_diag.bat`: appops, stanje servisa, kopija baze (`run-as`, samo debug build), `dumpsys usagestats`, logcat.
 - `run_diag2.bat`: `dumpsys usagestats database-info` (koliko dana sistem čuva: 10 dnevnih, 4 nedeljna, 6 mesečnih fajlova), baza, log `UsageSync`.
 
-Korisni logcat tagovi: `UsageSync` (svaki sync), `FocusMonitorService`, `ShortsAccessibility`.
+Korisni logcat tagovi: `UsageSync` (svaki sync), `FocusMonitorService` (uklj. „WakeUp: …“), `ShortsAccessibility` (Shorts/Reels vidljivi/nevidljivi), `WebsiteGuard`.
 
 Brza provera baze (Python):
 ```python
@@ -635,6 +660,26 @@ for d, m in c.execute("select epochDay, sum(durationMs)/60000 from usage_hourly 
 | B13 | crash Compose u overlay-u | nema `SavedStateRegistryOwner` | `OverlayLifecycleOwner` ga implementira | `f18f733` |
 | B14 | **svuda 0 vremena** | sync bez dozvole je dobio prazan rezultat i pomerio kursor na „sada“ | `hasAccess()`, kursor samo uz događaje | `e61ca36` |
 | B15 | **prethodni dani prazni** | samoisceljenje „prazna tabela“ se nije okinulo | eksplicitni backfill (`BACKFILL_VERSION`), lookback 10 dana | `2d199e3` |
+
+Grana `bugfix/stabilization` (oktobar 2026, po jedan commit po bagu; ID-jevi iz bug loga):
+
+| ID | Problem | Ispravka |
+|---|---|---|
+| BUG-002 | posle blokade Reels-a Shorts radi | jedno stanje i jedan budžet za sve short-form aplikacije |
+| BUG-003 | do 10 s „fantomskog“ vremena posle kratkog izlaska | vreme samo između dva aktivna tick-a |
+| BUG-004 | jutarnja blokada ne okida | `WakeUpDetector` (noć od pravog korišćenja, sabiranje upaljenog ekrana) |
+| BUG-001 | Steps misija broji njihanje telefona | `StepValidator` (akcelerometar + ritam hoda) |
+| — | obrisani primeri pravila se vraćaju | seed jednom po instalaciji |
+| — | nova instalacija odmah blokira | svi primeri pravila isključeni |
+| — | emergency pauza gasi detox posle alarma | detox važi i tokom pauze |
+| — | emergency pauza ne važi za Shorts/Reels | Accessibility servis čita pauzu |
+| — | alarm ne zvoni posle restarta pre otključavanja | direct boot (§9.7a) |
+| — | nedostajuća migracija tiho briše bazu | destruktivno samo v1–4 i downgrade, `MigrationCoverageTest` |
+| — | servis uspavan preko noći | korak „Unrestricted battery“ u podešavanjima |
+| perf | YouTube/Instagram skenirani i do 4×/s, BFS 600 čvorova | bez skeniranja kad nema pravila, ≤1/0,75 s, BFS ≤1/3 s |
+| perf | UI tokovi rade i dok je aplikacija u pozadini | `collectAsStateWithLifecycle` |
+| perf | neograničen keš ikonica u stalno živom procesu | LRU ~4 MB + `onTrimMemory` |
+| perf | main thread na svake 2 s bez potrebe | samo kad overlay treba prikazati/skloniti |
 
 Rezervna kopija stanja pre refaktora: `git stash apply refs/backup/pre-refactor`.
 

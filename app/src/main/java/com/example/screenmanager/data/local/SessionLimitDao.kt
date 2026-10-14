@@ -16,9 +16,6 @@ interface SessionLimitDao {
     @Query("SELECT * FROM session_limit_rules ORDER BY name")
     fun observeRules(): Flow<List<SessionLimitRuleEntity>>
 
-    @Query("SELECT COUNT(*) FROM session_limit_rules")
-    suspend fun countRules(): Int
-
     @Upsert
     suspend fun upsertStates(states: List<SessionLimitStateEntity>)
 
@@ -27,9 +24,6 @@ interface SessionLimitDao {
 
     @Query("SELECT * FROM session_limit_state")
     suspend fun allStates(): List<SessionLimitStateEntity>
-
-    @Query("SELECT * FROM session_limit_state")
-    fun observeStates(): Flow<List<SessionLimitStateEntity>>
 
     /**
      * Zajedničko Shorts/Reels interval stanje (`shorts:all`, ShortsPolicy.SHARED_STATE_KEY) nema red

@@ -4,7 +4,6 @@ import android.app.Application
 import android.util.Log
 import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.data.DefaultRulesData
-import com.example.screenmanager.data.repository.SettingsRepository
 import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.domain.AppStateKeys
 import com.example.screenmanager.domain.ServiceLocator
@@ -24,21 +23,12 @@ import kotlinx.coroutines.launch
  */
 class ScreenManagerApplication : Application() {
 
-    val settingsRepository: SettingsRepository
-        get() = ServiceLocator.settingsRepository(this)
-
     // SupervisorJob: pad jednog seed-a ne obara ostale.
     private val applicationScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
             Log.e("ScreenManagerApp", "Greška pri inicijalizaciji podrazumevanih podataka", throwable)
         }
     )
-
-    companion object {
-        private lateinit var instance: ScreenManagerApplication
-
-        fun getInstance(): ScreenManagerApplication = instance
-    }
 
     /** Proces ostaje živ zbog FocusMonitorService-a; kad se UI sakrije, oslobađaju se UI keševi. */
     override fun onTrimMemory(level: Int) {
@@ -48,7 +38,6 @@ class ScreenManagerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
         initializeDefaultData()
     }
 

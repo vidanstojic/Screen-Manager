@@ -41,9 +41,6 @@ class UsageStatsRepository(
 
     // --- Sve aplikacije zbirno ---
 
-    fun observeTodayHourlyUsage(): Flow<List<HourlyUsage>> =
-        hourlyDao.observeHourly(TimeBuckets.epochDay(System.currentTimeMillis()))
-
     /** Po satu za izabrani dan (DayPicker). */
     fun observeHourlyUsageForDay(dayStartTimestamp: Long): Flow<List<HourlyUsage>> =
         hourlyDao.observeHourly(TimeBuckets.epochDay(dayStartTimestamp))
@@ -53,10 +50,6 @@ class UsageStatsRepository(
         val day = TimeBuckets.epochDay(dayStartTimestamp)
         return hourlyDao.observeTotals(day, day)
     }
-
-    fun observeDailyTotals(): Flow<List<UsageSummary>> = observeTotalsForDay(System.currentTimeMillis())
-
-    fun observeWeeklyTotals(): Flow<List<UsageSummary>> = totalsSince(TimeBuckets.startOfWeek())
 
     /**
      * Po aplikaciji za poslednjih 7 dana (danas uključen) — isti prozor kao
@@ -174,14 +167,11 @@ class UsageStatsRepository(
                     stateDao.upsert(AppInternalState(AppStateKeys.USAGE_BACKFILL_VERSION, BACKFILL_VERSION))
                 }
             }
-            stateDao.upsert(AppInternalState(AppStateKeys.LAST_USAGE_EVENT_SYNC_AT, now))
 
             Log.i(TAG, "Sync backfill=${!backfillDone} from=$cursor events=${events.size} sessions=${sessions.size} hourlyRows=${rows.size}")
             SyncResult.Synced(events = events.size, sessions = sessions.size, hourlyRows = rows.size)
         }
     }
-
-    suspend fun lastSyncAt(): Long = stateDao.getLong(AppStateKeys.LAST_USAGE_EVENT_SYNC_AT) ?: 0L
 
     /** Sirove sesije: [TimeBuckets.RAW_LOG_RETENTION_DAYS]; rollup-ovi: [TimeBuckets.ROLLUP_RETENTION_DAYS] (B10). */
     suspend fun cleanupOldLogs(now: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {

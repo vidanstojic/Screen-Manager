@@ -1,10 +1,8 @@
 package com.example.screenmanager.domain
 
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
 
 /**
  * Kalendarske granice u lokalnoj zoni.
@@ -27,26 +25,10 @@ object TimeBuckets {
     fun startOfNextDay(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
         startOfDay(epochDay(now, zone) + 1, zone)
 
-    fun startOfWeek(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long {
-        val monday = LocalDate.ofEpochDay(epochDay(now, zone))
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        return monday.atStartOfDay(zone).toInstant().toEpochMilli()
-    }
-
     fun startOfMonth(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long {
         val first = LocalDate.ofEpochDay(epochDay(now, zone)).withDayOfMonth(1)
         return first.atStartOfDay(zone).toInstant().toEpochMilli()
     }
-
-    /**
-     * Početak "klizećeg" prozora od poslednjih 7 dana (danas uključen).
-     * Indeks dana 0..6 u grafiku odgovara `epochDay - rollingWeekStartDay`.
-     */
-    fun startOfRollingWeek(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
-        startOfDay(rollingWeekStartDay(now, zone), zone)
-
-    fun rollingWeekStartDay(now: Long = System.currentTimeMillis(), zone: ZoneId = zone()): Long =
-        epochDay(now, zone) - 6
 
     const val MINUTE_MS: Long = 60_000L
     const val HOUR_MS: Long = 60 * MINUTE_MS

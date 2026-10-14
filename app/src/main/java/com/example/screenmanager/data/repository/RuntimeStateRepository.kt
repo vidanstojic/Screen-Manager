@@ -50,9 +50,6 @@ class RuntimeStateRepository(
 
     // --- Shorts / Reels ---
 
-    suspend fun shortsPenalties(): Map<String, Long> =
-        stateDao.getWithPrefix(AppStateKeys.SHORTS_PENALTY_PREFIX).toPackageMap(AppStateKeys.SHORTS_PENALTY_PREFIX)
-
     fun observeShortsPenalties(): Flow<Map<String, Long>> =
         stateDao.observeWithPrefix(AppStateKeys.SHORTS_PENALTY_PREFIX)
             .map { it.toPackageMap(AppStateKeys.SHORTS_PENALTY_PREFIX) }
@@ -79,9 +76,6 @@ class RuntimeStateRepository(
 
     suspend fun sessionStates(): Map<String, SessionState> =
         sessionLimitDao.allStates().associate { it.ruleId to it.toDomain() }
-
-    fun observeSessionStates(): Flow<Map<String, SessionState>> =
-        sessionLimitDao.observeStates().map { list -> list.associate { it.ruleId to it.toDomain() } }
 
     suspend fun sessionState(ruleId: String): SessionState? = sessionLimitDao.state(ruleId)?.toDomain()
 

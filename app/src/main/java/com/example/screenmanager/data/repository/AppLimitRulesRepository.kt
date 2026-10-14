@@ -11,16 +11,7 @@ class AppLimitRulesRepository(private val dao: AppLimitRuleDao) {
     fun observeAll(): Flow<List<AppLimitRule>> =
         dao.observeAll().map { entities -> entities.map { it.toModel() } }
 
-    fun observeEnabled(): Flow<List<AppLimitRule>> =
-        dao.observeEnabled().map { entities -> entities.map { it.toModel() } }
-
-    suspend fun add(rule: AppLimitRule) = dao.upsert(rule.toEntity())
-
     suspend fun update(rule: AppLimitRule) = dao.upsert(rule.toEntity())
 
-    suspend fun delete(rule: AppLimitRule) = dao.delete(rule.toEntity())
-
     suspend fun deleteById(id: String) = dao.deleteById(id)
-
-    suspend fun getById(id: String): AppLimitRule? = dao.findById(id)?.toModel()
 }

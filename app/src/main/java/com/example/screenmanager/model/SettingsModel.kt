@@ -2,10 +2,7 @@ package com.example.screenmanager.model
 
 import java.io.Serializable
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 /*
  * Napomena: modeli pravila su Serializable da bi forma za izmenu mogla da
@@ -127,19 +124,10 @@ data class EmergencySessionConfig(
     val isActive: Boolean
         get() = isActiveAt(System.currentTimeMillis())
 
-    val activeUntilLabel: String?
-        get() = activeUntilMillis
-            ?.takeIf { isActive }
-            ?.let { LABEL_FORMAT.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) }
-
     fun activated(now: Long, durationMinutes: Int = defaultDurationMinutes): EmergencySessionConfig =
         copy(activeUntilMillis = now + durationMinutes * 60_000L)
 
     fun ended(): EmergencySessionConfig = copy(activeUntilMillis = null)
-
-    private companion object {
-        val LABEL_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-    }
 }
 
 data class AppOption(

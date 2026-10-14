@@ -70,10 +70,6 @@ data class AppColors(
     /** Akcentni gradijent za vodoravne/dijagonalne površine (dugmad, izabrana stavka). */
     val accentBrush: Brush
         get() = Brush.linearGradient(listOf(accentStart, accentEnd))
-
-    /** Akcentni gradijent odozgo nadole (stubići grafika). */
-    val accentVerticalBrush: Brush
-        get() = Brush.verticalGradient(listOf(accent, accentEnd))
 }
 
 val DarkAppColors = AppColors(

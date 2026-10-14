@@ -12,6 +12,4 @@ class ShortVideoConfigRepository(private val dao: ShortVideoConfigDao) {
         dao.observe().map { entity -> entity?.toModel() }
 
     suspend fun update(config: ShortVideoConfig) = dao.upsert(config.toEntity())
-
-    suspend fun get(): ShortVideoConfig? = dao.get()?.toModel()
 }

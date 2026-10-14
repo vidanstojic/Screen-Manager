@@ -6,7 +6,6 @@ import com.example.screenmanager.data.local.ScheduleRuleEntity
 import com.example.screenmanager.data.local.SessionLimitRuleEntity
 import com.example.screenmanager.data.local.ShortVideoConfigEntity
 import com.example.screenmanager.data.local.WakeUpConfigEntity
-import java.time.DayOfWeek
 
 /**
  * Primeri pravila za novu instalaciju. Svi su ISKLJUČENI: korisnik ih uključuje

@@ -11,6 +11,7 @@ out/
 build/
 app/build/
 .gradle/
+.kotlin/
 java (generated)/
 res (generated)/
 

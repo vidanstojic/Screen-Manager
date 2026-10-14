@@ -10,7 +10,6 @@ object AppStateKeys {
     const val WAKE_SCREEN_ON_AT = "wake_screen_on_at"
     const val WAKE_CANDIDATE_AT = "wake_candidate_at"
     const val WAKE_CANDIDATE_ON_MS = "wake_candidate_on_ms"
-    const val LAST_USAGE_EVENT_SYNC_AT = "last_usage_event_sync_at"
     const val USAGE_SYNC_CURSOR = "usage_sync_cursor"
 
     /** 1 = primeri pravila su već upisani (jednom po instalaciji). */

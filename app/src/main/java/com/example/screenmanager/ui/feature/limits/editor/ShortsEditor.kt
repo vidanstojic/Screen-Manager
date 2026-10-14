@@ -116,10 +116,10 @@ private fun modeHint(mode: ShortsMode): String = when (mode) {
         "Every time Shorts or Reels open, you are sent straight back."
 
     ShortsMode.BUDGET ->
-        "The budget is counted per app. When it runs out, the whole app is blocked for the set " +
-            "time and Shorts/Reels stay closed until midnight."
+        "One budget is shared by all selected apps. When it runs out, those apps are blocked for " +
+            "the set time and Shorts/Reels stay closed until midnight."
 
     ShortsMode.SESSIONS ->
-        "Only time inside Shorts/Reels counts. They are closed during the break and, after the " +
-            "last session, until midnight."
+        "Only time inside Shorts/Reels counts, shared by all selected apps. They are closed during " +
+            "the break and, after the last session, until midnight."
 }

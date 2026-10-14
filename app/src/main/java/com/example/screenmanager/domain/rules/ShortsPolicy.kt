@@ -21,31 +21,39 @@ sealed interface ShortsVerdict {
  * Čista logika za modove [ShortsMode.BLOCKED] i [ShortsMode.SESSIONS].
  * [ShortsMode.BUDGET] ostaje u servisu jer zavisi od akumulacije vremena gledanja.
  *
- * Interval mod ponovo koristi [SessionLimitTracker] sa sintetičkim pravilom
- * `shorts:<paket>` — tick se dešava samo dok je plejer vidljiv, a tracker sam
+ * Svi short-form izvori (YouTube Shorts, Instagram Reels) dele JEDNO stanje:
+ * jedna sesija M/N/K i jedan dnevni budžet. Ranije je svaka aplikacija imala
+ * svoj brojač, pa je posle blokade Reels-a prelazak na Shorts otvarao novu,
+ * netaknutu sesiju (BUG-002).
+ *
+ * Interval mod koristi [SessionLimitTracker] sa sintetičkim pravilom
+ * [SHARED_STATE_KEY]; tick se dešava samo dok je plejer vidljiv, a tracker sam
  * zatvara sesiju ako je rupa između dva viđenja duža od grace perioda (30 s).
  */
 object ShortsPolicy {
     const val STATE_PREFIX = "shorts:"
 
-    fun stateKey(packageName: String) = STATE_PREFIX + packageName
+    /** Ključ jedinog interval stanja za sve short-form aplikacije. */
+    const val SHARED_STATE_KEY = STATE_PREFIX + "all"
 
-    fun sessionRule(config: ShortVideoConfig, packageName: String) = SessionLimitRule(
-        id = stateKey(packageName),
+    /** Ključ zajedničkog dnevnog budžeta gledanja (BUDGET mod). */
+    const val SHARED_WATCH_KEY = "all"
+
+    fun sessionRule(config: ShortVideoConfig) = SessionLimitRule(
+        id = SHARED_STATE_KEY,
         name = "Shorts/Reels",
-        selectedAppIds = listOf(packageName),
+        selectedAppIds = config.selectedAppIds,
         sessionLengthMinutes = config.sessionLengthMinutes,
         maxSessions = config.maxSessions,
         cooldownMinutes = config.cooldownMinutes
     )
 
     /**
-     * Poziva se na svako viđenje Shorts/Reels plejera.
+     * Poziva se na svako viđenje Shorts/Reels plejera u bilo kojoj od izabranih aplikacija.
      * @return novo stanje sesije (samo za SESSIONS) i odluka.
      */
     fun onVisible(
         config: ShortVideoConfig,
-        packageName: String,
         previous: SessionState?,
         now: Long,
         zone: ZoneId,
@@ -54,7 +62,7 @@ object ShortsPolicy {
         ShortsMode.BLOCKED -> previous to ShortsVerdict.Kick("Shorts/Reels are blocked", null)
         ShortsMode.BUDGET -> previous to ShortsVerdict.Allow
         ShortsMode.SESSIONS -> {
-            val next = SessionLimitTracker.advance(sessionRule(config, packageName), previous, true, now, zone)
+            val next = SessionLimitTracker.advance(sessionRule(config), previous, true, now, zone)
             val verdict = when {
                 next.isSessionRunning -> ShortsVerdict.Allow
                 next.sessionsUsed >= config.maxSessions ->
@@ -64,4 +72,12 @@ object ShortsPolicy {
             next to verdict
         }
     }
+
+    /**
+     * Dnevni budžet (BUDGET) je zajednički: [watchedTodayMs] je zbir gledanja u
+     * svim izabranim aplikacijama. Kad se potroši, izbacuje se iz Shorts/Reels
+     * svake od njih do ponoći.
+     */
+    fun budgetExhausted(config: ShortVideoConfig, watchedTodayMs: Long): Boolean =
+        watchedTodayMs >= config.maxReelsWatchMinutes.coerceAtLeast(0) * 60_000L
 }

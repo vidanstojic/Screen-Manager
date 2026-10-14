@@ -44,8 +44,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - BLOCKED: svaki ulazak u Shorts/Reels → BACK;
  * - SESSIONS: interval mod (M/N/K) samo za Shorts/Reels → BACK tokom pauze
  *   i posle N-te sesije do ponoći ([ShortsPolicy] + SessionLimitTracker);
- * - BUDGET: dnevni budžet po aplikaciji → kazna za celu aplikaciju (sprovodi
- *   je FocusMonitorService preko RulesEngine-a) i BACK do kraja dana.
+ * - BUDGET: zajednički dnevni budžet → kazna za sve izabrane aplikacije
+ *   (sprovodi je FocusMonitorService preko RulesEngine-a) i BACK do kraja dana.
+ * YouTube Shorts i Instagram Reels dele isti brojač (sesije i budžet).
  * Ostatak aplikacije (obični video, poruke, feed) radi normalno u svim modovima.
  */
 class ShortsAccessibilityService : AccessibilityService() {
@@ -74,11 +75,13 @@ class ShortsAccessibilityService : AccessibilityService() {
     private var pendingWatchMs = 0L
     private var lastFlushAt = 0L
     private var cachedDay = -1L
-    private val storedWatchMs = HashMap<String, Long>()
+    /** Danas odgledano (zbir svih short-form aplikacija), već upisano u bazu; null = nije učitano. */
+    private var storedWatchMs: Long? = null
     private var lastDumpAt = 0L
     private var lastKickToastAt = 0L
-    private val sessionCache = HashMap<String, SessionState?>()
-    private val sessionPersistedAt = HashMap<String, Long>()
+    private var sessionLoaded = false
+    private var sessionState: SessionState? = null
+    private var sessionPersistedAt = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -168,29 +171,16 @@ class ShortsAccessibilityService : AccessibilityService() {
      * samo čuva stanje interval sesije i izvršava BACK + kratko obaveštenje.
      */
     private suspend fun onPolicyVisible(packageName: String, config: ShortVideoConfig, now: Long) {
-        val key = ShortsPolicy.stateKey(packageName)
-        val previous = if (sessionCache.containsKey(key)) sessionCache[key] else runtimeRepository.sessionState(key)
+        val previous = loadSessionState()
         val (next, verdict) = ShortsPolicy.onVisible(
             config = config,
-            packageName = packageName,
             previous = previous,
             now = now,
             zone = TimeBuckets.zone(),
             startOfNextDay = TimeBuckets.startOfNextDay(now)
         )
 
-        if (next != null && next != previous) {
-            sessionCache[key] = next
-            val structural = previous == null ||
-                previous.sessionsUsed != next.sessionsUsed ||
-                previous.sessionStartedAt != next.sessionStartedAt ||
-                previous.frozenUntil != next.frozenUntil ||
-                previous.epochDay != next.epochDay
-            if (structural || now - (sessionPersistedAt[key] ?: 0L) >= FLUSH_INTERVAL_MS) {
-                runtimeRepository.saveSessionStates(listOf(next))
-                sessionPersistedAt[key] = now
-            }
-        }
+        saveSessionState(previous, next, now)
 
         when (verdict) {
             ShortsVerdict.Allow -> scheduleFollowUp()
@@ -199,6 +189,29 @@ class ShortsAccessibilityService : AccessibilityService() {
                 performGlobalAction(GLOBAL_ACTION_BACK)
                 notifyKick(verdict, now)
             }
+        }
+    }
+
+    private suspend fun loadSessionState(): SessionState? {
+        if (!sessionLoaded) {
+            sessionState = runtimeRepository.sessionState(ShortsPolicy.SHARED_STATE_KEY)
+            sessionLoaded = true
+        }
+        return sessionState
+    }
+
+    /** Strukturne promene (nova sesija, pauza, novi dan) odmah u bazu, ostalo najviše na [FLUSH_INTERVAL_MS]. */
+    private suspend fun saveSessionState(previous: SessionState?, next: SessionState?, now: Long) {
+        if (next == null || next == previous) return
+        sessionState = next
+        val structural = previous == null ||
+            previous.sessionsUsed != next.sessionsUsed ||
+            previous.sessionStartedAt != next.sessionStartedAt ||
+            previous.frozenUntil != next.frozenUntil ||
+            previous.epochDay != next.epochDay
+        if (structural || now - sessionPersistedAt >= FLUSH_INTERVAL_MS) {
+            runtimeRepository.saveSessionStates(listOf(next))
+            sessionPersistedAt = now
         }
     }
 
@@ -217,34 +230,35 @@ class ShortsAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** BUDGET mod: dnevni budžet gledanja + kazna za celu aplikaciju. */
+    /**
+     * BUDGET mod: zajednički dnevni budžet gledanja za sve izabrane aplikacije.
+     * Kad se potroši, sve one dobijaju kaznu (cela aplikacija), a Shorts/Reels
+     * ostaju zatvoreni do ponoći u svakoj od njih.
+     */
     private suspend fun onBudgetVisible(packageName: String, config: ShortVideoConfig, now: Long) {
         val day = TimeBuckets.epochDay(now)
         if (day != cachedDay) {
-            storedWatchMs.clear()
+            storedWatchMs = null
             pendingWatchMs = 0L
             cachedDay = day
         }
 
-        if (visiblePackage != null && visiblePackage != packageName) flush(now)
-        if (visiblePackage == packageName && now - lastVisibleAt <= VISIBILITY_GRACE_MS) {
+        // Prelazak iz jedne aplikacije u drugu ne prekida brojanje: budžet je zajednički.
+        if (visiblePackage != null && now - lastVisibleAt <= VISIBILITY_GRACE_MS) {
             pendingWatchMs += now - lastVisibleAt
         }
         visiblePackage = packageName
         lastVisibleAt = now
 
-        val stored = storedWatchMs.getOrPut(packageName) { runtimeRepository.shortsWatchedMs(packageName, day) }
-        val limitMs = config.maxReelsWatchMinutes.coerceAtLeast(0) * TimeBuckets.MINUTE_MS
-        val total = stored + pendingWatchMs
+        val stored = storedWatchMs ?: runtimeRepository.shortsWatchedMs(ShortsPolicy.SHARED_WATCH_KEY, day)
+            .also { storedWatchMs = it }
 
-        if (total >= limitMs) {
-            if (stored < limitMs) {
-                // Upravo prešli budžet → kazna za celu aplikaciju.
+        if (ShortsPolicy.budgetExhausted(config, stored + pendingWatchMs)) {
+            if (!ShortsPolicy.budgetExhausted(config, stored)) {
+                // Upravo prešli budžet → kazna za sve izabrane aplikacije.
                 flush(now)
-                runtimeRepository.setShortsPenalty(
-                    packageName,
-                    now + config.fullAppBlockMinutes.coerceAtLeast(1) * TimeBuckets.MINUTE_MS
-                )
+                val until = now + config.fullAppBlockMinutes.coerceAtLeast(1) * TimeBuckets.MINUTE_MS
+                config.selectedAppIds.forEach { runtimeRepository.setShortsPenalty(it, until) }
             }
             performGlobalAction(GLOBAL_ACTION_BACK)
             visiblePackage = null
@@ -275,11 +289,10 @@ class ShortsAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun flush(now: Long) {
-        val packageName = visiblePackage ?: return
+        if (visiblePackage == null) return
         lastFlushAt = now
         if (pendingWatchMs <= 0L) return
-        val total = runtimeRepository.addShortsWatchedMs(packageName, cachedDay, pendingWatchMs)
-        storedWatchMs[packageName] = total
+        storedWatchMs = runtimeRepository.addShortsWatchedMs(ShortsPolicy.SHARED_WATCH_KEY, cachedDay, pendingWatchMs)
         pendingWatchMs = 0L
     }
 

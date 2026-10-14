@@ -14,9 +14,9 @@ object AppStateKeys {
     /** + packageName → kraj kazne za Shorts/Reels (cela aplikacija blokirana). */
     const val SHORTS_PENALTY_PREFIX = "shorts_penalty_until:"
 
-    /** + packageName → danas odgledano short-form vreme (ms). */
+    /** + ključ (`all` = zbir svih short-form aplikacija) → danas odgledano short-form vreme (ms). */
     const val SHORTS_WATCHED_PREFIX = "shorts_watched_ms:"
 
-    /** + packageName → epochDay na koji se odnosi [SHORTS_WATCHED_PREFIX]. */
+    /** + ključ → epochDay na koji se odnosi [SHORTS_WATCHED_PREFIX]. */
     const val SHORTS_WATCHED_DAY_PREFIX = "shorts_watched_day:"
 }

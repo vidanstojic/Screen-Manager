@@ -31,7 +31,10 @@ interface SessionLimitDao {
     @Query("SELECT * FROM session_limit_state")
     fun observeStates(): Flow<List<SessionLimitStateEntity>>
 
-    /** Shorts/Reels interval stanja (`shorts:<paket>`) nemaju red u session_limit_rules — ne brišu se. */
-    @Query("DELETE FROM session_limit_state WHERE ruleId NOT IN (SELECT id FROM session_limit_rules) AND ruleId NOT LIKE 'shorts:%'")
+    /**
+     * Zajedničko Shorts/Reels interval stanje (`shorts:all`, ShortsPolicy.SHARED_STATE_KEY) nema red
+     * u session_limit_rules — ne briše se. Stara stanja po aplikaciji (`shorts:<paket>`) se brišu.
+     */
+    @Query("DELETE FROM session_limit_state WHERE ruleId NOT IN (SELECT id FROM session_limit_rules) AND ruleId != 'shorts:all'")
     suspend fun deleteOrphanStates()
 }

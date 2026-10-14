@@ -54,18 +54,18 @@ class RuntimeStateRepository(
     suspend fun setShortsPenalty(packageName: String, until: Long) =
         put(AppStateKeys.SHORTS_PENALTY_PREFIX + packageName, until)
 
-    /** Danas odgledano short-form vreme za paket (resetuje se promenom dana). */
-    suspend fun shortsWatchedMs(packageName: String, epochDay: Long): Long {
-        val day = stateDao.getLong(AppStateKeys.SHORTS_WATCHED_DAY_PREFIX + packageName)
+    /** Danas odgledano short-form vreme pod ključem [key] (resetuje se promenom dana). */
+    suspend fun shortsWatchedMs(key: String, epochDay: Long): Long {
+        val day = stateDao.getLong(AppStateKeys.SHORTS_WATCHED_DAY_PREFIX + key)
         if (day != epochDay) return 0L
-        return stateDao.getLong(AppStateKeys.SHORTS_WATCHED_PREFIX + packageName) ?: 0L
+        return stateDao.getLong(AppStateKeys.SHORTS_WATCHED_PREFIX + key) ?: 0L
     }
 
-    /** Dodaje [deltaMs] na današnji zbir i vraća novi zbir. */
-    suspend fun addShortsWatchedMs(packageName: String, epochDay: Long, deltaMs: Long): Long {
-        val total = shortsWatchedMs(packageName, epochDay) + deltaMs
-        put(AppStateKeys.SHORTS_WATCHED_DAY_PREFIX + packageName, epochDay)
-        put(AppStateKeys.SHORTS_WATCHED_PREFIX + packageName, total)
+    /** Dodaje [deltaMs] na današnji zbir pod ključem [key] i vraća novi zbir. */
+    suspend fun addShortsWatchedMs(key: String, epochDay: Long, deltaMs: Long): Long {
+        val total = shortsWatchedMs(key, epochDay) + deltaMs
+        put(AppStateKeys.SHORTS_WATCHED_DAY_PREFIX + key, epochDay)
+        put(AppStateKeys.SHORTS_WATCHED_PREFIX + key, total)
         return total
     }
 

@@ -1,10 +1,8 @@
 package com.example.screenmanager.service
 
 import android.accessibilityservice.AccessibilityService
-import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import com.example.screenmanager.alarm.AlarmModule
 import com.example.screenmanager.alarm.service.WebsiteGuard
@@ -35,8 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Shorts/Reels blocker (TRS 2.3).
  *
  * Performanse (B8): `onAccessibilityEvent` (main thread) samo zakazuje skeniranje;
- * obilazak stabla radi na jednom serijskom pozadinskom dispatcher-u, sa
- * debounce-om, a manifest config već filtrira događaje na 2 paketa.
+ * obilazak stabla radi na jednom serijskom pozadinskom dispatcher-u, a manifest
+ * config već filtrira događaje na 2 paketa. Svako čitanje stabla je IPC ka
+ * YouTube/Instagram procesu, pa: bez skeniranja kad nema šta da se sprovede,
+ * najviše ~1 skeniranje u 0,75 s, a skupa rezervna pretraga najviše na 3 s.
  *
  * Tačnost (B7): detekcija preko [ShortsDetector] (ID plejera + veličina),
  * ne preko teksta "Shorts" koji postoji i u navigacionom tabu.
@@ -59,7 +59,6 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     private val runtimeRepository by lazy { ServiceLocator.runtimeStateRepository(this) }
     private val settingsRepository by lazy { ServiceLocator.settingsRepository(this) }
-    private val isDebuggable by lazy { applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0 }
 
     @Volatile
     private var shortsConfig: StateFlow<ShortVideoConfig?> = MutableStateFlow(null)
@@ -81,7 +80,9 @@ class ShortsAccessibilityService : AccessibilityService() {
     private var cachedDay = -1L
     /** Danas odgledano (zbir svih short-form aplikacija), već upisano u bazu; null = nije učitano. */
     private var storedWatchMs: Long? = null
-    private var lastDumpAt = 0L
+    @Volatile private var lastScanAt = 0L
+    private var lastDeepScanAt = 0L
+    private var lastVisible = false
     private var lastKickToastAt = 0L
     private var sessionLoaded = false
     private var sessionState: SessionState? = null
@@ -111,8 +112,21 @@ class ShortsAccessibilityService : AccessibilityService() {
             return
         }
 
+        // Ništa za sprovođenje (blokada isključena, aplikacija nije izabrana, pauza) → bez
+        // skeniranja. Ako je plejer upravo bio vidljiv, zakazani follow-up ga zatvara.
+        val config = shortsConfig.value ?: return
+        val now = System.currentTimeMillis()
+        if (!config.isEnabled || packageName !in config.selectedAppIds || emergency.value?.isActiveAt(now) == true) return
+
         lastEventPackage = packageName
-        scheduleScan(SCAN_DEBOUNCE_MS)
+        // YouTube/Instagram šalju "content changed" i nekoliko puta u sekundi (progres videa,
+        // animacije). Promena ekrana se skenira odmah, a ostalo najviše jednom u MIN_SCAN_INTERVAL_MS.
+        val delay = if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            SCAN_DEBOUNCE_MS
+        } else {
+            (MIN_SCAN_INTERVAL_MS - (now - lastScanAt)).coerceAtLeast(SCAN_DEBOUNCE_MS)
+        }
+        scheduleScan(delay)
     }
 
     override fun onInterrupt() = Unit
@@ -133,27 +147,33 @@ class ShortsAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun scan() {
-        val config = shortsConfig.value
-        if (config == null) {
-            Log.d(TAG, "Scan skipped: config not loaded yet")
+        val config = shortsConfig.value ?: return
+        val now = System.currentTimeMillis()
+        lastScanAt = now
+
+        // Emergency pauza važi i za Shorts/Reels, kao i za ostale limite (FocusMonitorService/RulesEngine).
+        val paused = emergency.value?.isActiveAt(now) == true
+        if (!config.isEnabled || paused) {
+            onShortsHidden(config, now)
             return
         }
         val root = rootInActiveWindow
         val packageName = root?.packageName?.toString() ?: lastEventPackage
-        val now = System.currentTimeMillis()
-
-        // Emergency pauza važi i za Shorts/Reels, kao i za ostale limite (FocusMonitorService/RulesEngine).
-        val paused = emergency.value?.isActiveAt(now) == true
-        if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds || paused) {
-            Log.d(TAG, "Scan skipped: root=${root != null} pkg=$packageName enabled=${config.isEnabled} paused=$paused")
+        if (root == null || packageName == null || packageName !in config.selectedAppIds) {
             onShortsHidden(config, now)
             return
         }
 
-        maybeDumpTree(root, now)
-
-        val visible = ShortsDetector.isShortFormVisible(root, packageName)
-        if (isDebuggable) Log.d(TAG, "Scan pkg=$packageName mode=${config.mode} shortFormVisible=$visible")
+        // Skup obilazak stabla (rezervna pretraga) najviše na DEEP_SCAN_INTERVAL_MS;
+        // brza pretraga po poznatim ID-jevima plejera radi pri svakom skeniranju.
+        val deep = now - lastDeepScanAt >= DEEP_SCAN_INTERVAL_MS
+        val detection = ShortsDetector.detect(root, packageName, allowDeepSearch = deep)
+        if (detection.deepSearched) lastDeepScanAt = now
+        val visible = detection.visible
+        if (visible != lastVisible) {
+            Log.i(TAG, "Short-form ${if (visible) "visible" else "hidden"} in $packageName (mode=${config.mode})")
+            lastVisible = visible
+        }
         if (visible) {
             onShortsVisible(packageName, config, now)
         } else {
@@ -302,39 +322,14 @@ class ShortsAccessibilityService : AccessibilityService() {
         pendingWatchMs = 0L
     }
 
-    /** Samo u debug build-u: pomaže da se kalibrišu ID-jevi u [ShortsDetector]. */
-    private fun maybeDumpTree(root: AccessibilityNodeInfo, now: Long) {
-        if (!isDebuggable || now - lastDumpAt < DEBUG_DUMP_INTERVAL_MS) return
-        lastDumpAt = now
-        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
-        queue.addLast(root to 0)
-        var visited = 0
-        while (queue.isNotEmpty() && visited < DEBUG_DUMP_MAX_NODES) {
-            val (node, depth) = queue.removeFirst()
-            visited++
-            if (node.viewIdResourceName != null || node.contentDescription != null) {
-                val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
-                Log.d(
-                    TAG,
-                    "DUMP ${"  ".repeat(depth.coerceAtMost(12))}id=${node.viewIdResourceName} " +
-                        "desc=${node.contentDescription} class=${node.className} vis=${node.isVisibleToUser} " +
-                        "sel=${node.isSelected} bounds=$bounds"
-                )
-            }
-            for (index in 0 until node.childCount) {
-                node.getChild(index)?.let { queue.addLast(it to depth + 1) }
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "ShortsAccessibility"
         private const val SCAN_DEBOUNCE_MS = 250L
+        private const val MIN_SCAN_INTERVAL_MS = 750L
+        private const val DEEP_SCAN_INTERVAL_MS = 3_000L
         private const val FOLLOW_UP_SCAN_MS = 2_000L
         private const val VISIBILITY_GRACE_MS = 4_000L
         private const val FLUSH_INTERVAL_MS = 5_000L
-        private const val DEBUG_DUMP_INTERVAL_MS = 5_000L
         private const val KICK_TOAST_INTERVAL_MS = 4_000L
-        private const val DEBUG_DUMP_MAX_NODES = 400
     }
 }

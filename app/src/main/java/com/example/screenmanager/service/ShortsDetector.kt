@@ -2,6 +2,7 @@ package com.example.screenmanager.service
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Prepoznaje da li je na ekranu AKTIVAN Shorts/Reels plejer.
@@ -14,8 +15,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  *    uz isključivanje tabova/shelf-ova,
  * 3. pogodak važi samo ako je čvor vidljiv i zauzima većinu ekrana.
  *
- * Ako aplikacije promene ID-jeve, dovoljno je dopuniti liste ispod
- * (debug build loguje stablo — vidi ShortsAccessibilityService).
+ * Ako aplikacije promene ID-jeve, dovoljno je dopuniti liste ispod. ID nađen
+ * rezervnom pretragom se pamti, pa sledeći put ide brzim putem.
  */
 object ShortsDetector {
     const val YOUTUBE = "com.google.android.youtube"
@@ -46,15 +47,29 @@ object ShortsDetector {
     private const val MAX_NODES = 600
     private const val MIN_SCREEN_FRACTION = 0.6f
 
-    fun isShortFormVisible(root: AccessibilityNodeInfo, packageName: String): Boolean {
+    /** @property deepSearched da li je urađena skupa rezervna pretraga stabla. */
+    data class Detection(val visible: Boolean, val deepSearched: Boolean)
+
+    /** ID-jevi plejera nađeni rezervnom pretragom — sledeći put idu brzim putem. */
+    private val learnedIds = ConcurrentHashMap<String, MutableSet<String>>()
+
+    /**
+     * @param allowDeepSearch rezervni BFS (do [MAX_NODES] čvorova, svaki je IPC ka aplikaciji)
+     *   samo kad ga pozivalac dozvoli; brza pretraga po ID-jevima radi uvek.
+     */
+    fun detect(root: AccessibilityNodeInfo, packageName: String, allowDeepSearch: Boolean): Detection {
         val rootBounds = Rect().also(root::getBoundsInScreen)
-        if (rootBounds.isEmpty) return false
+        if (rootBounds.isEmpty) return Detection(visible = false, deepSearched = false)
 
-        playerIds[packageName].orEmpty().forEach { id ->
-            if (root.findAccessibilityNodeInfosByViewId(id).any { isDominant(it, rootBounds) }) return true
+        val known = playerIds[packageName].orEmpty() + learnedIds[packageName].orEmpty()
+        known.forEach { id ->
+            if (root.findAccessibilityNodeInfosByViewId(id).any { isDominant(it, rootBounds) }) {
+                return Detection(visible = true, deepSearched = false)
+            }
         }
+        if (!allowDeepSearch) return Detection(visible = false, deepSearched = false)
 
-        val keywords = idKeywords[packageName] ?: return false
+        val keywords = idKeywords[packageName] ?: return Detection(visible = false, deepSearched = false)
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.addLast(root)
         var visited = 0
@@ -67,13 +82,14 @@ object ShortsDetector {
                 excludedIdParts.none { id.contains(it, ignoreCase = true) } &&
                 isDominant(node, rootBounds)
             ) {
-                return true
+                learnedIds.getOrPut(packageName) { ConcurrentHashMap.newKeySet() }.add(id)
+                return Detection(visible = true, deepSearched = true)
             }
             for (index in 0 until node.childCount) {
                 node.getChild(index)?.let(queue::addLast)
             }
         }
-        return false
+        return Detection(visible = false, deepSearched = true)
     }
 
     private fun isDominant(node: AccessibilityNodeInfo, rootBounds: Rect): Boolean {

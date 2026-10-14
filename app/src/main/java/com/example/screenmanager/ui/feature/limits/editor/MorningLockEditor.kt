@@ -46,9 +46,10 @@ fun MorningLockEditor(
 
         FormCard(
             title = "When",
-            hint = "If the screen stays off for at least ${draft.inactivityHours}h (a night's sleep), " +
-                "the selected apps are locked for ${formatMinutes(draft.blockDurationMinutes)} once " +
-                "you start using the phone again."
+            hint = "After at least ${draft.inactivityHours}h without using the phone (a night's sleep), " +
+                "the selected apps are locked for ${formatMinutes(draft.blockDurationMinutes)} once the " +
+                "screen has been on for ${formatMinutes(draft.triggerDelayMinutes)}. Quick glances at " +
+                "night don't reset the night."
         ) {
             StepperRow(
                 label = "Phone unused for at least",

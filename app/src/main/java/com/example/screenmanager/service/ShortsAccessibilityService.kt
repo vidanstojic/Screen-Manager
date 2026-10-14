@@ -66,7 +66,6 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     private val scanScheduled = AtomicBoolean(false)
     @Volatile private var lastEventPackage: String? = null
-    @Volatile private var lastInteractionWriteAt = 0L
 
     // Sledeće promenljive menja isključivo scanDispatcher (serijski).
     private var followUpJob: Job? = null
@@ -103,12 +102,6 @@ class ShortsAccessibilityService : AccessibilityService() {
         if (packageName !in ShortsDetector.supportedPackages) {
             websiteGuard?.takeIf { it.handles(packageName) }?.onEvent(packageName)
             return
-        }
-
-        val now = System.currentTimeMillis()
-        if (now - lastInteractionWriteAt > INTERACTION_WRITE_INTERVAL_MS) {
-            lastInteractionWriteAt = now
-            serviceScope.launch { runtimeRepository.markInteraction(now) }
         }
 
         lastEventPackage = packageName
@@ -331,7 +324,6 @@ class ShortsAccessibilityService : AccessibilityService() {
         private const val FOLLOW_UP_SCAN_MS = 2_000L
         private const val VISIBILITY_GRACE_MS = 4_000L
         private const val FLUSH_INTERVAL_MS = 5_000L
-        private const val INTERACTION_WRITE_INTERVAL_MS = 5_000L
         private const val DEBUG_DUMP_INTERVAL_MS = 5_000L
         private const val KICK_TOAST_INTERVAL_MS = 4_000L
         private const val DEBUG_DUMP_MAX_NODES = 400

@@ -2,7 +2,7 @@ package com.example.screenmanager.domain.wakeup
 
 /** Ko je okinuo jutarnju blokadu. */
 enum class WakeUpSource {
-    /** Heuristika u FocusMonitorService: dugo ugašen ekran → korisnik aktivan. */
+    /** FocusMonitorService + [WakeUpDetector]: posle duge noći korisnik koristi telefon. */
     SCREEN_HEURISTIC,
 
     /** Smart Alarm (Phase 2): korisnik je ugasio alarm. */

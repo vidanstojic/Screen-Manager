@@ -26,13 +26,17 @@ import com.example.screenmanager.domain.rules.SessionLimitTracker
 import com.example.screenmanager.domain.rules.SessionState
 import com.example.screenmanager.domain.rules.ShortsPolicy
 import com.example.screenmanager.domain.usage.ForegroundResolver
+import com.example.screenmanager.domain.wakeup.WakeState
+import com.example.screenmanager.domain.wakeup.WakeUpDetector
 import com.example.screenmanager.domain.wakeup.WakeUpSource
+import com.example.screenmanager.model.WakeUpConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -93,6 +97,12 @@ class FocusMonitorService : Service() {
 
     private var loopsStarted = false
     private var wakeUpEvaluationJob: Job? = null
+    private val wakeMutex = Mutex()
+    private var wakeState = WakeState()
+    private var wakeStateLoaded = false
+
+    /** Paljenje/gašenje ekrana se obrađuje strogo redom (inače bi brzi pogled mogao da stigne obrnuto). */
+    private val wakeEvents = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -117,6 +127,9 @@ class FocusMonitorService : Service() {
             RECEIVER_NOT_EXPORTED
         )
         ServiceLocator.scheduleDailyMaintenance(this)
+        serviceScope.launch {
+            for (event in wakeEvents) runCatching { event() }.onFailure { Log.w(TAG, "Wake event failed", it) }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -135,6 +148,7 @@ class FocusMonitorService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
+        wakeEvents.close()
         overlayController.hide()
         val snapshot = sessionStates.values.toList()
         serviceScope.launch(NonCancellable) { runtimeRepository.saveSessionStates(snapshot) }
@@ -152,6 +166,17 @@ class FocusMonitorService : Service() {
             .stateIn(serviceScope, SharingStarted.Eagerly, null)
         shortsPenalties = runtimeRepository.observeShortsPenalties()
             .stateIn(serviceScope, SharingStarted.Eagerly, emptyMap())
+
+        // Servis (ponovo) pokrenut: ako je ekran upaljen, to je paljenje (inače bi se propustilo
+        // jutarnje); ako je ugašen a stanje pamti upaljen ekran, propušteno gašenje se beleži sada.
+        val startedAt = System.currentTimeMillis()
+        wakeEvents.trySend {
+            if (interactive.value) {
+                onWakeScreenOn(startedAt)
+            } else {
+                updateWakeState { if (it.screenOnAt != null) WakeUpDetector.onScreenOff(it, startedAt) else it }
+            }
+        }
 
         serviceScope.launch {
             // Shorts/Reels interval stanja vodi ShortsAccessibilityService — ne učitavamo ih
@@ -271,8 +296,8 @@ class FocusMonitorService : Service() {
         wakeUpEvaluationJob?.cancel()
         overlayController.hide()
         val now = System.currentTimeMillis()
+        wakeEvents.trySend { updateWakeState { WakeUpDetector.onScreenOff(it, now) } }
         serviceScope.launch {
-            runtimeRepository.markScreenOff(now)
             // Neaktivan tick: vreme dok je ekran ugašen ne ulazi u sesiju (BUG-003).
             if (::rules.isInitialized) advanceSessions(rules.value, null, now, TimeBuckets.zone())
             persistSessionStates(now)
@@ -283,32 +308,47 @@ class FocusMonitorService : Service() {
     private fun onScreenOn() {
         val now = System.currentTimeMillis()
         interactive.value = true
-        serviceScope.launch {
-            val lastOff = runtimeRepository.lastScreenOff()
-            runtimeRepository.markScreenOn(now)
-            val config = settingsRepository.getWakeUpConfig() ?: return@launch
-            if (!config.isEnabled || lastOff == null) return@launch
-            if (now - lastOff >= config.inactivityHours * TimeBuckets.HOUR_MS) {
-                startWakeUpEvaluation(now, config.triggerDelayMinutes)
-            }
-        }
+        wakeEvents.trySend { onWakeScreenOn(now) }
     }
 
     /**
-     * Posle dugog mraka ekran se upalio: ako je korisnik i dalje aktivan
-     * posle `triggerDelayMinutes`, pali se jutarnja blokada (TRS 2.5).
+     * Jutarnja blokada (TRS 2.5): [WakeUpDetector] prati noć i buđenje; ovde se samo
+     * stanje čuva u bazi i zakazuje provera kada se nakupi dovoljno upaljenog ekrana.
      */
-    private fun startWakeUpEvaluation(startedAt: Long, triggerDelayMinutes: Int) {
+    private suspend fun onWakeScreenOn(now: Long) {
+        val config = (if (::rules.isInitialized) rules.value.wakeUp else null)
+            ?: settingsRepository.getWakeUpConfig()
+            ?: WakeUpConfig()
+        val state = updateWakeState { WakeUpDetector.onScreenOn(it, now, config.inactivityHours) }
+        if (state.wakeAt == now) Log.i(TAG, "WakeUp: candidate at $now (dark since ${state.darkSince})")
+        scheduleWakeCheck(state, now, config.triggerDelayMinutes)
+    }
+
+    private fun scheduleWakeCheck(state: WakeState, now: Long, triggerDelayMinutes: Int) {
+        val remaining = WakeUpDetector.remainingMs(state, now, triggerDelayMinutes) ?: return
         wakeUpEvaluationJob?.cancel()
         wakeUpEvaluationJob = serviceScope.launch {
-            delay(triggerDelayMinutes.coerceAtLeast(0) * TimeBuckets.MINUTE_MS)
-            val lastInteraction = runtimeRepository.lastInteraction() ?: 0L
-            val userStayedActive = interactive.value &&
-                (foreground.currentPackage != null || lastInteraction >= startedAt)
-            if (userStayedActive) {
-                wakeUpTrigger.trigger(WakeUpSource.SCREEN_HEURISTIC)
-            }
+            delay(remaining)
+            val checkAt = System.currentTimeMillis()
+            if (!interactive.value) return@launch
+            val current = wakeMutex.withLock { wakeState }
+            if (!WakeUpDetector.shouldTrigger(current, checkAt, triggerDelayMinutes)) return@launch
+            val until = wakeUpTrigger.trigger(WakeUpSource.SCREEN_HEURISTIC, checkAt)
+            Log.i(TAG, "WakeUp: triggered at $checkAt, locked until $until")
+            updateWakeState(WakeUpDetector::onTriggered)
         }
+    }
+
+    private suspend fun updateWakeState(change: (WakeState) -> WakeState): WakeState {
+        val next = wakeMutex.withLock {
+            if (!wakeStateLoaded) {
+                wakeState = runtimeRepository.wakeState()
+                wakeStateLoaded = true
+            }
+            change(wakeState).also { wakeState = it }
+        }
+        runCatching { runtimeRepository.saveWakeState(next) }.onFailure { Log.w(TAG, "Saving wake state failed", it) }
+        return next
     }
 
     private fun sendHome() {

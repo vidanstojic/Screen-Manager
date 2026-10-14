@@ -7,6 +7,7 @@ import com.example.screenmanager.data.local.toDomain
 import com.example.screenmanager.data.local.toEntity
 import com.example.screenmanager.domain.AppStateKeys
 import com.example.screenmanager.domain.rules.SessionState
+import com.example.screenmanager.domain.wakeup.WakeState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -30,17 +31,22 @@ class RuntimeStateRepository(
 
     suspend fun setWakeUpBlockedUntil(until: Long) = put(AppStateKeys.WAKEUP_BLOCKED_UNTIL, until)
 
-    // --- Ekran / aktivnost ---
+    // --- Detekcija buđenja ---
 
-    suspend fun markScreenOff(timestamp: Long) = put(AppStateKeys.LAST_SCREEN_OFF_AT, timestamp)
+    suspend fun wakeState(): WakeState = WakeState(
+        // Prvi put posle prelaska sa stare heuristike noć počinje od poslednjeg gašenja ekrana.
+        darkSince = stateDao.getLong(AppStateKeys.WAKE_DARK_SINCE) ?: stateDao.getLong(AppStateKeys.LAST_SCREEN_OFF_AT),
+        screenOnAt = stateDao.getLong(AppStateKeys.WAKE_SCREEN_ON_AT),
+        wakeAt = stateDao.getLong(AppStateKeys.WAKE_CANDIDATE_AT),
+        wakeOnMs = stateDao.getLong(AppStateKeys.WAKE_CANDIDATE_ON_MS) ?: 0L
+    )
 
-    suspend fun markScreenOn(timestamp: Long) = put(AppStateKeys.LAST_SCREEN_ON_AT, timestamp)
-
-    suspend fun lastScreenOff(): Long? = stateDao.getLong(AppStateKeys.LAST_SCREEN_OFF_AT)
-
-    suspend fun markInteraction(timestamp: Long) = put(AppStateKeys.LAST_USER_INTERACTION_AT, timestamp)
-
-    suspend fun lastInteraction(): Long? = stateDao.getLong(AppStateKeys.LAST_USER_INTERACTION_AT)
+    suspend fun saveWakeState(state: WakeState) {
+        putOrDelete(AppStateKeys.WAKE_DARK_SINCE, state.darkSince)
+        putOrDelete(AppStateKeys.WAKE_SCREEN_ON_AT, state.screenOnAt)
+        putOrDelete(AppStateKeys.WAKE_CANDIDATE_AT, state.wakeAt)
+        put(AppStateKeys.WAKE_CANDIDATE_ON_MS, state.wakeOnMs)
+    }
 
     // --- Shorts / Reels ---
 
@@ -84,6 +90,10 @@ class RuntimeStateRepository(
     }
 
     private suspend fun put(key: String, value: Long) = stateDao.upsert(AppInternalState(key, value))
+
+    private suspend fun putOrDelete(key: String, value: Long?) {
+        if (value == null) stateDao.delete(key) else put(key, value)
+    }
 
     private fun List<AppInternalState>.toPackageMap(prefix: String): Map<String, Long> =
         associate { it.stateKey.removePrefix(prefix) to it.stateValueLong }

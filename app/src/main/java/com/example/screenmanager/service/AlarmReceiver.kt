@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.example.screenmanager.alarm.AlarmModule
+import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.alarm.domain.RingReason
 import com.example.screenmanager.alarm.service.AlarmDismissFlow
 import com.example.screenmanager.alarm.service.AlarmNotifications
@@ -56,9 +57,11 @@ class AlarmReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ServiceLocator.alarmRepository(context).findById(alarmId)?.let { alarm ->
-                    AlarmDismissFlow.onDismissed(context, alarm, RingReason.SNOOZE, wakeCheckRound = 0)
-                }
+                val alarm = runCatching { ServiceLocator.alarmRepository(context).findById(alarmId) }.getOrNull()
+                    ?: DirectBootAlarmStore(context).find(alarmId)
+                alarm?.let { AlarmDismissFlow.onDismissed(context, it, RingReason.SNOOZE, wakeCheckRound = 0) }
+            } catch (error: RuntimeException) {
+                Log.e(TAG, "Dismissing snoozed alarm failed", error)
             } finally {
                 pendingResult.finish()
             }
@@ -69,6 +72,10 @@ class AlarmReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                if (!DirectBootAlarmStore.isUserUnlocked(context)) {
+                    rescheduleBeforeUnlock(context, alarmId)
+                    return@launch
+                }
                 val alarmRepository = ServiceLocator.alarmRepository(context)
                 val alarmScheduler = ServiceLocator.alarmScheduler(context)
                 val alarm = alarmRepository.findById(alarmId)
@@ -78,13 +85,29 @@ class AlarmReceiver : BroadcastReceiver() {
                     alarm.repeatDays.isEmpty() -> alarmRepository.upsert(alarm.copy(enabled = false))
                     else -> alarmScheduler.scheduleAlarm(alarm)
                 }
-            } catch (error: IllegalStateException) {
-                Log.e(TAG, "Alarm processing failed due to invalid state", error)
             } catch (error: SecurityException) {
                 Log.e(TAG, "Alarm scheduling blocked by system policy", error)
+            } catch (error: RuntimeException) {
+                // Npr. baza nedostupna — bez ovoga bi izuzetak u korutini srušio proces dok alarm zvoni.
+                Log.e(TAG, "Alarm processing failed", error)
             } finally {
                 pendingResult.finish()
             }
+        }
+    }
+
+    /**
+     * Telefon je restartovan i još nije otključan: baza nije dostupna, pa se sledeći
+     * termin računa iz kopije alarma. Jednokratni alarm se posle otključavanja
+     * isključuje i u bazi ([com.example.screenmanager.service.BootReceiver]).
+     */
+    private fun rescheduleBeforeUnlock(context: Context, alarmId: Long) {
+        val store = DirectBootAlarmStore(context)
+        val alarm = store.find(alarmId) ?: return
+        if (alarm.repeatDays.isEmpty()) {
+            store.markFiredOnce(alarmId)
+        } else {
+            ServiceLocator.alarmScheduler(context).scheduleAlarm(alarm)
         }
     }
 

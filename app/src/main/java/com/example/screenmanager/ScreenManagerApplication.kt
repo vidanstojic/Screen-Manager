@@ -2,6 +2,7 @@ package com.example.screenmanager
 
 import android.app.Application
 import android.util.Log
+import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.data.DefaultRulesData
 import com.example.screenmanager.data.repository.SettingsRepository
 import com.example.screenmanager.data.local.AppInternalState
@@ -53,6 +54,8 @@ class ScreenManagerApplication : Application() {
      * dopunjuju se uvek kad nedostaju.
      */
     private fun initializeDefaultData() {
+        // Alarm može da pokrene proces pre prvog otključavanja (direct boot); baza tada nije dostupna.
+        if (!DirectBootAlarmStore.isUserUnlocked(this)) return
         val database = ServiceLocator.database(this)
 
         applicationScope.launch {

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.domain.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,10 @@ class BootReceiver : BroadcastReceiver() {
             try {
                 val alarmRepository = ServiceLocator.alarmRepository(context)
                 val alarmScheduler = ServiceLocator.alarmScheduler(context)
+                // Jednokratni alarmi koji su zazvonili pre otključavanja se gase i u bazi.
+                DirectBootAlarmStore(context).consumeFiredOnce().forEach { id ->
+                    alarmRepository.findById(id)?.let { alarmRepository.upsert(it.copy(enabled = false)) }
+                }
                 alarmScheduler.rescheduleAll(alarmRepository.getEnabled())
             } catch (error: IllegalStateException) {
                 Log.e(TAG, "Failed to restore alarms after boot", error)

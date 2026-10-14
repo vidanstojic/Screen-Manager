@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
 import com.example.screenmanager.alarm.AlarmModule
+import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.alarm.data.PendingSnooze
 import com.example.screenmanager.alarm.domain.RingPolicy
 import com.example.screenmanager.alarm.domain.RingReason
@@ -82,6 +83,8 @@ class AlarmRingService : Service() {
         scope.launch {
             val alarm = draft ?: withContext(Dispatchers.IO) {
                 runCatching { ServiceLocator.alarmRepository(this@AlarmRingService).findById(alarmId) }.getOrNull()
+                    // Pre prvog otključavanja baza nije dostupna: kopija iz device-protected skladišta.
+                    ?: DirectBootAlarmStore(this@AlarmRingService).find(alarmId)
             }
             if (alarm == null) {
                 Log.w(TAG, "Alarm $alarmId not found, nothing to ring")

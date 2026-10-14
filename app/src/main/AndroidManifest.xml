@@ -83,17 +83,22 @@
 
         <receiver
             android:name=".service.AlarmReceiver"
+            android:directBootAware="true"
             android:enabled="true"
             android:exported="false" />
 
-        <!-- ===== Smart Alarm ===== -->
+        <!-- ===== Smart Alarm =====
+             directBootAware: alarm zvoni i posle restarta pre prvog otključavanja
+             (podaci iz device-protected skladišta, vidi DirectBootAlarmStore). -->
         <service
             android:name=".alarm.service.AlarmRingService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
         <activity
             android:name=".alarm.service.AlarmRingActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
@@ -105,6 +110,7 @@
 
         <activity
             android:name=".alarm.service.WakeCheckActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
@@ -115,12 +121,15 @@
 
         <receiver
             android:name=".alarm.service.WakeCheckReceiver"
+            android:directBootAware="true"
             android:exported="false" />
 
         <receiver
             android:name=".alarm.service.AlarmSystemEventsReceiver"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />

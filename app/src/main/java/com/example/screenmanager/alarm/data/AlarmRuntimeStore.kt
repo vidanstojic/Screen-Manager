@@ -12,14 +12,13 @@ data class PendingSnooze(val alarmId: Long, val at: Long, val count: Int)
 
 /**
  * Runtime stanje alarma koje mora da preživi gašenje procesa i restart
- * telefona (odlaganja i wake-up check provere). Čuva se u SharedPreferences — mali broj ključeva,
- * nije deo korisničkih pravila u Room bazi.
+ * telefona (odlaganja i wake-up check provere). Čuva se u device-protected SharedPreferences
+ * (dostupne i pre prvog otključavanja) — mali broj ključeva, nije deo korisničkih pravila u Room bazi.
  *
  * Svi pozivi su iz istog procesa, pa [snoozes] uvek odgovara stanju na disku.
  */
 class AlarmRuntimeStore(context: Context) {
-    private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = deviceProtectedPrefs(context.applicationContext)
 
     private val _snoozes = MutableStateFlow(readSnoozes())
 
@@ -84,6 +83,18 @@ class AlarmRuntimeStore(context: Context) {
             }
 
     companion object {
+        /**
+         * Device-protected skladište: odlaganje i wake-up check moraju da rade i pre prvog
+         * otključavanja posle restarta. Stari fajl (credential skladište) se jednom premesti.
+         */
+        private fun deviceProtectedPrefs(context: Context): SharedPreferences {
+            val storage = context.createDeviceProtectedStorageContext()
+            if (DirectBootAlarmStore.isUserUnlocked(context)) {
+                runCatching { storage.moveSharedPreferencesFrom(context, PREFS_NAME) }
+            }
+            return storage.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }
+
         private const val PREFS_NAME = "alarm_runtime"
         private const val SNOOZE_AT = "snooze_at:"
         private const val SNOOZE_COUNT = "snooze_count:"

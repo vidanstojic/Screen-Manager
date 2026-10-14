@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.example.screenmanager.MainActivity
+import com.example.screenmanager.alarm.data.DirectBootAlarmStore
 import com.example.screenmanager.alarm.domain.NextAlarmCalculator
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.service.AlarmReceiver
@@ -26,12 +27,15 @@ class AlarmScheduler(
     private val alarmManager: AlarmManager
         get() = context.getSystemService(AlarmManager::class.java)
 
+    private val directBoot by lazy { DirectBootAlarmStore(context) }
+
     fun scheduleAlarm(alarm: AlarmRule) {
         if (!alarm.enabled) {
             cancelAlarm(alarm.id)
             return
         }
         setExact(nextTriggerAt(alarm), firePendingIntent(alarm.id, AlarmReceiver.ACTION_FIRE_ALARM, snoozeCount = 0))
+        directBoot.save(alarm)
     }
 
     /** Odlaganje: [alarmId] ponovo zvoni u [at]; [snoozeCount] = koje je ovo odlaganje zaredom. */
@@ -47,6 +51,7 @@ class AlarmScheduler(
     fun cancelAlarm(alarmId: Long) {
         alarmManager.cancel(firePendingIntent(alarmId, AlarmReceiver.ACTION_FIRE_ALARM, 0))
         cancelSnooze(alarmId)
+        directBoot.remove(alarmId)
     }
 
     fun rescheduleAll(alarms: List<AlarmRule>) {

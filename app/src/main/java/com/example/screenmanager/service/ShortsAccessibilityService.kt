@@ -13,6 +13,7 @@ import com.example.screenmanager.domain.TimeBuckets
 import com.example.screenmanager.domain.rules.SessionState
 import com.example.screenmanager.domain.rules.ShortsPolicy
 import com.example.screenmanager.domain.rules.ShortsVerdict
+import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.ShortsMode
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   (sprovodi je FocusMonitorService preko RulesEngine-a) i BACK do kraja dana.
  * YouTube Shorts i Instagram Reels dele isti brojač (sesije i budžet).
  * Ostatak aplikacije (obični video, poruke, feed) radi normalno u svim modovima.
+ * Dok traje emergency pauza, Shorts/Reels se ne blokiraju i vreme se ne broji.
  */
 class ShortsAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -61,6 +63,9 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     @Volatile
     private var shortsConfig: StateFlow<ShortVideoConfig?> = MutableStateFlow(null)
+
+    @Volatile
+    private var emergency: StateFlow<EmergencySessionConfig?> = MutableStateFlow(null)
 
     private var websiteGuard: WebsiteGuard? = null
 
@@ -86,6 +91,8 @@ class ShortsAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         Log.i(TAG, "Service connected")
         shortsConfig = settingsRepository.observeShortVideoConfig()
+            .stateIn(serviceScope, SharingStarted.Eagerly, null)
+        emergency = settingsRepository.observeEmergencySessionConfig()
             .stateIn(serviceScope, SharingStarted.Eagerly, null)
         // Smart Alarm wake-up detox: blokada sajtova radi u ovom istom servisu.
         websiteGuard = WebsiteGuard(
@@ -135,8 +142,10 @@ class ShortsAccessibilityService : AccessibilityService() {
         val packageName = root?.packageName?.toString() ?: lastEventPackage
         val now = System.currentTimeMillis()
 
-        if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds) {
-            Log.d(TAG, "Scan skipped: root=${root != null} pkg=$packageName enabled=${config.isEnabled} apps=${config.selectedAppIds}")
+        // Emergency pauza važi i za Shorts/Reels, kao i za ostale limite (FocusMonitorService/RulesEngine).
+        val paused = emergency.value?.isActiveAt(now) == true
+        if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds || paused) {
+            Log.d(TAG, "Scan skipped: root=${root != null} pkg=$packageName enabled=${config.isEnabled} paused=$paused")
             onShortsHidden(config, now)
             return
         }

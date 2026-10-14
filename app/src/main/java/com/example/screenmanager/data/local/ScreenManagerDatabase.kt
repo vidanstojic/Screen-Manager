@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * ([MIGRATION_6_7]), postojeći alarmi ostaju sa podrazumevanim vrednostima.
  *
  * Migracija sa verzija < 5 je destruktivna (projekat je u razvoju): pravila se ponovo
- * seed-uju u [com.example.screenmanager.ScreenManagerApplication], a
+ * upisuju u [com.example.screenmanager.ScreenManagerApplication], a
  * istorija potrošnje se ponovo povlači iz UsageStats (do 7 dana unazad).
  */
 @Database(
@@ -41,7 +41,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SessionLimitRuleEntity::class,
         SessionLimitStateEntity::class
     ],
-    version = 7,
+    version = ScreenManagerDatabase.VERSION,
     exportSchema = false
 )
 abstract class ScreenManagerDatabase : RoomDatabase() {
@@ -57,6 +57,11 @@ abstract class ScreenManagerDatabase : RoomDatabase() {
     abstract fun sessionLimitDao(): SessionLimitDao
 
     companion object {
+        const val VERSION = 7
+
+        /** Verzije pre prvog javnog modela (projekat u razvoju): jedine smeju da se obrišu pri nadogradnji. */
+        val DESTRUCTIVE_FROM = intArrayOf(1, 2, 3, 4)
+
         @Volatile
         private var instance: ScreenManagerDatabase? = null
 
@@ -102,14 +107,21 @@ abstract class ScreenManagerDatabase : RoomDatabase() {
             "`wakeCheckDelayMinutes` INTEGER NOT NULL DEFAULT 5"
         )
 
+        /** Sve prave migracije, redom; nova verzija baze = nova migracija ovde. */
+        val MIGRATIONS: Array<Migration> get() = arrayOf(MIGRATION_5_6, MIGRATION_6_7)
+
         fun getInstance(context: Context): ScreenManagerDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     ScreenManagerDatabase::class.java,
                     "screen_manager.db"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                ).addMigrations(*MIGRATIONS)
+                    // Samo verzije < 5 i vraćanje na stariju verziju (instalacija starijeg build-a)
+                    // brišu bazu. Ranije je SVAKA nedostajuća migracija tiho brisala alarme,
+                    // pravila i istoriju; sada je to greška koju hvata MigrationCoverageTest.
+                    .fallbackToDestructiveMigrationFrom(true, *DESTRUCTIVE_FROM)
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build().also { instance = it }
             }
         }

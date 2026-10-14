@@ -92,10 +92,12 @@ class WakeUpDetoxPolicyTest {
     }
 
     @Test
-    fun `emergency pause also lifts the detox`() {
+    fun `emergency pause does not lift the detox`() {
+        // Pauza je za Screen Manager limite; detox posle alarma ne sme da se zaobiđe jednim klikom.
         val engine = RulesEngine()
         val rules = RulesSnapshot(emergency = EmergencySessionConfig(defaultDurationMinutes = 15, activeUntilMillis = 10_000))
         val state = RuntimeState(alarmDetoxUntil = 50_000, alarmDetoxPackages = setOf("a"))
-        assertNull(engine.evaluate("a", 1_000, ZoneId.of("UTC"), rules, state))
+        assertEquals(BlockReason.ALARM_DETOX, engine.evaluate("a", 1_000, ZoneId.of("UTC"), rules, state)?.reason)
+        assertNull("aplikacija van detox-a je puštena", engine.evaluate("b", 1_000, ZoneId.of("UTC"), rules, state))
     }
 }

@@ -424,7 +424,7 @@ setAlarmClock ──► AlarmReceiver.FIRE ──► AlarmRingService (FGS, zvuk
 
 - Po alarmu: uključeno, trajanje 5 min – 4 h, **aplikacije** i **sajtovi** (domeni; blokiraju se i poddomeni).
 - Pali ga gašenje alarma (i posle odlaganja), ali ne ponovno zvonjenje zbog wake-up check-a. Drugi alarm ne skraćuje aktivnu blokadu — kraj je kasniji od dva, liste se spajaju.
-- **Aplikacije** — jedine izmene na Screen Manager strani: `RuntimeState.alarmDetox*` + `BlockReason.ALARM_DETOX` u `RulesEngine`; `FocusMonitorService` prosleđuje `AlarmDetoxStore.lock` (StateFlow, bez upita po tick-u). Overlay pokazuje „Wake-up detox is active · <naziv alarma>“. Emergency pauza ukida i detox.
+- **Aplikacije** — jedine izmene na Screen Manager strani: `RuntimeState.alarmDetox*` + `BlockReason.ALARM_DETOX` u `RulesEngine`; `FocusMonitorService` prosleđuje `AlarmDetoxStore.lock` (StateFlow, bez upita po tick-u). Overlay pokazuje „Wake-up detox is active · <naziv alarma>“. Emergency pauza NE ukida detox (pauza je za Screen Manager limite).
 - **Sajtovi** — `WebsiteGuard` radi unutar postojećeg Accessibility servisa: čita adresnu traku poznatih browsera (Chrome, Samsung Internet, Firefox, Edge, Brave, Opera, Vivaldi, Kiwi, DuckDuckGo) i šalje korisnika na Home uz poruku do kada traje detox. **Browseri se dodaju u filter paketa servisa samo dok traje detox sa sajtovima** — ostatak dana servis ne dobija nijedan događaj iz browsera.
 - Forma upozorava ako servisi koji sprovode detox nisu uključeni; lista alarma prikazuje aktivan detox.
 
@@ -585,7 +585,7 @@ JUnit 4 testovi u `app/src/test/java/com/example/screenmanager/` (106 testova: 2
 | `alarm/domain/NextAlarmCalculatorTest` | jednokratni i ponavljajući alarm, „isti dan sledeće nedelje“, `now` spolja, **DST rupa (29.03.) i preklapanje (25.10.)** |
 | `alarm/domain/RingPolicyTest` | granica odlaganja, pojačavanje, utišavanje tokom misije, jačina toka nikad 0 |
 | `alarm/domain/MissionsTest` | rezultat računa odgovara prikazanom izrazu (500 primera po težini), težine rastu, isto seme = isti računi, poređenje teksta, zamena koraka računom |
-| `alarm/domain/WakeUpDetoxPolicyTest` | blokada, spajanje bez skraćivanja, normalizacija i poklapanje domena, `RulesEngine` → `ALARM_DETOX`, emergency ukida detox |
+| `alarm/domain/WakeUpDetoxPolicyTest` | blokada, spajanje bez skraćivanja, normalizacija i poklapanje domena, `RulesEngine` → `ALARM_DETOX`, emergency ne ukida detox |
 | `alarm/domain/WakeCheckPolicyTest` | runde, rok od 2 min, ponovno zvonjenje samo za nepotvrđenu proveru iste runde |
 | `alarm/data/AlarmTonesTest` | katalog zvukova i prikazna imena |
 | `data/local/AlarmEntityMappingTest` | entitet ↔ model bez gubitka, red iz v6 → podrazumevane opcije, nepoznat enum, serijalizacija radne kopije |

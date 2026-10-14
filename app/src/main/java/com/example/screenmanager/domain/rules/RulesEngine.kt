@@ -25,9 +25,18 @@ class RulesEngine {
         rules: RulesSnapshot,
         state: RuntimeState
     ): BlockDecision? {
-        if (rules.emergency?.isActiveAt(now) == true) return null
+        // Wake-up detox iz Smart Alarm-a (Phase 2): aplikacije su izabrane u alarmu. Važi i
+        // tokom emergency pauze — pauza je za Screen Manager limite, a detox je obaveza
+        // koju je korisnik sam uzeo uz alarm i ne sme da se zaobiđe jednim klikom.
+        val detox = if (state.alarmDetoxUntil > now && packageName in state.alarmDetoxPackages) {
+            BlockDecision(packageName, BlockReason.ALARM_DETOX, state.alarmDetoxUntil, state.alarmDetoxLabel)
+        } else {
+            null
+        }
+        if (rules.emergency?.isActiveAt(now) == true) return detox
 
-        val candidates = ArrayList<BlockDecision>(4)
+        val candidates = ArrayList<BlockDecision>(5)
+        detox?.let(candidates::add)
 
         rules.schedules
             .filter { it.isEnabled && packageName in it.selectedAppIds }
@@ -66,11 +75,6 @@ class RulesEngine {
             if (config.isEnabled && packageName in config.selectedAppIds && state.wakeUpBlockedUntil > now) {
                 candidates += BlockDecision(packageName, BlockReason.WAKE_UP, state.wakeUpBlockedUntil)
             }
-        }
-
-        // Wake-up detox iz Smart Alarm-a (Phase 2): aplikacije su izabrane u alarmu.
-        if (state.alarmDetoxUntil > now && packageName in state.alarmDetoxPackages) {
-            candidates += BlockDecision(packageName, BlockReason.ALARM_DETOX, state.alarmDetoxUntil, state.alarmDetoxLabel)
         }
 
         return candidates.maxByOrNull { it.blockedUntil }

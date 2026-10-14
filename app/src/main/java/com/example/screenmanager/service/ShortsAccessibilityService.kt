@@ -144,7 +144,7 @@ class ShortsAccessibilityService : AccessibilityService() {
 
         if (root == null || packageName == null || !config.isEnabled || packageName !in config.selectedAppIds) {
             Log.d(TAG, "Scan skipped: root=${root != null} pkg=$packageName enabled=${config.isEnabled} apps=${config.selectedAppIds}")
-            onShortsHidden(now)
+            onShortsHidden(config, now)
             return
         }
 
@@ -155,7 +155,7 @@ class ShortsAccessibilityService : AccessibilityService() {
         if (visible) {
             onShortsVisible(packageName, config, now)
         } else {
-            onShortsHidden(now)
+            onShortsHidden(config, now)
         }
     }
 
@@ -269,10 +269,14 @@ class ShortsAccessibilityService : AccessibilityService() {
         scheduleFollowUp()
     }
 
-    private suspend fun onShortsHidden(now: Long) {
+    private suspend fun onShortsHidden(config: ShortVideoConfig, now: Long) {
         if (visiblePackage != null) flush(now)
         visiblePackage = null
         followUpJob?.cancel()
+        if (sessionLoaded) {
+            val previous = sessionState
+            saveSessionState(previous, ShortsPolicy.onHidden(config, previous, now, TimeBuckets.zone()), now)
+        }
     }
 
     /**

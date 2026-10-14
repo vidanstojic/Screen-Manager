@@ -74,6 +74,17 @@ object ShortsPolicy {
     }
 
     /**
+     * Plejer više nije vidljiv (izlazak iz Shorts/Reels ili iz aplikacije): u SESSIONS
+     * modu tracker beleži neaktivan tick, pa vreme van Shorts/Reels ne ulazi u sesiju.
+     */
+    fun onHidden(config: ShortVideoConfig, previous: SessionState?, now: Long, zone: ZoneId): SessionState? =
+        if (config.mode == ShortsMode.SESSIONS && previous != null) {
+            SessionLimitTracker.advance(sessionRule(config), previous, false, now, zone)
+        } else {
+            previous
+        }
+
+    /**
      * Dnevni budžet (BUDGET) je zajednički: [watchedTodayMs] je zbir gledanja u
      * svim izabranim aplikacijama. Kad se potroši, izbacuje se iz Shorts/Reels
      * svake od njih do ponoći.

@@ -273,6 +273,8 @@ class FocusMonitorService : Service() {
         val now = System.currentTimeMillis()
         serviceScope.launch {
             runtimeRepository.markScreenOff(now)
+            // Neaktivan tick: vreme dok je ekran ugašen ne ulazi u sesiju (BUG-003).
+            if (::rules.isInitialized) advanceSessions(rules.value, null, now, TimeBuckets.zone())
             persistSessionStates(now)
             syncUsage()
         }

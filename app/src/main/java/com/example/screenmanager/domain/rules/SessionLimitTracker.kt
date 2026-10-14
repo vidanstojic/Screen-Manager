@@ -38,14 +38,18 @@ object SessionLimitTracker {
                 // pa se dalje ponašamo kao da sesija ne traje.
                 state = state.endSession(frozenUntil = lastSeen + cooldownMs)
             } else {
-                if (foregroundInRule) {
-                    val delta = (now - lastSeen).coerceIn(0L, MAX_TICK_GAP_MS)
+                state = if (foregroundInRule) {
+                    // Vreme između dva aktivna tick-a; povratak posle izlaska počinje od nule.
+                    val delta = if (state.activeTick) (now - lastSeen).coerceIn(0L, MAX_TICK_GAP_MS) else 0L
                     val active = state.activeMs + delta
-                    state = if (active >= sessionLengthMs) {
+                    if (active >= sessionLengthMs) {
                         state.endSession(frozenUntil = now + cooldownMs)
                     } else {
-                        state.copy(activeMs = active, lastSeenAt = now)
+                        state.copy(activeMs = active, lastSeenAt = now, activeTick = true)
                     }
+                } else {
+                    // Sesija ostaje otvorena (grace), ali vreme van aplikacije se ne broji.
+                    state.copy(activeTick = false)
                 }
                 return state
             }
@@ -62,12 +66,14 @@ object SessionLimitTracker {
         sessionsUsed = sessionsUsed + 1,
         sessionStartedAt = now,
         activeMs = 0L,
-        lastSeenAt = now
+        lastSeenAt = now,
+        activeTick = true
     )
 
     private fun SessionState.endSession(frozenUntil: Long) = copy(
         sessionStartedAt = null,
         activeMs = 0L,
-        frozenUntil = frozenUntil
+        frozenUntil = frozenUntil,
+        activeTick = false
     )
 }

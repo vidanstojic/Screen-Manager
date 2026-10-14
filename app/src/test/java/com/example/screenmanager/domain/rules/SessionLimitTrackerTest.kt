@@ -82,4 +82,24 @@ class SessionLimitTrackerTest {
         assertEquals(1, state!!.sessionsUsed)
         assertTrue(state!!.isSessionRunning)
     }
+
+    @Test
+    fun `short exit does not add phantom time`() {
+        // BUG-003: 10 s u aplikaciji, 20 s napolje (tick-ovi bez foreground-a), pa povratak.
+        var state = run(null, t0, t0 + 10_000, foreground = true)!!
+        val activeBefore = state.activeMs
+        state = run(state, t0 + 10_000, t0 + 30_000, foreground = false)!!
+        assertTrue(state.isSessionRunning)
+        state = SessionLimitTracker.advance(rule, state, true, t0 + 30_000, zone)
+        assertEquals("povratak ne dodaje vreme provedeno van aplikacije", activeBefore, state.activeMs)
+        state = SessionLimitTracker.advance(rule, state, true, t0 + 32_000, zone)
+        assertEquals(activeBefore + 2_000, state.activeMs)
+    }
+
+    @Test
+    fun `continuous use still counts every tick`() {
+        val state = run(null, t0, t0 + 30_000, foreground = true)!!
+        // Prvi tick otvara sesiju (0 ms), svaki sledeći dodaje 2 s.
+        assertEquals(28_000, state.activeMs)
+    }
 }

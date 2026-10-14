@@ -28,6 +28,10 @@ data class RulesSnapshot(
  * @property activeMs aktivno (foreground) vreme tekuće sesije.
  * @property lastSeenAt poslednji tick kada je aplikacija iz grupe bila u foreground-u.
  * @property frozenUntil kraj cool-down perioda (K), 0 ako nema.
+ * @property activeTick da li je PRETHODNI tick bio aktivan. Vreme se dodaje samo
+ *   između dva uzastopna aktivna tick-a, pa povratak posle kratkog izlaska ne
+ *   donosi "fantomsko" vreme (BUG-003). Ne čuva se u bazi: posle restarta
+ *   procesa prvi tick počinje od nule.
  */
 data class SessionState(
     val ruleId: String,
@@ -36,7 +40,8 @@ data class SessionState(
     val sessionStartedAt: Long? = null,
     val activeMs: Long = 0L,
     val lastSeenAt: Long? = null,
-    val frozenUntil: Long = 0L
+    val frozenUntil: Long = 0L,
+    val activeTick: Boolean = false
 ) {
     val isSessionRunning: Boolean get() = sessionStartedAt != null
 }

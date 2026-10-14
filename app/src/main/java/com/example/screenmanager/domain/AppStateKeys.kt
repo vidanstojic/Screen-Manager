@@ -13,6 +13,9 @@ object AppStateKeys {
     const val LAST_USAGE_EVENT_SYNC_AT = "last_usage_event_sync_at"
     const val USAGE_SYNC_CURSOR = "usage_sync_cursor"
 
+    /** 1 = primeri pravila su već upisani (jednom po instalaciji). */
+    const val DEFAULT_RULES_SEEDED = "default_rules_seeded"
+
     /** Verzija poslednjeg uspešnog punog backfill-a istorije (vidi UsageStatsRepository). */
     const val USAGE_BACKFILL_VERSION = "usage_backfill_version"
 

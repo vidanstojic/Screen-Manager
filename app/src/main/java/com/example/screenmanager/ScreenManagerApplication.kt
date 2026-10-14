@@ -4,19 +4,20 @@ import android.app.Application
 import android.util.Log
 import com.example.screenmanager.data.DefaultRulesData
 import com.example.screenmanager.data.repository.SettingsRepository
+import com.example.screenmanager.data.local.AppInternalState
+import com.example.screenmanager.domain.AppStateKeys
 import com.example.screenmanager.domain.ServiceLocator
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
  * Globalni Application sloj.
  *
- * Asinhrono (bez blokiranja main thread-a) seed-uje podrazumevana pravila
- * ako baza još nema zapise. Zavisnosti se dobijaju preko [ServiceLocator],
+ * Asinhrono (bez blokiranja main thread-a) upisuje podrazumevane podatke
+ * (vidi [initializeDefaultData]). Zavisnosti se dobijaju preko [ServiceLocator],
  * pa UI, servisi i workeri dele iste instance.
  */
 class ScreenManagerApplication : Application() {
@@ -43,43 +44,38 @@ class ScreenManagerApplication : Application() {
         initializeDefaultData()
     }
 
+    /**
+     * Primeri pravila (rasporedi, dnevni limiti, interval) upisuju se SAMO pri prvom
+     * pokretanju posle instalacije. Ranije su se ponovo upisivali čim bi korisnik
+     * obrisao sva pravila jedne vrste, pa su se obrisana pravila vraćala.
+     *
+     * Jednoredne konfiguracije (Shorts, jutarnja blokada, emergency) su obavezne i
+     * dopunjuju se uvek kad nedostaju.
+     */
     private fun initializeDefaultData() {
         val database = ServiceLocator.database(this)
 
         applicationScope.launch {
-            val dao = database.scheduleRuleDao()
-            if (dao.observeAll().first().isEmpty()) {
-                DefaultRulesData.getDefaultScheduleRules().forEach { dao.upsert(it) }
+            val state = database.appInternalStateDao()
+            if (state.getLong(AppStateKeys.DEFAULT_RULES_SEEDED) == null) {
+                // Postojeća instalacija (pre ove verzije) već ima Shorts konfiguraciju: ne seed-ujemo ponovo.
+                val freshInstall = database.shortVideoConfigDao().get() == null
+                if (freshInstall) {
+                    DefaultRulesData.getDefaultScheduleRules().forEach { database.scheduleRuleDao().upsert(it) }
+                    DefaultRulesData.getDefaultAppLimitRules().forEach { database.appLimitRuleDao().upsert(it) }
+                    DefaultRulesData.getDefaultSessionLimitRules().forEach { database.sessionLimitDao().upsertRule(it) }
+                }
+                state.upsert(AppInternalState(AppStateKeys.DEFAULT_RULES_SEEDED, 1L))
             }
-        }
 
-        applicationScope.launch {
-            val dao = database.appLimitRuleDao()
-            if (dao.observeAll().first().isEmpty()) {
-                DefaultRulesData.getDefaultAppLimitRules().forEach { dao.upsert(it) }
-            }
-        }
+            val shortVideo = database.shortVideoConfigDao()
+            if (shortVideo.get() == null) shortVideo.upsert(DefaultRulesData.getDefaultShortVideoConfig())
 
-        applicationScope.launch {
-            val dao = database.sessionLimitDao()
-            if (dao.countRules() == 0) {
-                DefaultRulesData.getDefaultSessionLimitRules().forEach { dao.upsertRule(it) }
-            }
-        }
+            val wakeUp = database.wakeUpConfigDao()
+            if (wakeUp.get() == null) wakeUp.upsert(DefaultRulesData.getDefaultWakeUpConfig())
 
-        applicationScope.launch {
-            val dao = database.shortVideoConfigDao()
-            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultShortVideoConfig())
-        }
-
-        applicationScope.launch {
-            val dao = database.wakeUpConfigDao()
-            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultWakeUpConfig())
-        }
-
-        applicationScope.launch {
-            val dao = database.emergencySessionConfigDao()
-            if (dao.get() == null) dao.upsert(DefaultRulesData.getDefaultEmergencySessionConfig())
+            val emergency = database.emergencySessionConfigDao()
+            if (emergency.get() == null) emergency.upsert(DefaultRulesData.getDefaultEmergencySessionConfig())
         }
     }
 }

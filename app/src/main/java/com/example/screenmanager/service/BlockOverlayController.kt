@@ -33,8 +33,10 @@ class BlockOverlayController(
     private var lifecycleOwner: OverlayLifecycleOwner? = null
     private val decisionState: MutableState<BlockDecision?> = mutableStateOf(null)
 
-    val isShowing: Boolean
-        get() = composeView != null
+    /** Čitljivo sa bilo koje niti: monitor petlja na osnovu njega preskače prelazak na main thread. */
+    @Volatile
+    var isShowing: Boolean = false
+        private set
 
     @MainThread
     fun show(decision: BlockDecision) {
@@ -69,6 +71,7 @@ class BlockOverlayController(
             .onSuccess {
                 composeView = view
                 lifecycleOwner = owner
+                isShowing = true
             }
             .onFailure { owner.stop() }
     }
@@ -80,6 +83,7 @@ class BlockOverlayController(
         lifecycleOwner?.stop()
         composeView = null
         lifecycleOwner = null
+        isShowing = false
         decisionState.value = null
     }
 }

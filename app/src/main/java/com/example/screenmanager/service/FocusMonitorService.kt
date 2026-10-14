@@ -231,8 +231,11 @@ class FocusMonitorService : Service() {
                 rulesEngine.evaluate(pkg, now, zone, snapshot, state)
             }
 
-        withContext(Dispatchers.Main) {
-            if (decision != null) overlayController.show(decision) else overlayController.hide()
+        // Main thread samo kad overlay treba prikazati ili skloniti (ne na svaka 2 s).
+        if (decision != null || overlayController.isShowing) {
+            withContext(Dispatchers.Main) {
+                if (decision != null) overlayController.show(decision) else overlayController.hide()
+            }
         }
     }
 

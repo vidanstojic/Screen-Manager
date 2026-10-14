@@ -21,7 +21,6 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.PermissionState
 import com.example.screenmanager.model.ShortsMode
@@ -77,8 +77,8 @@ fun OverviewRoute(
     viewModel: OverviewViewModel = viewModel(),
     appViewModel: AppViewModel = viewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val permissions by appViewModel.permissionState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val permissions by appViewModel.permissionState.collectAsStateWithLifecycle()
     OnResume(viewModel::onResume)
 
     OverviewScreen(

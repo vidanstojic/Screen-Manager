@@ -13,13 +13,13 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.ui.AppViewModel
 import com.example.screenmanager.ui.common.OnResume
@@ -49,8 +49,8 @@ fun StatsRoute(
     viewModel: StatsViewModel = viewModel(),
     appViewModel: AppViewModel = viewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val permissions by appViewModel.permissionState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val permissions by appViewModel.permissionState.collectAsStateWithLifecycle()
     OnResume(viewModel::onResume)
 
     StatsScreen(

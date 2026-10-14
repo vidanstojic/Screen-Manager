@@ -15,33 +15,30 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.alarm.data.AlarmPermission
 import com.example.screenmanager.alarm.domain.AlarmDetoxLock
-import com.example.screenmanager.ui.common.pluralize
-import androidx.compose.material.icons.rounded.Block
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.ui.common.OnResume
-import com.example.screenmanager.ui.components.IconBadge
-import com.example.screenmanager.ui.components.ListRow
-import com.example.screenmanager.ui.components.StatusPill
-import androidx.compose.material.icons.rounded.Snooze
-import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.ui.platform.LocalContext
 import com.example.screenmanager.ui.common.formatClock
+import com.example.screenmanager.ui.common.pluralize
 import com.example.screenmanager.ui.common.relativeDayLabel
 import com.example.screenmanager.ui.common.rememberNow
 import com.example.screenmanager.ui.components.AddFab
@@ -50,6 +47,9 @@ import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.AppSwitch
 import com.example.screenmanager.ui.components.EmptyState
 import com.example.screenmanager.ui.components.FabSpacer
+import com.example.screenmanager.ui.components.IconBadge
+import com.example.screenmanager.ui.components.ListRow
+import com.example.screenmanager.ui.components.StatusPill
 import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
@@ -63,11 +63,11 @@ fun AlarmsRoute(
     onEditAlarm: (alarmId: Long?) -> Unit,
     viewModel: AlarmsViewModel = viewModel()
 ) {
-    val alarms by viewModel.alarms.collectAsState()
-    val snoozes by viewModel.snoozes.collectAsState()
-    val detoxLock by viewModel.detoxLock.collectAsState()
-    val wakeChecks by viewModel.wakeChecks.collectAsState()
-    val permissions by viewModel.permissions.collectAsState()
+    val alarms by viewModel.alarms.collectAsStateWithLifecycle()
+    val snoozes by viewModel.snoozes.collectAsStateWithLifecycle()
+    val detoxLock by viewModel.detoxLock.collectAsStateWithLifecycle()
+    val wakeChecks by viewModel.wakeChecks.collectAsStateWithLifecycle()
+    val permissions by viewModel.permissions.collectAsStateWithLifecycle()
     val now by rememberNow()
     val loadedAlarms = alarms.orEmpty()
     val context = LocalContext.current

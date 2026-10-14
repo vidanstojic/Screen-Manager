@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.model.AlarmRule
 import com.example.screenmanager.model.AppOption
@@ -52,9 +52,9 @@ fun AlarmEditorRoute(
     onDone: () -> Unit,
     viewModel: AlarmsViewModel = viewModel()
 ) {
-    val alarms by viewModel.alarms.collectAsState()
-    val installedApps by viewModel.installedApps.collectAsState()
-    val detoxReadiness by viewModel.detoxReadiness.collectAsState()
+    val alarms by viewModel.alarms.collectAsStateWithLifecycle()
+    val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val detoxReadiness by viewModel.detoxReadiness.collectAsStateWithLifecycle()
     OnResume { viewModel.refreshPermissions() }
     val loaded = alarms
     if (loaded == null) {

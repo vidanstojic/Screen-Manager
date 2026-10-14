@@ -21,13 +21,13 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.domain.PermissionState
 import com.example.screenmanager.domain.PermissionStateChecker
@@ -53,8 +53,8 @@ fun SettingsRoute(
     appViewModel: AppViewModel = viewModel(),
     viewModel: SettingsViewModel = viewModel()
 ) {
-    val permissions by appViewModel.permissionState.collectAsState()
-    val dailyGoalMinutes by viewModel.dailyGoalMinutes.collectAsState()
+    val permissions by appViewModel.permissionState.collectAsStateWithLifecycle()
+    val dailyGoalMinutes by viewModel.dailyGoalMinutes.collectAsStateWithLifecycle()
     SettingsScreen(
         permissions = permissions,
         dailyGoalMinutes = dailyGoalMinutes,

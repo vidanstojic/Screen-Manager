@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -30,10 +31,20 @@ object AppIconLoader {
     /** Najmanje "obojenih" piksela (zbir težina) da bi se boja uopšte prihvatila. */
     private const val MIN_COLORFUL_WEIGHT = 12f
 
+    /** Ograničen keš: ~4 MB ikonica (≈50 aplikacija od 144 px), ne cela lista instaliranih. */
+    private const val CACHE_BYTES = 4 * 1024 * 1024
+
     /** `Entry(null)` znači "već probano, paket nema ikonicu" (npr. deinstaliran). */
     private class Entry(val bitmap: ImageBitmap?)
 
-    private val cache = ConcurrentHashMap<String, Entry>()
+    /**
+     * Proces živi koliko i FocusMonitorService (stalno), pa neograničen keš ikonica
+     * iz izbora aplikacija ostaje u memoriji zauvek. LruCache + [trim] kad se UI sakrije.
+     */
+    private val cache = object : LruCache<String, Entry>(CACHE_BYTES) {
+        override fun sizeOf(key: String, value: Entry): Int =
+            value.bitmap?.let { it.width * it.height * 4 } ?: 1
+    }
 
     /** `AccentEntry(null)` znači "ikonica nema izraženu boju" (npr. crno-bela). */
     private class AccentEntry(val color: Color?)
@@ -41,19 +52,22 @@ object AppIconLoader {
     private val accents = ConcurrentHashMap<String, AccentEntry>()
 
     /** Već učitana ikonica, bez čekanja — da se pri skrolovanju ne vidi treptaj. */
-    fun cached(packageName: String): ImageBitmap? = cache[packageName]?.bitmap
+    fun cached(packageName: String): ImageBitmap? = cache.get(packageName)?.bitmap
 
     suspend fun load(context: Context, packageName: String): ImageBitmap? {
-        cache[packageName]?.let { return it.bitmap }
+        cache.get(packageName)?.let { return it.bitmap }
         return withContext(Dispatchers.IO) {
             val bitmap = runCatching {
                 val drawable = context.applicationContext.packageManager.getApplicationIcon(packageName)
                 drawable.toBitmap().asImageBitmap()
             }.getOrNull()
-            cache[packageName] = Entry(bitmap)
+            cache.put(packageName, Entry(bitmap))
             bitmap
         }
     }
+
+    /** UI više nije vidljiv: ikonice se oslobađaju (boje su male i ostaju). */
+    fun trim() = cache.evictAll()
 
     /** Već izračunata boja aplikacije, bez čekanja. */
     fun cachedAccent(packageName: String): Color? = accents[packageName]?.color

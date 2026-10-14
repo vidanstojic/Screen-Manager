@@ -8,6 +8,7 @@ import com.example.screenmanager.data.repository.SettingsRepository
 import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.domain.AppStateKeys
 import com.example.screenmanager.domain.ServiceLocator
+import com.example.screenmanager.ui.common.AppIconLoader
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,12 @@ class ScreenManagerApplication : Application() {
         private lateinit var instance: ScreenManagerApplication
 
         fun getInstance(): ScreenManagerApplication = instance
+    }
+
+    /** Proces ostaje živ zbog FocusMonitorService-a; kad se UI sakrije, oslobađaju se UI keševi. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) AppIconLoader.trim()
     }
 
     override fun onCreate() {

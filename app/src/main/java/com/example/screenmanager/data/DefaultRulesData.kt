@@ -8,6 +8,10 @@ import com.example.screenmanager.data.local.ShortVideoConfigEntity
 import com.example.screenmanager.data.local.WakeUpConfigEntity
 import java.time.DayOfWeek
 
+/**
+ * Primeri pravila za novu instalaciju. Svi su ISKLJUČENI: korisnik ih uključuje
+ * sam, pa ga aplikacija ne blokira pravilima koja nije podesio.
+ */
 object DefaultRulesData {
     fun getDefaultScheduleRules(): List<ScheduleRuleEntity> {
         return listOf(
@@ -20,7 +24,7 @@ object DefaultRulesData {
                 endTimeMinute = 0,
                 daysOfWeek = "MONDAY,TUESDAY,WEDNESDAY,THURSDAY",
                 selectedAppIds = "com.google.android.youtube,com.instagram.android",
-                isEnabled = true
+                isEnabled = false
             ),
             ScheduleRuleEntity(
                 id = "schedule_2",
@@ -44,7 +48,7 @@ object DefaultRulesData {
                 selectedAppIds = "com.google.android.youtube",
                 dailyLimitMinutes = 45,
                 blockDurationMinutes = 45,
-                isEnabled = true,
+                isEnabled = false,
                 description = "Blocks YouTube until midnight once the daily cap is used."
             ),
             AppLimitRuleEntity(
@@ -53,7 +57,7 @@ object DefaultRulesData {
                 selectedAppIds = "com.instagram.android",
                 dailyLimitMinutes = 30,
                 blockDurationMinutes = 30,
-                isEnabled = true,
+                isEnabled = false,
                 description = "Blocks Instagram until midnight once the daily cap is used."
             )
         )
@@ -65,7 +69,7 @@ object DefaultRulesData {
             maxReelsWatchMinutes = 15,
             fullAppBlockMinutes = 60,
             selectedAppIds = "com.instagram.android,com.google.android.youtube",
-            isEnabled = true
+            isEnabled = false
         )
     }
 
@@ -76,7 +80,7 @@ object DefaultRulesData {
             triggerDelayMinutes = 2,
             blockDurationMinutes = 30,
             selectedAppIds = "com.google.android.youtube,com.instagram.android",
-            isEnabled = true
+            isEnabled = false
         )
     }
 

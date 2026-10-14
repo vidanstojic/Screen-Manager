@@ -184,7 +184,8 @@ private fun StepsMission(goal: Int, onSolved: () -> Unit, onInteraction: () -> U
             }
             Spacer(Modifier.height(Spacing.md))
             Text(
-                text = "Get out of bed and walk around — keep the phone in your hand.",
+                text = "Get out of bed and walk around — keep the phone in your hand. " +
+                    "Shaking the phone doesn't count; steps show up after a few in a row.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = AppTheme.colors.textSecondary,
                 textAlign = TextAlign.Center

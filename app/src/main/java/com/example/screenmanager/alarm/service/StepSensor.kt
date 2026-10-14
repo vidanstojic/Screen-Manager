@@ -8,32 +8,46 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.core.content.ContextCompat
+import com.example.screenmanager.alarm.domain.StepValidator
 
 /**
- * Brojanje koraka za misiju ([Sensor.TYPE_STEP_DETECTOR]: jedan događaj po
- * koraku, sa malim kašnjenjem). Zahteva dozvolu ACTIVITY_RECOGNITION.
+ * Brojanje koraka za misiju: [Sensor.TYPE_STEP_DETECTOR] (jedan događaj po koraku,
+ * zahteva dozvolu ACTIVITY_RECOGNITION) + akcelerometar kojim [StepValidator]
+ * odbacuje lažne korake (njihanje telefona, BUG-001).
  */
 class StepSensor(context: Context) {
     private val appContext = context.applicationContext
     private val sensorManager = appContext.getSystemService(SensorManager::class.java)
     private val detector: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+    private val accelerometer: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private var listener: SensorEventListener? = null
 
     val isAvailable: Boolean
         get() = detector != null && hasPermission(appContext)
 
     fun start(onStep: () -> Unit) {
-        val sensor = detector ?: return
+        val stepSensor = detector ?: return
         stop()
+        val validator = StepValidator()
         val newListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                repeat(event.values.firstOrNull()?.toInt()?.coerceAtLeast(1) ?: 1) { onStep() }
+                val time = event.timestamp / NANOS_PER_MS
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER ->
+                        validator.onAcceleration(time, event.values[0], event.values[1], event.values[2])
+
+                    Sensor.TYPE_STEP_DETECTOR -> {
+                        val reported = event.values.firstOrNull()?.toInt()?.coerceAtLeast(1) ?: 1
+                        repeat(reported) { repeat(validator.onStepEvent(time)) { onStep() } }
+                    }
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         listener = newListener
-        sensorManager.registerListener(newListener, sensor, SensorManager.SENSOR_DELAY_GAME)
+        accelerometer?.let { sensorManager.registerListener(newListener, it, SensorManager.SENSOR_DELAY_GAME) }
+        sensorManager.registerListener(newListener, stepSensor, SensorManager.SENSOR_DELAY_GAME)
     }
 
     fun stop() {
@@ -42,6 +56,8 @@ class StepSensor(context: Context) {
     }
 
     companion object {
+        private const val NANOS_PER_MS = 1_000_000L
+
         fun hasPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
                 PackageManager.PERMISSION_GRANTED

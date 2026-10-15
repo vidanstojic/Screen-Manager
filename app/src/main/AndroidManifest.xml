@@ -10,8 +10,12 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+        Samo SCHEDULE_EXACT_ALARM: Play USE_EXACT_ALARM dozvoljava isključivo aplikacijama
+        čija je osnovna funkcija budilnik/kalendar. Bez dozvole alarmi rade neprecizno
+        (AlarmScheduler/WakeCheckController), a Alarms ekran nudi "Alarms & reminders".
+    -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- Smart Alarm: zvonjenje (FGS sa zvukom), ekran preko zaključanog telefona, vibracija -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />

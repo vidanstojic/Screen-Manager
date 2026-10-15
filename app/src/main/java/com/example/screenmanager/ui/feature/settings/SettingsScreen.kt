@@ -22,7 +22,10 @@ import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -33,11 +36,13 @@ import com.example.screenmanager.domain.PermissionState
 import com.example.screenmanager.domain.PermissionStateChecker
 import com.example.screenmanager.ui.AppViewModel
 import com.example.screenmanager.ui.common.formatMinutes
+import com.example.screenmanager.ui.components.AccessibilityDisclosureDialog
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
+import com.example.screenmanager.ui.components.openAccessibilitySettings
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StepperRow
 import com.example.screenmanager.ui.components.SwitchRow
@@ -78,6 +83,16 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    var showAccessibilityDisclosure by rememberSaveable { mutableStateOf(false) }
+    if (showAccessibilityDisclosure) {
+        AccessibilityDisclosureDialog(
+            onAgree = {
+                showAccessibilityDisclosure = false
+                context.openAccessibilitySettings()
+            },
+            onDismiss = { showAccessibilityDisclosure = false }
+        )
+    }
 
     AppScreen(title = "Settings", onBack = onBack) {
         Column(
@@ -139,7 +154,7 @@ fun SettingsScreen(
                     title = "Accessibility service",
                     description = "Detects Shorts and Reels inside YouTube and Instagram.",
                     granted = permissions.accessibilityEnabled,
-                    onGrant = { context.openSettings(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                    onGrant = { showAccessibilityDisclosure = true }
                 )
                 CardDivider()
                 PermissionRow(

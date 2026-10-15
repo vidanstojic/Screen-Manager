@@ -1,7 +1,5 @@
 package com.example.screenmanager.ui.feature.alarms
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +29,7 @@ import com.example.screenmanager.alarm.domain.WakeUpDetoxPolicy
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.WakeUpDetox
 import com.example.screenmanager.ui.common.formatMinutes
+import com.example.screenmanager.ui.components.AccessibilityDisclosureDialog
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppPickerDialog
 import com.example.screenmanager.ui.components.AppSelectionField
@@ -43,6 +42,7 @@ import com.example.screenmanager.ui.components.StatusPill
 import com.example.screenmanager.ui.components.StepperRow
 import com.example.screenmanager.ui.components.SwitchRow
 import com.example.screenmanager.ui.components.TextAction
+import com.example.screenmanager.ui.components.openAccessibilitySettings
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -181,11 +181,17 @@ private fun DetoxWarnings(detox: WakeUpDetox, readiness: DetoxReadiness) {
     }
     if (detox.sites.isNotEmpty() && !readiness.sitesEnforced) {
         WarningRow("Blocking sites needs the Accessibility service.") {
-            TextAction(text = "Turn on", onClick = {
-                runCatching {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }
-            })
+            var showDisclosure by rememberSaveable { mutableStateOf(false) }
+            TextAction(text = "Turn on", onClick = { showDisclosure = true })
+            if (showDisclosure) {
+                AccessibilityDisclosureDialog(
+                    onAgree = {
+                        showDisclosure = false
+                        context.openAccessibilitySettings()
+                    },
+                    onDismiss = { showDisclosure = false }
+                )
+            }
         }
     }
 }

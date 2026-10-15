@@ -5,12 +5,11 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.PowerManager
-import android.os.VibrationAttributes
 import android.os.VibrationEffect
-import android.os.VibratorManager
 import android.util.Log
 import com.example.screenmanager.alarm.data.AlarmTones
 import com.example.screenmanager.alarm.domain.RingPolicy
+import com.example.screenmanager.domain.PlatformCompat
 import com.example.screenmanager.model.AlarmSound
 
 /**
@@ -26,7 +25,7 @@ import com.example.screenmanager.model.AlarmSound
  */
 class AlarmPlayer(private val context: Context) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
-    private val vibrator = context.getSystemService(VibratorManager::class.java).defaultVibrator
+    private val vibrator = PlatformCompat.defaultVibrator(context)
     private var player: MediaPlayer? = null
     private var savedStreamVolume: Int? = null
 
@@ -83,7 +82,7 @@ class AlarmPlayer(private val context: Context) {
 
     private fun startVibration() {
         val effect = VibrationEffect.createWaveform(VIBRATION_PATTERN, 0)
-        vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM))
+        PlatformCompat.vibrateAsAlarm(vibrator, effect)
     }
 
     private companion object {

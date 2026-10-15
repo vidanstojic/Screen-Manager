@@ -1,6 +1,5 @@
 package com.example.screenmanager.service
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,13 +10,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.example.screenmanager.MainActivity
 import com.example.screenmanager.R
-import com.example.screenmanager.data.usage.UsageEventSource
 import com.example.screenmanager.alarm.AlarmModule
+import com.example.screenmanager.data.usage.UsageEventSource
 import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.domain.TimeBuckets
 import com.example.screenmanager.domain.rules.RulesSnapshot
@@ -30,6 +31,7 @@ import com.example.screenmanager.domain.wakeup.WakeState
 import com.example.screenmanager.domain.wakeup.WakeUpDetector
 import com.example.screenmanager.domain.wakeup.WakeUpSource
 import com.example.screenmanager.model.WakeUpConfig
+import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,7 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.time.ZoneId
 
 /**
  * Foreground servis koji sprovodi SVA pravila (TRS 2.2, 2.4, 2.5) i drži
@@ -118,13 +119,14 @@ class FocusMonitorService : Service() {
         createNotificationChannel()
         overlayController = BlockOverlayController(this) { sendHome() }
         interactive.value = powerManager.isInteractive
-        registerReceiver(
+        ContextCompat.registerReceiver(
+            this,
             screenReceiver,
             IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
             },
-            RECEIVER_NOT_EXPORTED
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
         ServiceLocator.scheduleDailyMaintenance(this)
         serviceScope.launch {
@@ -134,8 +136,13 @@ class FocusMonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } catch (error: ForegroundServiceStartNotAllowedException) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (error: IllegalStateException) {
+            // Android 12+: ForegroundServiceStartNotAllowedException (podklasa IllegalStateException).
             Log.w(TAG, "Foreground start not allowed right now", error)
             stopSelf()
             return START_NOT_STICKY

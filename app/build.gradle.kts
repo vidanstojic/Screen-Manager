@@ -14,7 +14,9 @@ android {
         // Play odbija pakete "com.example.*"; posle prve objave ID se više ne može menjati.
         // Kod ostaje u paketu com.example.screenmanager (namespace), menja se samo ID aplikacije.
         applicationId = "rs.vidanstojic.focusflow"
-        minSdk = 35
+        // Android 10: od API 29 postoje UsageEvents tipovi na kojima počiva praćenje
+        // (ACTIVITY_RESUMED/PAUSED, DEVICE_SHUTDOWN). Novije API-je čuva domain/PlatformCompat.
+        minSdk = 29
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"

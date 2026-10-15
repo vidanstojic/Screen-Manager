@@ -67,7 +67,7 @@ class AlarmScheduler(
      */
     fun setExact(triggerAt: Long, operation: PendingIntent) {
         try {
-            if (!alarmManager.canScheduleExactAlarms()) {
+            if (!PlatformCompat.canScheduleExactAlarms(alarmManager)) {
                 alarmManager.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000L, operation)
                 return
             }

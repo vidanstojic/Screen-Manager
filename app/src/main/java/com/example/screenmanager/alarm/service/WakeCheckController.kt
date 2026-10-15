@@ -18,6 +18,7 @@ import com.example.screenmanager.alarm.domain.PendingWakeCheck
 import com.example.screenmanager.alarm.domain.RingReason
 import com.example.screenmanager.alarm.domain.WakeCheckPolicy
 import com.example.screenmanager.domain.AlarmScheduler
+import com.example.screenmanager.domain.PlatformCompat
 
 /**
  * Tok wake-up check-a na Androidu:
@@ -83,7 +84,7 @@ class WakeCheckController(private val context: Context) {
 
     private fun setExact(at: Long, operation: PendingIntent) {
         try {
-            if (alarmManager.canScheduleExactAlarms()) {
+            if (PlatformCompat.canScheduleExactAlarms(alarmManager)) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
             } else {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)

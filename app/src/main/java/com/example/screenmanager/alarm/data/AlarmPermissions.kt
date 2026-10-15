@@ -1,14 +1,13 @@
 package com.example.screenmanager.alarm.data
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
-import androidx.core.content.ContextCompat
+import com.example.screenmanager.domain.PlatformCompat
 
 /** Jedna dozvola bitna za alarme: da li je data i kako je korisnik daje. */
 data class AlarmPermission(
@@ -33,11 +32,11 @@ class AlarmPermissions(private val context: Context) {
         AlarmPermission(AlarmPermission.Kind.NOTIFICATIONS, notificationsGranted()),
         AlarmPermission(
             AlarmPermission.Kind.EXACT_ALARMS,
-            context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
+            PlatformCompat.canScheduleExactAlarms(context.getSystemService(AlarmManager::class.java))
         ),
         AlarmPermission(
             AlarmPermission.Kind.FULL_SCREEN,
-            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+            PlatformCompat.canUseFullScreenIntent(context.getSystemService(NotificationManager::class.java))
         ),
         AlarmPermission(AlarmPermission.Kind.DISPLAY_OVER_APPS, Settings.canDrawOverlays(context))
     )
@@ -49,13 +48,24 @@ class AlarmPermissions(private val context: Context) {
             AlarmPermission.Kind.NOTIFICATIONS ->
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            AlarmPermission.Kind.EXACT_ALARMS -> Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
-            AlarmPermission.Kind.FULL_SCREEN -> Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, packageUri)
+            // Ove dve stavke su nedozvoljene samo na verzijama koje imaju i ova podešavanja (31+ / 34+).
+            AlarmPermission.Kind.EXACT_ALARMS ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
+                } else {
+                    appDetails(packageUri)
+                }
+            AlarmPermission.Kind.FULL_SCREEN ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, packageUri)
+                } else {
+                    appDetails(packageUri)
+                }
             AlarmPermission.Kind.DISPLAY_OVER_APPS -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, packageUri)
         }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
-    private fun notificationsGranted(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
+    private fun notificationsGranted(): Boolean = PlatformCompat.notificationsGranted(context)
+
+    private fun appDetails(packageUri: Uri) = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
 }

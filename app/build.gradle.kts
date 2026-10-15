@@ -11,7 +11,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.screenmanager"
+        // Play odbija pakete "com.example.*"; posle prve objave ID se više ne može menjati.
+        // Kod ostaje u paketu com.example.screenmanager (namespace), menja se samo ID aplikacije.
+        applicationId = "rs.vidanstojic.focusflow"
         minSdk = 35
         targetSdk = 35
         versionCode = 1

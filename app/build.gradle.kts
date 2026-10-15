@@ -8,7 +8,9 @@ plugins {
 
 android {
     namespace = "com.example.screenmanager"
-    compileSdk = 35
+    // Play od 31. 8. 2026. traži targetSdk 36 za nove aplikacije i ažuriranja.
+    // Potreban "Android SDK Platform 36" (SDK Manager) i AGP 8.10+.
+    compileSdk = 36
 
     defaultConfig {
         // Play odbija pakete "com.example.*"; posle prve objave ID se više ne može menjati.
@@ -17,7 +19,7 @@ android {
         // Android 10: od API 29 postoje UsageEvents tipovi na kojima počiva praćenje
         // (ACTIVITY_RESUMED/PAUSED, DEVICE_SHUTDOWN). Novije API-je čuva domain/PlatformCompat.
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 

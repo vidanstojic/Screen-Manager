@@ -21,10 +21,22 @@
     <!-- Smart Alarm: misija "koraci" (senzor koraka) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
-    <!-- DODATO: Neophodno za dobijanje liste svih instaliranih aplikacija -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <!--
+        Vidljivost paketa bez QUERY_ALL_PACKAGES (Play je dozvoljava samo uz posebnu
+        deklaraciju). Dovoljne su aplikacije sa ikonicom u launcher-u (birač aplikacija,
+        imena i ikonice, YouTube/Instagram, browseri) i sami launcher-i (UsageEventSource
+        ih isključuje iz statistike). UsageStats i Accessibility događaji ne zavise od ovoga.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
 
     <application
         android:name=".ScreenManagerApplication"

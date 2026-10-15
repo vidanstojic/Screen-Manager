@@ -33,3 +33,5 @@ captures/
 # --- Operativni sistemi ---
 .DS_Store
 Thumbs.db
+# --- Potpisivanje (lozinke za keystore) ---
+keystore.properties

@@ -84,6 +84,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var showAccessibilityDisclosure by rememberSaveable { mutableStateOf(false) }
+    var showPrivacy by rememberSaveable { mutableStateOf(false) }
+    if (showPrivacy) PrivacyDialog(onDismiss = { showPrivacy = false })
     if (showAccessibilityDisclosure) {
         AccessibilityDisclosureDialog(
             onAgree = {
@@ -190,8 +192,9 @@ fun SettingsScreen(
                 )
                 CardDivider()
                 ListRow(
-                    title = "Your data stays on this device",
-                    subtitle = "Usage history and rules are stored locally. Nothing is uploaded."
+                    title = "Privacy",
+                    subtitle = "Your data stays on this device. Nothing is collected or shared.",
+                    onClick = { showPrivacy = true }
                 )
             }
         }

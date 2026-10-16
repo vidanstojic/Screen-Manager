@@ -63,4 +63,4 @@ effective date.
 
 ## Contact
 
-Questions about this policy: **TODO-kontakt-email**
+Questions about this policy: **vidan.stojic+focusflow@gmail.com**

@@ -18,7 +18,7 @@ val keystoreProperties = Properties().apply {
 android {
     namespace = "com.example.screenmanager"
     // Play od 31. 8. 2026. traži targetSdk 36 za nove aplikacije i ažuriranja.
-    // Potreban "Android SDK Platform 36" (SDK Manager) i AGP 8.10+.
+    // Potreban "Android SDK Platform 36" (SDK Manager); vidi suppressUnsupportedCompileSdk u gradle.properties.
     compileSdk = 36
 
     defaultConfig {

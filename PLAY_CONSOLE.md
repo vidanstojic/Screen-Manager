@@ -28,7 +28,8 @@ koji ide i bez pregleda).
       GitHub → `vidanstojic/Screen-Manager` → **Settings › Pages** → *Source: Deploy from a branch*
       → Branch `release/play-prep`, folder `/docs` → Save. Posle 1–2 min otvori
       `https://vidanstojic.github.io/Screen-Manager/PRIVACY` i proveri da se stranica učitava.
-      (Kad spojiš u `main`, prebaci izvor na `main` /docs.)
+      (Ne čeka se merge. Kad spojiš u `main`, prebaci izvor na `main` /docs **pre** brisanja
+      grane `release/play-prep`, inače link prestaje da radi.)
 - [ ] `git push` nove commit-e sa `release/play-prep`.
 - [ ] `./gradlew testDebugUnitTest` → sve zeleno.
 - [ ] `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`.
@@ -233,7 +234,7 @@ mode, Shorts & Reels limits, morning lock, and a wake-up alarm with missions.
 ## 6. Šta je na Vidanu (ne može iz koda)
 
 1. GitHub Pages (poglavlje 1) i push.
-2. Snimci ekrana i dva videa (Accessibility, FGS).
+2. Snimci ekrana i tri videa (Accessibility, FGS specialUse, FGS mediaPlayback).
 3. Play Console: listing, App content, interni pa zatvoreni test.
 4. Verifikacija identiteta naloga mora biti odobrena pre objave.
 

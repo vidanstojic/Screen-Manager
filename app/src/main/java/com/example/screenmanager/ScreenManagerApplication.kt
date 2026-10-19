@@ -3,6 +3,7 @@ package com.example.screenmanager
 import android.app.Application
 import android.util.Log
 import com.example.screenmanager.alarm.data.DirectBootAlarmStore
+import com.example.screenmanager.alarm.service.AlarmVolumeGuard
 import com.example.screenmanager.data.DefaultRulesData
 import com.example.screenmanager.data.local.AppInternalState
 import com.example.screenmanager.domain.AppStateKeys
@@ -38,6 +39,8 @@ class ScreenManagerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Sinhrono i pre svega: alarm koji je pokrenuo ovaj proces odmah pojačava tok.
+        AlarmVolumeGuard.restoreIfInterrupted(this)
         initializeDefaultData()
     }
 

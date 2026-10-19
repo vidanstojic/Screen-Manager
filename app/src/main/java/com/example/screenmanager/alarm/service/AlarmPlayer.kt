@@ -18,7 +18,8 @@ import com.example.screenmanager.model.AlarmSound
  * - Pušta preko ALARM toka ([AudioAttributes.USAGE_ALARM]) — čuje se i kad
  *   je telefon na nečujnom, a "Do not disturb" ga propušta ako su alarmi dozvoljeni.
  * - Za vreme zvonjenja postavlja jačinu ALARM toka na [AlarmSound.volumePercent],
- *   a posle vraća korisnikovu.
+ *   a posle vraća korisnikovu. Korisnikova jačina se čuva i na disku ([AlarmVolumeGuard]),
+ *   pa se vraća i kad sistem ubije proces dok alarm zvoni.
  * - Postepeno pojačavanje i utišavanje tokom misije radi pozivalac preko [setVolumeFraction].
  *
  * Nije thread-safe: poziva se samo sa main thread-a servisa.
@@ -48,7 +49,10 @@ class AlarmPlayer(private val context: Context) {
         player?.let { runCatching { it.stop() }; it.release() }
         player = null
         vibrator.cancel()
-        savedStreamVolume?.let { runCatching { audioManager.setStreamVolume(AudioManager.STREAM_ALARM, it, 0) } }
+        savedStreamVolume?.let {
+            runCatching { audioManager.setStreamVolume(AudioManager.STREAM_ALARM, it, 0) }
+            AlarmVolumeGuard.clear(context)
+        }
         savedStreamVolume = null
     }
 
@@ -75,7 +79,11 @@ class AlarmPlayer(private val context: Context) {
     private fun raiseStreamVolume(percent: Int) {
         runCatching {
             val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            savedStreamVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            // Ako je prethodno zvonjenje prekinuto ubijanjem procesa, tok je još pojačan:
+            // korisnikova jačina je ona sačuvana tada, ne trenutna.
+            val userVolume = AlarmVolumeGuard.saved(context) ?: audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            savedStreamVolume = userVolume
+            AlarmVolumeGuard.save(context, userVolume)
             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, RingPolicy.streamVolumeIndex(percent, max), 0)
         }.onFailure { Log.w(TAG, "Cannot set alarm volume", it) }
     }
@@ -93,4 +101,38 @@ class AlarmPlayer(private val context: Context) {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
     }
+}
+
+/**
+ * Korisnikova jačina ALARM toka dok alarm zvoni, u device-protected skladištu (alarm zvoni
+ * i pre prvog otključavanja). Ako sistem ubije proces usred zvonjenja, [AlarmPlayer.stop]
+ * se ne izvrši i tok ostaje pojačan; [restoreIfInterrupted] pri sledećem startu procesa
+ * ga vraća.
+ */
+object AlarmVolumeGuard {
+    private const val FILE = "alarm_volume"
+    private const val KEY = "user_alarm_stream_volume"
+
+    fun saved(context: Context): Int? = prefs(context).getInt(KEY, -1).takeIf { it >= 0 }
+
+    /** `commit` (sinhrono): proces može da umre odmah posle pojačavanja. */
+    fun save(context: Context, volume: Int) {
+        prefs(context).edit().putInt(KEY, volume).commit()
+    }
+
+    fun clear(context: Context) {
+        prefs(context).edit().remove(KEY).apply()
+    }
+
+    /** Poziva se pri startu procesa, pre bilo kog zvonjenja. */
+    fun restoreIfInterrupted(context: Context) {
+        val volume = saved(context) ?: return
+        runCatching {
+            context.getSystemService(AudioManager::class.java).setStreamVolume(AudioManager.STREAM_ALARM, volume, 0)
+        }.onFailure { Log.w("AlarmVolumeGuard", "Cannot restore alarm volume", it) }
+        clear(context)
+    }
+
+    private fun prefs(context: Context) =
+        context.createDeviceProtectedStorageContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
 }

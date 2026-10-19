@@ -41,3 +41,8 @@ Pre svakog novog upload-a povećaj `versionCode` (i po potrebi `versionName`) u 
 R8 (minify + shrinkResources) je uključen samo za release, pa se release testira posebno:
 otvaranje svih ekrana, izmena i čuvanje pravila (rotacija ekrana usred forme), alarm,
 blokade, Shorts/Reels, restart telefona.
+
+## 5. Google Play
+
+Ceo postupak (Pages za privacy policy, listing, deklaracije, zatvoreni test sa 12 testera / 14 dana,
+lista provera) je u [`PLAY_CONSOLE.md`](PLAY_CONSOLE.md); grafika za listing je u `docs/play-store/`.

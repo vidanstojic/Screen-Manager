@@ -1,5 +1,8 @@
 package com.example.screenmanager.domain.wakeup
 
+import java.time.Instant
+import java.time.ZoneId
+
 /**
  * Stanje detekcije buđenja (čuva se u app_internal_state, vidi RuntimeStateRepository).
  *
@@ -32,6 +35,9 @@ data class WakeState(
  *    i preko više kratkih paljenja (ugasiš alarm, zaključaš, pa uzmeš telefon).
  * 4. Kandidat stariji od [WAKE_WINDOW_MS] zastareva (npr. pogled u 4 h), a sledeće
  *    paljenje ekrana posle iste noći postaje novi kandidat.
+ * 5. Pauza mora da bude NOĆ: bar [MIN_NIGHT_OVERLAP_MS] u lokalnom prozoru
+ *    00:00–[NIGHT_END_HOUR]:00. Ranije je i dnevna pauza duža od `inactivityHours`
+ *    (npr. 10–16 h bez telefona) palila "jutarnju" blokadu.
  */
 object WakeUpDetector {
     /** Upaljen ekran duži od ovoga = korisnik je stvarno koristio telefon. */
@@ -40,19 +46,45 @@ object WakeUpDetector {
     /** Kandidat za buđenje važi najduže ovoliko. */
     const val WAKE_WINDOW_MS: Long = 3 * 60 * 60_000L
 
+    /** Kraj noćnog prozora (lokalno vreme); prozor počinje u ponoć. */
+    const val NIGHT_END_HOUR: Int = 8
+
+    /** Koliko pauze mora da padne u noćni prozor da bi se računala kao noć. */
+    const val MIN_NIGHT_OVERLAP_MS: Long = 60 * 60_000L
+
     private const val HOUR_MS = 60 * 60_000L
     private const val MINUTE_MS = 60_000L
+    private const val DAY_MS = 24 * HOUR_MS
 
-    fun onScreenOn(state: WakeState, now: Long, inactivityHours: Int): WakeState {
+    fun onScreenOn(state: WakeState, now: Long, inactivityHours: Int, zone: ZoneId): WakeState {
         var next = state.copy(screenOnAt = now)
         val dark = next.darkSince ?: return next
         if (next.wakeAt != null && now - next.wakeAt!! > WAKE_WINDOW_MS) {
             next = next.copy(wakeAt = null, wakeOnMs = 0L)
         }
-        if (next.wakeAt == null && now - dark >= inactivityHours.coerceAtLeast(1) * HOUR_MS) {
+        if (next.wakeAt == null &&
+            now - dark >= inactivityHours.coerceAtLeast(1) * HOUR_MS &&
+            nightOverlapMs(dark, now, zone) >= MIN_NIGHT_OVERLAP_MS
+        ) {
             next = next.copy(wakeAt = now, wakeOnMs = 0L)
         }
         return next
+    }
+
+    /** Koliko intervala [from, to) pada u noćne prozore (00:00–[NIGHT_END_HOUR]:00) svih dana. */
+    internal fun nightOverlapMs(from: Long, to: Long, zone: ZoneId): Long {
+        if (to <= from) return 0L
+        if (to - from >= DAY_MS) return MIN_NIGHT_OVERLAP_MS // ceo dan bez telefona sigurno sadrži noć
+        var total = 0L
+        var day = Instant.ofEpochMilli(from).atZone(zone).toLocalDate()
+        val lastDay = Instant.ofEpochMilli(to).atZone(zone).toLocalDate()
+        while (!day.isAfter(lastDay)) {
+            val start = day.atStartOfDay(zone).toInstant().toEpochMilli()
+            val end = day.atTime(NIGHT_END_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+            total += (minOf(to, end) - maxOf(from, start)).coerceAtLeast(0L)
+            day = day.plusDays(1)
+        }
+        return total
     }
 
     fun onScreenOff(state: WakeState, now: Long): WakeState {

@@ -329,7 +329,7 @@ class FocusMonitorService : Service() {
         val config = (if (::rules.isInitialized) rules.value.wakeUp else null)
             ?: settingsRepository.getWakeUpConfig()
             ?: WakeUpConfig()
-        val state = updateWakeState { WakeUpDetector.onScreenOn(it, now, config.inactivityHours) }
+        val state = updateWakeState { WakeUpDetector.onScreenOn(it, now, config.inactivityHours, TimeBuckets.zone()) }
         if (state.wakeAt == now) Log.i(TAG, "WakeUp: candidate at $now (dark since ${state.darkSince})")
         scheduleWakeCheck(state, now, config.triggerDelayMinutes)
     }

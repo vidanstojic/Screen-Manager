@@ -51,7 +51,7 @@ class PermissionStateChecker(private val context: Context) {
 
     private fun notificationsEnabled(): Boolean = PlatformCompat.notificationsGranted(context)
 
-    private fun isAccessibilityEnabled(): Boolean {
+    fun isAccessibilityEnabled(): Boolean {
         val expected = ComponentName(context, ShortsAccessibilityService::class.java).flattenToString()
         val enabled = Settings.Secure.getString(
             context.contentResolver,

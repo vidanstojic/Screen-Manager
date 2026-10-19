@@ -12,6 +12,7 @@ import com.example.screenmanager.model.ShortVideoConfig
 import com.example.screenmanager.model.ShortsMode
 import com.example.screenmanager.ui.common.formatMinutes
 import com.example.screenmanager.ui.components.AppIcon
+import com.example.screenmanager.ui.components.rememberAccessibilityGate
 import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.SegmentedControl
 import com.example.screenmanager.ui.components.StepperRow
@@ -32,12 +33,16 @@ fun ShortsEditor(
     onBack: () -> Unit
 ) {
     var draft by rememberSaveable { mutableStateOf(initial) }
+    val accessibilityGate = rememberAccessibilityGate()
 
     RuleEditorScaffold(
         title = "Shorts & Reels",
         onBack = onBack,
         canSave = true,
-        onSave = { onSave(draft) }
+        onSave = {
+            val saved = draft
+            accessibilityGate.run(needsService = saved.isEnabled && saved.selectedAppIds.isNotEmpty()) { onSave(saved) }
+        }
     ) {
         FormCard(hint = "Only short videos are limited. Regular videos, the feed and messages keep working.") {
             SwitchRow(

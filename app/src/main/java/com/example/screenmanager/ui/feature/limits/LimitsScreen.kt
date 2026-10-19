@@ -43,6 +43,7 @@ import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.SecondaryButton
 import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StepperRow
+import com.example.screenmanager.ui.components.rememberAccessibilityGate
 import com.example.screenmanager.ui.components.screenContentPadding
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
@@ -55,6 +56,7 @@ fun LimitsRoute(
     viewModel: LimitsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val accessibilityGate = rememberAccessibilityGate()
     LimitsScreen(
         state = state,
         labelFor = viewModel::appLabel,
@@ -64,7 +66,13 @@ fun LimitsRoute(
             onToggleAppLimit = { rule, enabled -> viewModel.saveAppLimit(rule.copy(isEnabled = enabled)) },
             onToggleSessionLimit = { rule, enabled -> viewModel.saveSessionLimit(rule.copy(isEnabled = enabled)) },
             onToggleSchedule = { rule, enabled -> viewModel.saveSchedule(rule.copy(isEnabled = enabled)) },
-            onToggleShorts = { enabled -> state?.let { viewModel.saveShorts(it.shorts.copy(isEnabled = enabled)) } },
+            onToggleShorts = { enabled ->
+                state?.let { current ->
+                    accessibilityGate.run(needsService = enabled && current.shorts.selectedAppIds.isNotEmpty()) {
+                        viewModel.saveShorts(current.shorts.copy(isEnabled = enabled))
+                    }
+                }
+            },
             onToggleMorningLock = { enabled ->
                 state?.let { viewModel.saveMorningLock(it.morningLock.copy(isEnabled = enabled)) }
             },

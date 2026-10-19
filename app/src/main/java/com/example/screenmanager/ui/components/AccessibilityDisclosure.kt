@@ -11,8 +11,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import com.example.screenmanager.domain.ServiceLocator
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -66,6 +72,46 @@ fun AccessibilityDisclosureDialog(onAgree: () -> Unit, onDismiss: () -> Unit) {
         confirmButton = { TextAction(text = "Agree", onClick = onAgree) },
         dismissButton = { TextAction(text = "Not now", onClick = onDismiss, color = AppTheme.colors.textSecondary) }
     )
+}
+
+/**
+ * Uključivanje funkcije kojoj treba Accessibility servis (Shorts/Reels): Play traži da se
+ * obaveštenje pojavi u normalnom toku, ne samo iz Settings-a (REL-002).
+ */
+class AccessibilityGate internal constructor(private val request: (action: () -> Unit) -> Unit) {
+    /** Ako [needsService] a servis nije uključen, prvo obaveštenje; [action] se izvršava u oba slučaja. */
+    fun run(needsService: Boolean, action: () -> Unit) {
+        if (needsService) request(action) else action()
+    }
+}
+
+/**
+ * Servis uključen → akcija odmah. Inače [AccessibilityDisclosureDialog]: "Agree" izvršava
+ * akciju i otvara sistemska podešavanja, "Not now" samo izvršava akciju (pravilo je
+ * sačuvano, ali se ne sprovodi dok se servis ne uključi).
+ */
+@Composable
+fun rememberAccessibilityGate(): AccessibilityGate {
+    val context = LocalContext.current
+    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    pending?.let { action ->
+        AccessibilityDisclosureDialog(
+            onAgree = {
+                pending = null
+                context.openAccessibilitySettings()
+                action()
+            },
+            onDismiss = {
+                pending = null
+                action()
+            }
+        )
+    }
+    return remember(context) {
+        AccessibilityGate { action ->
+            if (ServiceLocator.permissionStateChecker(context).isAccessibilityEnabled()) action() else pending = action
+        }
+    }
 }
 
 /** Sistemska Accessibility podešavanja; pozivati tek posle [AccessibilityDisclosureDialog]. */

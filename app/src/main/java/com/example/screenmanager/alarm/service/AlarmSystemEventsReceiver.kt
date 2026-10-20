@@ -42,7 +42,8 @@ class AlarmSystemEventsReceiver : BroadcastReceiver() {
                 AlarmModule.runtimeStore(context).snoozes.value.values.forEach { snooze ->
                     scheduler.scheduleSnooze(snooze.alarmId, maxOf(snooze.at, now + MISSED_DELAY_MS), snooze.count)
                 }
-                WakeCheckController(context).restoreAll(now)
+                // Samo zakazivanje (bez reference na AlarmRingService iz BOOT_COMPLETED).
+                WakeCheckAlarms(context).restoreAll(now)
             } catch (error: RuntimeException) {
                 Log.e(TAG, "Restoring alarm state after $action failed", error)
             } finally {

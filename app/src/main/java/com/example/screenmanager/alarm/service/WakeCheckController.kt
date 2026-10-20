@@ -1,12 +1,10 @@
 package com.example.screenmanager.alarm.service
 
-import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.provider.Settings
@@ -18,7 +16,6 @@ import com.example.screenmanager.alarm.domain.PendingWakeCheck
 import com.example.screenmanager.alarm.domain.RingReason
 import com.example.screenmanager.alarm.domain.WakeCheckPolicy
 import com.example.screenmanager.domain.AlarmScheduler
-import com.example.screenmanager.domain.PlatformCompat
 
 /**
  * Tok wake-up check-a na Androidu:
@@ -32,20 +29,20 @@ import com.example.screenmanager.domain.PlatformCompat
  * preživljava gašenje procesa i restart telefona.
  */
 class WakeCheckController(private val context: Context) {
-    private val alarmManager = context.getSystemService(AlarmManager::class.java)
+    private val alarms = WakeCheckAlarms(context)
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
     private val store = AlarmModule.runtimeStore(context)
 
     fun schedule(check: PendingWakeCheck) {
         store.putWakeCheck(check)
-        setExact(check.askAt, pendingIntent(WakeCheckReceiver.ACTION_ASK, check.alarmId, check.round))
+        alarms.setExact(check.askAt, alarms.pendingIntent(WakeCheckReceiver.ACTION_ASK, check.alarmId, check.round))
     }
 
     fun ask(alarmId: Long, round: Int) {
         val pending = store.wakeChecks.value[alarmId]?.takeIf { it.round == round } ?: return
         val asked = WakeCheckPolicy.asked(pending, System.currentTimeMillis())
         store.putWakeCheck(asked)
-        setExact(asked.deadline!!, pendingIntent(WakeCheckReceiver.ACTION_DEADLINE, alarmId, round))
+        alarms.setExact(asked.deadline!!, alarms.pendingIntent(WakeCheckReceiver.ACTION_DEADLINE, alarmId, round))
         notificationManager.notify(NOTIFICATION_ID, buildNotification(alarmId, round, asked.deadline))
         if (Settings.canDrawOverlays(context)) {
             runCatching { context.startActivity(WakeCheckActivity.intent(context, alarmId, round)) }
@@ -64,47 +61,10 @@ class WakeCheckController(private val context: Context) {
 
     /** Otkazuje sve za [alarmId] (potvrda, brisanje alarma). */
     fun cancel(alarmId: Long) {
-        alarmManager.cancel(pendingIntent(WakeCheckReceiver.ACTION_ASK, alarmId, 0))
-        alarmManager.cancel(pendingIntent(WakeCheckReceiver.ACTION_DEADLINE, alarmId, 0))
+        alarms.cancel(alarmId)
         store.removeWakeCheck(alarmId)
         notificationManager.cancel(NOTIFICATION_ID)
     }
-
-    /** Posle restarta telefona: ponovo zakazuje provere iz [store]. */
-    fun restoreAll(now: Long) {
-        store.wakeChecks.value.values.forEach { check ->
-            val deadline = check.deadline
-            if (deadline == null) {
-                setExact(maxOf(check.askAt, now + RESTORE_DELAY_MS), pendingIntent(WakeCheckReceiver.ACTION_ASK, check.alarmId, check.round))
-            } else {
-                setExact(maxOf(deadline, now + RESTORE_DELAY_MS), pendingIntent(WakeCheckReceiver.ACTION_DEADLINE, check.alarmId, check.round))
-            }
-        }
-    }
-
-    private fun setExact(at: Long, operation: PendingIntent) {
-        try {
-            if (PlatformCompat.canScheduleExactAlarms(alarmManager)) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
-            }
-        } catch (error: SecurityException) {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
-        }
-    }
-
-    private fun pendingIntent(action: String, alarmId: Long, round: Int): PendingIntent =
-        PendingIntent.getBroadcast(
-            context,
-            AlarmScheduler.requestCode(alarmId),
-            Intent(context, WakeCheckReceiver::class.java).apply {
-                this.action = action
-                putExtra(WakeCheckReceiver.EXTRA_ALARM_ID, alarmId)
-                putExtra(WakeCheckReceiver.EXTRA_ROUND, round)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
     private fun buildNotification(alarmId: Long, round: Int, deadline: Long): Notification {
         ensureChannel()
@@ -127,7 +87,7 @@ class WakeCheckController(private val context: Context) {
             .setTimeoutAfter(WakeCheckPolicy.RESPONSE_WINDOW_MS)
             .setContentIntent(screen)
             .setFullScreenIntent(screen, true)
-            .addAction(0, "I'm awake", pendingIntent(WakeCheckReceiver.ACTION_CONFIRM, alarmId, round))
+            .addAction(0, "I'm awake", alarms.pendingIntent(WakeCheckReceiver.ACTION_CONFIRM, alarmId, round))
             .build()
     }
 
@@ -148,6 +108,5 @@ class WakeCheckController(private val context: Context) {
         private const val TAG = "WakeCheck"
         private const val CHANNEL_ID = "wake_check"
         private const val NOTIFICATION_ID = 41_010
-        private const val RESTORE_DELAY_MS = 5_000L
     }
 }

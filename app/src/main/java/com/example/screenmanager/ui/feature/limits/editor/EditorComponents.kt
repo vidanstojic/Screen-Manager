@@ -77,26 +77,27 @@ fun RuleEditorScaffold(
     }
 
     if (confirmDelete && onDelete != null) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            containerColor = AppTheme.colors.surface,
-            title = { Text("Delete this rule?", color = AppTheme.colors.textPrimary) },
-            text = { Text("The apps it covers will no longer be limited by it.", color = AppTheme.colors.textSecondary) },
-            confirmButton = {
-                TextAction(
-                    text = "Delete",
-                    color = AppTheme.colors.danger,
-                    onClick = {
-                        confirmDelete = false
-                        onDelete()
-                    }
-                )
+        DeleteRuleDialog(
+            onConfirm = {
+                confirmDelete = false
+                onDelete()
             },
-            dismissButton = {
-                TextAction(text = "Cancel", color = AppTheme.colors.textSecondary, onClick = { confirmDelete = false })
-            }
+            onDismiss = { confirmDelete = false }
         )
     }
+}
+
+/** Potvrda brisanja pravila (iz forme i dugim pritiskom na red u Limits listi). */
+@Composable
+fun DeleteRuleDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppTheme.colors.surface,
+        title = { Text("Delete this rule?", color = AppTheme.colors.textPrimary) },
+        text = { Text("The apps it covers will no longer be limited by it.", color = AppTheme.colors.textSecondary) },
+        confirmButton = { TextAction(text = "Delete", color = AppTheme.colors.danger, onClick = onConfirm) },
+        dismissButton = { TextAction(text = "Cancel", color = AppTheme.colors.textSecondary, onClick = onDismiss) }
+    )
 }
 
 /** Grupa polja forme: mali naslov iznad kartice, polja kao redovi unutar nje. */

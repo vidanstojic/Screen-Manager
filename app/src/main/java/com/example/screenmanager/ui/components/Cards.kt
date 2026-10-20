@@ -1,8 +1,10 @@
 package com.example.screenmanager.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,20 +126,28 @@ fun SectionHeader(
 /**
  * Red unutar kartice: [leading] (ikonica) · naslov + podnaslov · [trailing]
  * (switch, vrednost, strelica). Koristi se za liste pravila, podešavanja i sl.
+ * [onLongClick] (dug pritisak) je opcion, npr. za brisanje pravila iz liste.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ListRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val interaction = when {
+        onLongClick != null -> Modifier.combinedClickable(onClick = onClick ?: {}, onLongClick = onLongClick)
+        onClick != null -> Modifier.clickable(onClick = onClick)
+        else -> Modifier
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(interaction)
             .padding(horizontal = Spacing.lg, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

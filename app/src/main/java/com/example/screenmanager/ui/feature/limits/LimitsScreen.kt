@@ -20,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,6 +48,7 @@ import com.example.screenmanager.ui.components.SectionHeader
 import com.example.screenmanager.ui.components.StepperRow
 import com.example.screenmanager.ui.components.rememberAccessibilityGate
 import com.example.screenmanager.ui.components.screenContentPadding
+import com.example.screenmanager.ui.feature.limits.editor.DeleteRuleDialog
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -66,6 +70,9 @@ fun LimitsRoute(
             onToggleAppLimit = { rule, enabled -> viewModel.saveAppLimit(rule.copy(isEnabled = enabled)) },
             onToggleSessionLimit = { rule, enabled -> viewModel.saveSessionLimit(rule.copy(isEnabled = enabled)) },
             onToggleSchedule = { rule, enabled -> viewModel.saveSchedule(rule.copy(isEnabled = enabled)) },
+            onDeleteAppLimit = viewModel::deleteAppLimit,
+            onDeleteSessionLimit = viewModel::deleteSessionLimit,
+            onDeleteSchedule = viewModel::deleteSchedule,
             onToggleShorts = { enabled ->
                 state?.let { current ->
                     accessibilityGate.run(needsService = enabled && current.shorts.selectedAppIds.isNotEmpty()) {
@@ -119,7 +126,8 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleAppLimit(rule, it) },
-                            onClick = { onEditRule(RuleTarget.AppLimit(ruleId = rule.id)) }
+                            onClick = { onEditRule(RuleTarget.AppLimit(ruleId = rule.id)) },
+                            onDelete = { actions.onDeleteAppLimit(rule.id) }
                         )
                     }
                 )
@@ -135,7 +143,8 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSessionLimit(rule, it) },
-                            onClick = { onEditRule(RuleTarget.SessionLimit(ruleId = rule.id)) }
+                            onClick = { onEditRule(RuleTarget.SessionLimit(ruleId = rule.id)) },
+                            onDelete = { actions.onDeleteSessionLimit(rule.id) }
                         )
                     }
                 )
@@ -151,7 +160,8 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSchedule(rule, it) },
-                            onClick = { onEditRule(RuleTarget.Schedule(ruleId = rule.id)) }
+                            onClick = { onEditRule(RuleTarget.Schedule(ruleId = rule.id)) },
+                            onDelete = { actions.onDeleteSchedule(rule.id) }
                         )
                     }
                 )
@@ -215,6 +225,9 @@ class LimitsActions(
     val onToggleAppLimit: (AppLimitRule, Boolean) -> Unit,
     val onToggleSessionLimit: (SessionLimitRule, Boolean) -> Unit,
     val onToggleSchedule: (ScheduleRule, Boolean) -> Unit,
+    val onDeleteAppLimit: (String) -> Unit,
+    val onDeleteSessionLimit: (String) -> Unit,
+    val onDeleteSchedule: (String) -> Unit,
     val onToggleShorts: (Boolean) -> Unit,
     val onToggleMorningLock: (Boolean) -> Unit,
     val onEmergencyDurationChange: (Int) -> Unit,
@@ -230,6 +243,8 @@ private class RuleRowModel(
     val enabled: Boolean,
     val onToggle: (Boolean) -> Unit,
     val onClick: () -> Unit,
+    /** Dug pritisak na red → potvrda → brisanje; null za pravila koja se ne brišu (Shorts, jutarnja). */
+    val onDelete: (() -> Unit)? = null,
     /** Umesto ikonice vrste pravila (npr. ikonice aplikacija). */
     val leading: (@Composable () -> Unit)? = null
 )
@@ -265,10 +280,22 @@ private fun RuleSection(
 
 @Composable
 private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    val onDelete = row.onDelete
+    if (confirmDelete && onDelete != null) {
+        DeleteRuleDialog(
+            onConfirm = {
+                confirmDelete = false
+                onDelete()
+            },
+            onDismiss = { confirmDelete = false }
+        )
+    }
     ListRow(
         title = row.title,
         subtitle = row.summary,
         onClick = row.onClick,
+        onLongClick = onDelete?.let { { confirmDelete = true } },
         leading = row.leading ?: {
             IconBadge(
                 icon = kind.icon,

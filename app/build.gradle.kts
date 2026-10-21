@@ -47,6 +47,11 @@ android {
     }
 
     buildTypes {
+        // Debug se instalira pored verzije sa Play-a (drugi potpis → isti applicationId ne može).
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             // R8: manji APK i bez mrtvog koda iz biblioteka; pravila su u proguard-rules.pro.
             isMinifyEnabled = true

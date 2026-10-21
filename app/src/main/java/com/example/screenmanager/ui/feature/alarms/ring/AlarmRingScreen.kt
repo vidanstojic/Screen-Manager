@@ -155,7 +155,11 @@ fun AlarmRingScreen(
                 ) {
                     if (missionType != ring.alarm.mission.type) {
                         Text(
-                            text = "Step counting isn't available, so here's a math mission instead.",
+                            text = if (StepSensor.hasPermission(LocalContext.current)) {
+                                "This phone can't count steps, so here's a math mission instead."
+                            } else {
+                                "Physical activity permission is off, so steps can't be counted. Here's a math mission instead."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.textMuted,
                             modifier = Modifier.padding(bottom = Spacing.sm)

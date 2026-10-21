@@ -1,6 +1,9 @@
 package com.example.screenmanager.ui.feature.alarms
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -36,16 +39,54 @@ import kotlin.random.Random
 /**
  * Misija za gašenje alarma: bez misije, računi, prekucavanje ili koraci.
  * Sa misijom alarm može samo da se odloži dok zadatak nije rešen.
+ *
+ * Koraci bez dozvole za fizičku aktivnost bi pri zvonjenju tiho postali račun
+ * (BUG-015), pa se dozvola traži odmah pri izboru; ako je odbijena, izbor se
+ * vraća na prethodnu misiju uz objašnjenje.
  */
 @Composable
 fun AlarmMissionSection(mission: AlarmMission, onChange: (AlarmMission) -> Unit) {
+    val context = LocalContext.current
+    var stepsRefused by remember { mutableStateOf(false) }
+    var typeBeforeSteps by remember { mutableStateOf(mission.type) }
+    val stepsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            stepsRefused = true
+            onChange(mission.copy(type = typeBeforeSteps.takeIf { it != MissionType.STEPS } ?: MissionType.NONE))
+        }
+    }
     EditorSection(title = "Wake-up mission") {
         SegmentedControl(
             options = MissionType.entries,
             selected = mission.type,
-            onSelected = { onChange(mission.copy(type = it)) },
+            onSelected = { type ->
+                stepsRefused = false
+                val needsPermission = type == MissionType.STEPS &&
+                    StepSensor.hasSensor(context) && !StepSensor.hasPermission(context)
+                if (needsPermission && mission.type != MissionType.STEPS) typeBeforeSteps = mission.type
+                onChange(mission.copy(type = type))
+                if (needsPermission) stepsPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+            },
             label = ::missionTypeLabel
         )
+        if (stepsRefused) {
+            EditorHint(
+                text = "Steps need the Physical activity permission, so the mission was not changed. " +
+                    "Allow it in App info → Permissions, or pick another mission.",
+                color = AppTheme.colors.warning
+            )
+            TextAction(
+                text = "Open App info",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            )
+        }
         if (mission.type != MissionType.NONE) {
             AppCard(contentPadding = PaddingValues(vertical = Spacing.xs)) {
                 when (mission.type) {
@@ -143,7 +184,8 @@ private fun StepsOptions(mission: AlarmMission, onChange: (AlarmMission) -> Unit
             CardDivider()
             Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
                 Text(
-                    text = "Step counting needs the Physical activity permission. Without it a math mission is used.",
+                    text = "Step counting needs the Physical activity permission. Without it this alarm " +
+                        "will ask for a math mission instead of steps.",
                     style = MaterialTheme.typography.bodySmall,
                     color = AppTheme.colors.warning
                 )

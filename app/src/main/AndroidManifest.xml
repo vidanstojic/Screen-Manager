@@ -10,6 +10,8 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- "Go to home screen" gasi blokiranu aplikaciju (samo kad je već u pozadini). -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <!--
         Samo SCHEDULE_EXACT_ALARM: Play USE_EXACT_ALARM dozvoljava isključivo aplikacijama
         čija je osnovna funkcija budilnik/kalendar. Bez dozvole alarmi rade neprecizno

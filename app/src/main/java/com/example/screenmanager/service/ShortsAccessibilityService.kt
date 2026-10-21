@@ -1,6 +1,8 @@
 package com.example.screenmanager.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
@@ -92,6 +94,7 @@ class ShortsAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "Service connected")
+        instance = this
         // Sistem ponovo vezuje Accessibility i posle gašenja procesa; tada podiže i monitor
         // (limiti, rasporedi), koji bi inače čekao da korisnik otvori aplikaciju (BUG-018).
         FocusMonitorService.start(this)
@@ -112,9 +115,15 @@ class ShortsAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
         ensureMonitorRunning()
-        // Otvaranje YouTube/Instagram-a (i preko linka): limit se proverava odmah, ne posle do 2 s (BUG-019).
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && packageName in ShortsDetector.supportedPackages) {
-            FocusMonitorService.requestQuickCheck()
+        // Prozor YouTube/Instagram-a je na ekranu: monitor to zna i kad UsageEvents ćute (BUG-020),
+        // a pri otvaranju (i preko linka) proverava odmah, ne posle do 2 s (BUG-019).
+        if (packageName in ShortsDetector.supportedPackages) {
+            val at = System.currentTimeMillis() - (SystemClock.uptimeMillis() - event.eventTime)
+            FocusMonitorService.onAppWindowEvent(
+                packageName = packageName,
+                at = at,
+                windowChanged = event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            )
         }
         if (packageName !in ShortsDetector.supportedPackages) {
             websiteGuard?.takeIf { it.handles(packageName) }?.onEvent(packageName)
@@ -149,8 +158,14 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (instance === this) instance = null
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
         Log.i(TAG, "Service destroyed")
+        if (instance === this) instance = null
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -350,5 +365,10 @@ class ShortsAccessibilityService : AccessibilityService() {
         private const val FLUSH_INTERVAL_MS = 5_000L
         private const val KICK_TOAST_INTERVAL_MS = 4_000L
         private const val MONITOR_RESTART_INTERVAL_MS = 10_000L
+
+        @Volatile private var instance: ShortsAccessibilityService? = null
+
+        /** Početni ekran preko Accessibility-ja (pouzdanije od pokretanja HOME aktivnosti iz pozadine). */
+        fun performHome(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_HOME) == true
     }
 }

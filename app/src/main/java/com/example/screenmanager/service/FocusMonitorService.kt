@@ -1,5 +1,6 @@
 package com.example.screenmanager.service
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,6 +31,8 @@ import com.example.screenmanager.domain.rules.SessionLimitTracker
 import com.example.screenmanager.domain.rules.SessionState
 import com.example.screenmanager.domain.rules.ShortsPolicy
 import com.example.screenmanager.domain.usage.ForegroundResolver
+import com.example.screenmanager.domain.usage.RawEventKind
+import com.example.screenmanager.domain.usage.RawUsageEvent
 import com.example.screenmanager.domain.wakeup.WakeState
 import com.example.screenmanager.domain.wakeup.WakeUpDetector
 import com.example.screenmanager.domain.wakeup.WakeUpSource
@@ -95,6 +98,11 @@ class FocusMonitorService : Service() {
     // Stanje monitor petlje — menja se samo iz monitor korutine.
     private val foreground = ForegroundResolver()
     private var eventCursor = 0L
+    private var lastUsageEventAt = 0L
+
+    // "Go to home screen": blokirana aplikacija se kratko ne proverava dok launcher ne stigne u UsageEvents.
+    @Volatile private var homeRequestedFor: String? = null
+    @Volatile private var homeRequestedAt = 0L
     private val sessionStates = HashMap<String, SessionState>()
     private var sessionStatesPersistedAt = 0L
     private val sessionMutex = Mutex()
@@ -125,7 +133,7 @@ class FocusMonitorService : Service() {
         super.onCreate()
         isRunning = true
         createNotificationChannel()
-        overlayController = BlockOverlayController(this) { sendHome() }
+        overlayController = BlockOverlayController(this) { blockedPackage -> goHome(blockedPackage) }
         interactive.value = powerManager.isInteractive
         ContextCompat.registerReceiver(
             this,
@@ -255,8 +263,9 @@ class FocusMonitorService : Service() {
 
         if (!emergencyActive) advanceSessions(snapshot, foregroundPackage, now, zone)
 
+        val homeGrace = foregroundPackage == homeRequestedFor && now - homeRequestedAt < HOME_GRACE_MS
         val decision = foregroundPackage
-            ?.takeIf { it != packageName }
+            ?.takeIf { it != packageName && !homeGrace }
             ?.let { pkg ->
                 val state = RuntimeState(
                     todayUsageMs = liveUsage(pkg, now),
@@ -295,8 +304,27 @@ class FocusMonitorService : Service() {
         val from = if (eventCursor == 0L) now - INITIAL_EVENT_LOOKBACK_MS else eventCursor
         val events = eventSource.read(from, now + 1)
         events.forEach(foreground::apply)
+        events.lastOrNull()?.let { lastUsageEventAt = it.timestamp }
         eventCursor = maxOf(from, (events.lastOrNull()?.timestamp ?: (from - 1)) + 1)
+        applyWindowHint(now)
         return foreground.currentPackage
+    }
+
+    /**
+     * UsageEvents ne javljaju povratak u aplikaciju koja nije stigla da se pauzira (Recents,
+     * pa brzo nazad): resolver ostaje na launcher-u i YouTube radi bez blokade (BUG-020).
+     * Accessibility javlja svaki događaj prozora YouTube/Instagram-a koji je stvarno na
+     * ekranu; ako je noviji od poslednjeg UsageEvent-a, ta aplikacija je u prvom planu.
+     */
+    private fun applyWindowHint(now: Long) {
+        val hint = windowHint ?: return
+        // Prozor koji se još gasi (animacija odlaska na početni ekran) šalje događaje i malo posle
+        // launcher-ovog RESUMED-a; povratak iz Recents je uvek kasniji od toga.
+        if (hint.at <= lastUsageEventAt + WINDOW_HINT_MARGIN_MS || now - hint.at > WINDOW_HINT_TTL_MS) return
+        if (hint.packageName == homeRequestedFor && hint.at < homeRequestedAt + HOME_HINT_IGNORE_MS) return
+        if (foreground.currentPackage != hint.packageName) {
+            foreground.apply(RawUsageEvent(hint.at, hint.packageName, RawEventKind.RESUMED))
+        }
     }
 
     /** Današnja potrošnja + deo tekuće sesije koji poslednji sync još nije video. */
@@ -415,13 +443,31 @@ class FocusMonitorService : Service() {
         audio.dispatchMediaKeyEvent(KeyEvent(at, at, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE, 0))
     }
 
-    private fun sendHome() {
-        startActivity(
-            Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_HOME)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        )
+    /**
+     * "Go to home screen": blok se sklanja odmah (ranije je ostajao do sledeće provere, pa je
+     * delovalo da prvi klik ne radi), telefon ide na početni ekran, a blokirana aplikacija se
+     * gasi — povratak preko Recents je pokreće iz početka i odmah ponovo blokira.
+     */
+    private fun goHome(blockedPackage: String) {
+        overlayController.hide()
+        homeRequestedFor = blockedPackage
+        homeRequestedAt = System.currentTimeMillis()
+        clearWindowHint(blockedPackage)
+        if (!ShortsAccessibilityService.performHome()) {
+            runCatching {
+                startActivity(
+                    Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                )
+            }.onFailure { Log.w(TAG, "Going home failed", it) }
+        }
+        serviceScope.launch {
+            delay(KILL_DELAY_MS) // dok aplikacija ne pređe u pozadinu; prednji proces se ne može ugasiti
+            runCatching { getSystemService(ActivityManager::class.java)?.killBackgroundProcesses(blockedPackage) }
+                .onFailure { Log.w(TAG, "Closing $blockedPackage failed", it) }
+        }
     }
 
     private fun createNotificationChannel() {
@@ -452,6 +498,11 @@ class FocusMonitorService : Service() {
         private const val TICK_INTERVAL_MS = 2_000L
         private const val QUICK_TICK_INTERVAL_MS = 200L
         private const val QUICK_TICKS = 4
+        private const val WINDOW_HINT_TTL_MS = 5_000L
+        private const val WINDOW_HINT_MARGIN_MS = 700L
+        private const val HOME_HINT_IGNORE_MS = 2_000L
+        private const val HOME_GRACE_MS = 1_500L
+        private const val KILL_DELAY_MS = 800L
         private const val SYNC_INTERVAL_MS = 60_000L
         private const val SESSION_PERSIST_INTERVAL_MS = 15_000L
         private const val INITIAL_EVENT_LOOKBACK_MS = 10 * 60_000L
@@ -464,9 +515,21 @@ class FocusMonitorService : Service() {
         /** Zahtevi za proveru odmah; CONFLATED — više zahteva između dve provere je jedan. */
         private val quickChecks = Channel<Unit>(Channel.CONFLATED)
 
-        /** Accessibility: YouTube/Instagram je upravo došao na ekran → ne čekati sledeći tick (BUG-019). */
-        fun requestQuickCheck() {
-            quickChecks.trySend(Unit)
+        private class WindowHint(val packageName: String, val at: Long)
+
+        @Volatile private var windowHint: WindowHint? = null
+
+        /**
+         * Accessibility: prozor YouTube/Instagram-a je na ekranu u trenutku [at] (BUG-020). Kad
+         * se prozor tek pojavio ([windowChanged]), provera ide odmah, ne posle do 2 s (BUG-019).
+         */
+        fun onAppWindowEvent(packageName: String, at: Long, windowChanged: Boolean) {
+            windowHint = WindowHint(packageName, at)
+            if (windowChanged) quickChecks.trySend(Unit)
+        }
+
+        private fun clearWindowHint(packageName: String) {
+            if (windowHint?.packageName == packageName) windowHint = null
         }
 
         /**

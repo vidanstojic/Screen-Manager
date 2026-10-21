@@ -26,7 +26,7 @@ import com.example.screenmanager.ui.theme.ScreenManagerTheme
  */
 class BlockOverlayController(
     private val context: Context,
-    private val onGoHome: () -> Unit
+    private val onGoHome: (blockedPackage: String) -> Unit
 ) {
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var composeView: ComposeView? = null
@@ -51,7 +51,9 @@ class BlockOverlayController(
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 ScreenManagerTheme {
-                    decisionState.value?.let { BlockScreen(decision = it, onGoHome = onGoHome) }
+                    decisionState.value?.let { decision ->
+                        BlockScreen(decision = decision, onGoHome = { onGoHome(decision.packageName) })
+                    }
                 }
             }
         }

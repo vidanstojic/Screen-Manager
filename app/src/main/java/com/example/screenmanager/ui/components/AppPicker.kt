@@ -8,13 +8,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,12 +30,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -119,9 +126,17 @@ fun AppPickerDialog(
         else availableApps.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }
 
+    // Visina donje trake sa dugmetom (zavisi od navigacione trake/tastature) — toliko
+    // praznog prostora dobija kraj liste, da poslednja aplikacija ne ostane ispod dugmeta.
+    var confirmBarHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        // decorFitsSystemWindows = false: prozor dijaloga ide preko sistemskih traka i Compose
+        // dobija prave insets-e. Sa podrazumevanim true (targetSdk 35+ je uvek edge-to-edge)
+        // insets-i su bili 0, pa je dugme "Done" padalo ispod navigacione trake.
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         // Dijalog je zaseban prozor, pa crta svoju aurora pozadinu.
         AuroraBackground {
@@ -129,8 +144,6 @@ fun AppPickerDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .imePadding()
             ) {
                 Row(
                     modifier = Modifier
@@ -156,43 +169,83 @@ fun AppPickerDialog(
                     modifier = Modifier.padding(horizontal = Spacing.screen)
                 )
 
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(vertical = Spacing.sm)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
                 ) {
-                    items(filteredApps, key = { it.id }) { app ->
-                        val isSelected = app.id in selectedIds
-                        AppPickerRow(
-                            app = app,
-                            selected = isSelected,
-                            onToggle = {
-                                selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
-                            }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = Spacing.sm,
+                            bottom = with(density) { confirmBarHeightPx.toDp() } + Spacing.sm
                         )
-                    }
-                    if (filteredApps.isEmpty()) {
-                        item {
-                            Text(
-                                text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = AppTheme.colors.textSecondary,
-                                modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
+                    ) {
+                        items(filteredApps, key = { it.id }) { app ->
+                            val isSelected = app.id in selectedIds
+                            AppPickerRow(
+                                app = app,
+                                selected = isSelected,
+                                onToggle = {
+                                    selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
+                                }
                             )
                         }
+                        if (filteredApps.isEmpty()) {
+                            item {
+                                Text(
+                                    text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.textSecondary,
+                                    modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
+                                )
+                            }
+                        }
                     }
-                }
 
-                BottomActionBar {
-                    PrimaryButton(
+                    PickerConfirmBar(
                         text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
-                        onClick = { onConfirm(selectedIds.toList()) },
-                        modifier = Modifier.weight(1f)
+                        onConfirm = { onConfirm(selectedIds.toList()) },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .onSizeChanged { confirmBarHeightPx = it.height }
                     )
                 }
             }
         }
     }
 }
+
+/**
+ * Dugme za potvrdu koje lebdi nad listom, na prozirnom prelazu u boju pozadine.
+ *
+ * Razmak od dna prati telefon: sa navigacionom trakom (dugmad ili gesture linija)
+ * dugme stoji [Spacing.md] iznad nje, bez trake [MIN_BOTTOM_GAP] od ivice ekrana;
+ * dok je tastatura otvorena (pretraga), stoji iznad tastature.
+ */
+@Composable
+private fun PickerConfirmBar(text: String, onConfirm: () -> Unit, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val systemBottom = with(density) { WindowInsets.navigationBars.union(WindowInsets.ime).getBottom(density).toDp() }
+    val bottomGap = (systemBottom + Spacing.md).coerceAtLeast(MIN_BOTTOM_GAP)
+    val background = AppTheme.colors.background
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.4f to background.copy(alpha = 0.85f),
+                    1f to background
+                )
+            )
+            .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.xl, bottom = bottomGap)
+    ) {
+        PrimaryButton(text = text, onClick = onConfirm, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+private val MIN_BOTTOM_GAP = Spacing.xl
 
 @Composable
 private fun AppPickerRow(app: AppOption, selected: Boolean, onToggle: () -> Unit) {

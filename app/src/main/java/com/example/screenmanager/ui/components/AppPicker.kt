@@ -1,8 +1,5 @@
 package com.example.screenmanager.ui.components
 
-import android.os.Build
-import android.view.ViewGroup
-import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,54 +8,33 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absolutePadding
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.ui.common.pluralize
 import com.example.screenmanager.ui.theme.AppTheme
-import com.example.screenmanager.ui.theme.AuroraBackground
 import com.example.screenmanager.ui.theme.Spacing
 
 /**
@@ -119,7 +95,11 @@ private const val MAX_STACKED_ICONS = 4
 
 /**
  * Izbor aplikacija preko celog ekrana: pretraga + lista sa potvrdom.
- * Izbor se vraća tek na "Done" ([onConfirm]); "X" odbacuje izmene.
+ * Izbor se vraća tek na "Done" ([onConfirm]); "nazad" odbacuje izmene.
+ *
+ * Isti raspored kao forme pravila ([AppScreen] + [BottomActionBar], kao "Save" na
+ * Morning lock-u), u sloju unutar prozora aktivnosti ([FullScreenOverlay]) — dugme je
+ * uvek iznad navigacione trake ili tastature.
  */
 @Composable
 fun AppPickerDialog(
@@ -136,49 +116,21 @@ fun AppPickerDialog(
         else availableApps.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }
 
-    // Visina donje trake sa dugmetom (zavisi od navigacione trake/tastature) — toliko
-    // praznog prostora dobija kraj liste, da poslednja aplikacija ne ostane ispod dugmeta.
-    var confirmBarHeightPx by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-
-    // Razmaci od sistemskih traka i isečka kamere čitaju se iz prozora AKTIVNOSTI, gde su
-    // tačni. Prozor dijaloga dobija statusnu traku, ali za navigacionu 0 — dugme je padalo
-    // ispod gesture linije, a u landscape-u lista ispod dugmadi navigacije.
-    val layoutDirection = LocalLayoutDirection.current
-    val safeArea = WindowInsets.systemBars.union(WindowInsets.displayCutout)
-    val safeLeft = with(density) { safeArea.getLeft(density, layoutDirection).toDp() }
-    val safeTop = with(density) { safeArea.getTop(density).toDp() }
-    val safeRight = with(density) { safeArea.getRight(density, layoutDirection).toDp() }
-    val safeBottom = with(density) { safeArea.getBottom(density).toDp() }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-    ) {
-        DialogWindowFillsScreen()
-        // Dijalog je zaseban prozor, pa crta svoju aurora pozadinu.
-        AuroraBackground {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .absolutePadding(left = safeLeft, top = safeTop, right = safeRight)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircleIconButton(icon = Icons.Rounded.Close, contentDescription = "Close", onClick = onDismiss)
-                    Spacer(Modifier.width(Spacing.md))
-                    Text(
-                        text = "Choose apps",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = AppTheme.colors.textPrimary,
+    FullScreenOverlay(onDismiss = onDismiss) {
+        AppScreen(
+            title = "Choose apps",
+            onBack = onDismiss,
+            bottomBar = {
+                BottomActionBar {
+                    PrimaryButton(
+                        text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
+                        onClick = { onConfirm(selectedIds.toList()) },
                         modifier = Modifier.weight(1f)
                     )
                 }
-
+            }
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 AppTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -186,115 +138,33 @@ fun AppPickerDialog(
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = Spacing.screen)
                 )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = Spacing.sm)
                 ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            top = Spacing.sm,
-                            bottom = with(density) { confirmBarHeightPx.toDp() } + Spacing.sm
+                    items(filteredApps, key = { it.id }) { app ->
+                        val isSelected = app.id in selectedIds
+                        AppPickerRow(
+                            app = app,
+                            selected = isSelected,
+                            onToggle = {
+                                selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
+                            }
                         )
-                    ) {
-                        items(filteredApps, key = { it.id }) { app ->
-                            val isSelected = app.id in selectedIds
-                            AppPickerRow(
-                                app = app,
-                                selected = isSelected,
-                                onToggle = {
-                                    selectedIds = if (isSelected) selectedIds - app.id else selectedIds + app.id
-                                }
+                    }
+                    if (filteredApps.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppTheme.colors.textSecondary,
+                                modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
                             )
                         }
-                        if (filteredApps.isEmpty()) {
-                            item {
-                                Text(
-                                    text = if (availableApps.isEmpty()) "Loading apps…" else "No apps match \"$query\"",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = AppTheme.colors.textSecondary,
-                                    modifier = Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.xl)
-                                )
-                            }
-                        }
-                    }
-
-                    PickerConfirmBar(
-                        text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
-                        onConfirm = { onConfirm(selectedIds.toList()) },
-                        systemBottom = safeBottom,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .onSizeChanged { confirmBarHeightPx = it.height }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Dugme za potvrdu koje lebdi nad listom, na prozirnom prelazu u boju pozadine.
- *
- * Razmak od dna prati telefon: sa navigacionom trakom (dugmad ili gesture linija)
- * dugme stoji [Spacing.md] iznad nje, bez trake [MIN_BOTTOM_GAP] od ivice ekrana;
- * dok je tastatura otvorena (pretraga), stoji iznad tastature.
- */
-@Composable
-private fun PickerConfirmBar(
-    text: String,
-    onConfirm: () -> Unit,
-    systemBottom: Dp,
-    modifier: Modifier = Modifier
-) {
-    val density = LocalDensity.current
-    // Tastatura se otvara u prozoru dijaloga, pa se njena visina čita ovde.
-    val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
-    val bottomGap = (maxOf(systemBottom, imeBottom) + Spacing.md).coerceAtLeast(MIN_BOTTOM_GAP)
-    val background = AppTheme.colors.background
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.4f to background.copy(alpha = 0.85f),
-                    1f to background
-                )
-            )
-            .padding(start = Spacing.screen, end = Spacing.screen, top = Spacing.xl, bottom = bottomGap)
-    ) {
-        PrimaryButton(text = text, onClick = onConfirm, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-private val MIN_BOTTOM_GAP = Spacing.xl
-
-/**
- * Prozor dijaloga preko celog ekrana, i preko isečka kamere u landscape-u — isto kao
- * prozor aktivnosti, pa njeni razmaci od traka važe i ovde. Bez ovoga je u landscape-u
- * levo ostajala traka kroz koju se video ekran ispod.
- */
-@Composable
-private fun DialogWindowFillsScreen() {
-    val view = LocalView.current
-    DisposableEffect(view) {
-        (view.parent as? DialogWindowProvider)?.window?.let { window ->
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                window.attributes = window.attributes.apply {
-                    layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                    } else {
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                     }
                 }
             }
         }
-        onDispose { }
     }
 }
 

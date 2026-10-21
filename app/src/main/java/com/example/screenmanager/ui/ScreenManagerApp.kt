@@ -3,6 +3,7 @@ package com.example.screenmanager.ui
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.screenmanager.ui.common.OnResume
+import com.example.screenmanager.ui.components.OverlayHost
 import com.example.screenmanager.ui.navigation.AppNavHost
 import com.example.screenmanager.ui.theme.ScreenManagerTheme
 
@@ -23,6 +24,9 @@ fun ScreenManagerApp(appViewModel: AppViewModel = viewModel()) {
     OnResume(appViewModel::onResume)
 
     ScreenManagerTheme {
-        AppNavHost()
+        // Slojevi preko celog ekrana (izbor aplikacija) — u prozoru aktivnosti, ne kao Dialog.
+        OverlayHost {
+            AppNavHost()
+        }
     }
 }

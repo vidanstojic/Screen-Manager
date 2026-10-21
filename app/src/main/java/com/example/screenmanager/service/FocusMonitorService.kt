@@ -10,10 +10,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
+import android.view.KeyEvent
 import androidx.core.content.ContextCompat
 import com.example.screenmanager.MainActivity
 import com.example.screenmanager.R
@@ -50,6 +53,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Foreground servis koji sprovodi SVA pravila (TRS 2.2, 2.4, 2.5) i drži
@@ -57,7 +61,8 @@ import kotlinx.coroutines.withContext
  *
  * Petlje (samo dok je ekran upaljen — kad je ugašen, korutine su
  * suspendovane na [interactive], pa nema CPU rada):
- * - monitor (2s): inkrementalno čita UsageEvents → foreground paket
+ * - monitor (2s; odmah + nekoliko brzih provera kad Accessibility javi otvaranje
+ *   YouTube/Instagram-a, BUG-019): inkrementalno čita UsageEvents → foreground paket
  *   ([ForegroundResolver], B3) → interval sesije → [RulesEngine] → overlay.
  * - sync (60s): [com.example.screenmanager.domain.UsageStatsRepository.syncUsageEvents]
  *   i keš današnje potrošnje po paketu za dnevne limite.
@@ -208,10 +213,18 @@ class FocusMonitorService : Service() {
             // (inače bi ih ovaj servis pri čuvanju pregazio zastarelim kopijama).
             val appStates = runtimeRepository.sessionStates().filterKeys { !it.startsWith(ShortsPolicy.STATE_PREFIX) }
             sessionMutex.withLock { sessionStates.putAll(appStates) }
+            var quickTicksLeft = 0
             while (isActive) {
                 interactive.first { it }
                 runCatching { tick() }.onFailure { Log.w(TAG, "Monitor tick failed", it) }
-                delay(TICK_INTERVAL_MS)
+                if (quickTicksLeft > 0) {
+                    quickTicksLeft--
+                    delay(QUICK_TICK_INTERVAL_MS)
+                } else if (withTimeoutOrNull(TICK_INTERVAL_MS) { quickChecks.receive() } != null) {
+                    // UsageEvents zna da kasni par stotina ms za prozorom → nekoliko brzih provera.
+                    quickTicksLeft = QUICK_TICKS - 1
+                    delay(QUICK_TICK_INTERVAL_MS)
+                }
             }
         }
 
@@ -260,7 +273,15 @@ class FocusMonitorService : Service() {
         // Main thread samo kad overlay treba prikazati ili skloniti (ne na svaka 2 s).
         if (decision != null || overlayController.isShowing) {
             withContext(Dispatchers.Main) {
-                if (decision != null) overlayController.show(decision) else overlayController.hide()
+                if (decision != null) {
+                    val wasShowing = overlayController.isShowing
+                    overlayController.show(decision)
+                    if (!wasShowing && overlayController.isShowing && foregroundPackage == ShortsDetector.YOUTUBE) {
+                        pausePlayback()
+                    }
+                } else {
+                    overlayController.hide()
+                }
             }
         }
     }
@@ -380,6 +401,20 @@ class FocusMonitorService : Service() {
         return next
     }
 
+    /**
+     * Overlay ne pauzira aplikaciju ispod njega, pa bi video/reklama nastavili da se čuju
+     * iza blok ekrana (BUG-019). Samo za YouTube: medijski taster ide sesiji koja je
+     * poslednja puštala zvuk, a to je tada YouTube; za druge aplikacije mogao bi da
+     * pauzira npr. muziku koju korisnik sluša.
+     */
+    private fun pausePlayback() {
+        val audio = getSystemService(AudioManager::class.java) ?: return
+        if (!audio.isMusicActive) return
+        val at = SystemClock.uptimeMillis()
+        audio.dispatchMediaKeyEvent(KeyEvent(at, at, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE, 0))
+        audio.dispatchMediaKeyEvent(KeyEvent(at, at, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE, 0))
+    }
+
     private fun sendHome() {
         startActivity(
             Intent(Intent.ACTION_MAIN).apply {
@@ -415,6 +450,8 @@ class FocusMonitorService : Service() {
         private const val NOTIFICATION_ID = 1001
         private const val TAG = "FocusMonitorService"
         private const val TICK_INTERVAL_MS = 2_000L
+        private const val QUICK_TICK_INTERVAL_MS = 200L
+        private const val QUICK_TICKS = 4
         private const val SYNC_INTERVAL_MS = 60_000L
         private const val SESSION_PERSIST_INTERVAL_MS = 15_000L
         private const val INITIAL_EVENT_LOOKBACK_MS = 10 * 60_000L
@@ -423,6 +460,14 @@ class FocusMonitorService : Service() {
         @Volatile
         var isRunning: Boolean = false
             private set
+
+        /** Zahtevi za proveru odmah; CONFLATED — više zahteva između dve provere je jedan. */
+        private val quickChecks = Channel<Unit>(Channel.CONFLATED)
+
+        /** Accessibility: YouTube/Instagram je upravo došao na ekran → ne čekati sledeći tick (BUG-019). */
+        fun requestQuickCheck() {
+            quickChecks.trySend(Unit)
+        }
 
         /**
          * Pokreće servis ako je data Usage Access dozvola (bez nje servis

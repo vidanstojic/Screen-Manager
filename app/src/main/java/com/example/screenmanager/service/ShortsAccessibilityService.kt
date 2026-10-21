@@ -112,6 +112,10 @@ class ShortsAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
         ensureMonitorRunning()
+        // Otvaranje YouTube/Instagram-a (i preko linka): limit se proverava odmah, ne posle do 2 s (BUG-019).
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && packageName in ShortsDetector.supportedPackages) {
+            FocusMonitorService.requestQuickCheck()
+        }
         if (packageName !in ShortsDetector.supportedPackages) {
             websiteGuard?.takeIf { it.handles(packageName) }?.onEvent(packageName)
             return

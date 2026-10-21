@@ -1,5 +1,8 @@
 package com.example.screenmanager.ui.components
 
+import android.os.Build
+import android.view.ViewGroup
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,13 +12,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absolutePadding
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,10 +46,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.ui.common.pluralize
 import com.example.screenmanager.ui.theme.AppTheme
@@ -131,19 +141,27 @@ fun AppPickerDialog(
     var confirmBarHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
 
+    // Razmaci od sistemskih traka i isečka kamere čitaju se iz prozora AKTIVNOSTI, gde su
+    // tačni. Prozor dijaloga dobija statusnu traku, ali za navigacionu 0 — dugme je padalo
+    // ispod gesture linije, a u landscape-u lista ispod dugmadi navigacije.
+    val layoutDirection = LocalLayoutDirection.current
+    val safeArea = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+    val safeLeft = with(density) { safeArea.getLeft(density, layoutDirection).toDp() }
+    val safeTop = with(density) { safeArea.getTop(density).toDp() }
+    val safeRight = with(density) { safeArea.getRight(density, layoutDirection).toDp() }
+    val safeBottom = with(density) { safeArea.getBottom(density).toDp() }
+
     Dialog(
         onDismissRequest = onDismiss,
-        // decorFitsSystemWindows = false: prozor dijaloga ide preko sistemskih traka i Compose
-        // dobija prave insets-e. Sa podrazumevanim true (targetSdk 35+ je uvek edge-to-edge)
-        // insets-i su bili 0, pa je dugme "Done" padalo ispod navigacione trake.
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
+        DialogWindowFillsScreen()
         // Dijalog je zaseban prozor, pa crta svoju aurora pozadinu.
         AuroraBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
+                    .absolutePadding(left = safeLeft, top = safeTop, right = safeRight)
             ) {
                 Row(
                     modifier = Modifier
@@ -206,6 +224,7 @@ fun AppPickerDialog(
                     PickerConfirmBar(
                         text = if (selectedIds.isEmpty()) "Done" else "Done · ${selectedIds.size} selected",
                         onConfirm = { onConfirm(selectedIds.toList()) },
+                        systemBottom = safeBottom,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .onSizeChanged { confirmBarHeightPx = it.height }
@@ -224,10 +243,16 @@ fun AppPickerDialog(
  * dok je tastatura otvorena (pretraga), stoji iznad tastature.
  */
 @Composable
-private fun PickerConfirmBar(text: String, onConfirm: () -> Unit, modifier: Modifier = Modifier) {
+private fun PickerConfirmBar(
+    text: String,
+    onConfirm: () -> Unit,
+    systemBottom: Dp,
+    modifier: Modifier = Modifier
+) {
     val density = LocalDensity.current
-    val systemBottom = with(density) { WindowInsets.navigationBars.union(WindowInsets.ime).getBottom(density).toDp() }
-    val bottomGap = (systemBottom + Spacing.md).coerceAtLeast(MIN_BOTTOM_GAP)
+    // Tastatura se otvara u prozoru dijaloga, pa se njena visina čita ovde.
+    val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+    val bottomGap = (maxOf(systemBottom, imeBottom) + Spacing.md).coerceAtLeast(MIN_BOTTOM_GAP)
     val background = AppTheme.colors.background
     Box(
         modifier = modifier
@@ -246,6 +271,32 @@ private fun PickerConfirmBar(text: String, onConfirm: () -> Unit, modifier: Modi
 }
 
 private val MIN_BOTTOM_GAP = Spacing.xl
+
+/**
+ * Prozor dijaloga preko celog ekrana, i preko isečka kamere u landscape-u — isto kao
+ * prozor aktivnosti, pa njeni razmaci od traka važe i ovde. Bez ovoga je u landscape-u
+ * levo ostajala traka kroz koju se video ekran ispod.
+ */
+@Composable
+private fun DialogWindowFillsScreen() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        (view.parent as? DialogWindowProvider)?.window?.let { window ->
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    } else {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+            }
+        }
+        onDispose { }
+    }
+}
 
 @Composable
 private fun AppPickerRow(app: AppOption, selected: Boolean, onToggle: () -> Unit) {

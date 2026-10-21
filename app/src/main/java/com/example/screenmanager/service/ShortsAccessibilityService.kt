@@ -69,6 +69,7 @@ class ShortsAccessibilityService : AccessibilityService() {
     private var websiteGuard: WebsiteGuard? = null
 
     private val scanScheduled = AtomicBoolean(false)
+    private var lastMonitorStartAt = 0L
     @Volatile private var lastEventPackage: String? = null
 
     // Sledeće promenljive menja isključivo scanDispatcher (serijski).
@@ -91,6 +92,9 @@ class ShortsAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "Service connected")
+        // Sistem ponovo vezuje Accessibility i posle gašenja procesa; tada podiže i monitor
+        // (limiti, rasporedi), koji bi inače čekao da korisnik otvori aplikaciju (BUG-018).
+        FocusMonitorService.start(this)
         shortsConfig = settingsRepository.observeShortVideoConfig()
             .stateIn(serviceScope, SharingStarted.Eagerly, null)
         emergency = settingsRepository.observeEmergencySessionConfig()
@@ -107,6 +111,7 @@ class ShortsAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val packageName = event?.packageName?.toString() ?: return
+        ensureMonitorRunning()
         if (packageName !in ShortsDetector.supportedPackages) {
             websiteGuard?.takeIf { it.handles(packageName) }?.onEvent(packageName)
             return
@@ -127,6 +132,15 @@ class ShortsAccessibilityService : AccessibilityService() {
             (MIN_SCAN_INTERVAL_MS - (now - lastScanAt)).coerceAtLeast(SCAN_DEBOUNCE_MS)
         }
         scheduleScan(delay)
+    }
+
+    /** Rezerva za BUG-018: monitor ne radi (proces je bio ubijen) → start, najviše na [MONITOR_RESTART_INTERVAL_MS]. */
+    private fun ensureMonitorRunning() {
+        if (FocusMonitorService.isRunning) return
+        val now = System.currentTimeMillis()
+        if (now - lastMonitorStartAt < MONITOR_RESTART_INTERVAL_MS) return
+        lastMonitorStartAt = now
+        FocusMonitorService.start(this)
     }
 
     override fun onInterrupt() = Unit
@@ -331,5 +345,6 @@ class ShortsAccessibilityService : AccessibilityService() {
         private const val VISIBILITY_GRACE_MS = 4_000L
         private const val FLUSH_INTERVAL_MS = 5_000L
         private const val KICK_TOAST_INTERVAL_MS = 4_000L
+        private const val MONITOR_RESTART_INTERVAL_MS = 10_000L
     }
 }

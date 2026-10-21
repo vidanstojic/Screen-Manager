@@ -96,6 +96,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Vraća FocusMonitorService kad sistem ubije proces (BUG-018). -->
+        <receiver
+            android:name=".service.MonitorKeepAliveReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".service.AlarmReceiver"
             android:directBootAware="true"

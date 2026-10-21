@@ -62,7 +62,8 @@ import kotlinx.coroutines.withContext
  * - sync (60s): [com.example.screenmanager.domain.UsageStatsRepository.syncUsageEvents]
  *   i keš današnje potrošnje po paketu za dnevne limite.
  *
- * Pokreće se iz MainActivity i BootReceiver-a preko [start] (B2).
+ * Pokreće se preko [start] iz MainActivity, BootReceiver-a, ShortsAccessibilityService-a
+ * i [MonitorKeepAlive] alarma — ovaj poslednji ga vraća kad sistem ubije proces (BUG-018).
  */
 class FocusMonitorService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -74,6 +75,7 @@ class FocusMonitorService : Service() {
     private val rulesEngine = ServiceLocator.rulesEngine()
     private val eventSource by lazy { UsageEventSource(this) }
     private val powerManager by lazy { getSystemService(PowerManager::class.java) }
+    private val health by lazy { MonitorHealth(this) }
 
     private lateinit var overlayController: BlockOverlayController
     private val interactive = MutableStateFlow(true)
@@ -116,6 +118,7 @@ class FocusMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         createNotificationChannel()
         overlayController = BlockOverlayController(this) { sendHome() }
         interactive.value = powerManager.isInteractive
@@ -144,16 +147,31 @@ class FocusMonitorService : Service() {
         } catch (error: IllegalStateException) {
             // Android 12+: ForegroundServiceStartNotAllowedException (podklasa IllegalStateException).
             Log.w(TAG, "Foreground start not allowed right now", error)
+            MonitorKeepAlive.schedule(this, MonitorKeepAlive.RETRY_DELAY_MS)
             stopSelf()
             return START_NOT_STICKY
         }
+        health.beat(System.currentTimeMillis())
+        MonitorKeepAlive.schedule(this)
         startLoops()
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * Xiaomi/MIUI i slični ubiju ceo proces kad se aplikacija skloni iz Recents;
+     * alarm vraća praćenje bez otvaranja aplikacije (BUG-018). Gde proces preživi,
+     * prijemnik samo vidi da servis radi.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        MonitorKeepAlive.schedule(this, MonitorKeepAlive.RESTART_DELAY_MS)
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        isRunning = false
+        health.clear() // uredno gašenje nije "sistem nas je ubio"
         runCatching { unregisterReceiver(screenReceiver) }
         wakeEvents.close()
         overlayController.hide()
@@ -211,6 +229,7 @@ class FocusMonitorService : Service() {
             usageRepository.syncUsageEvents()
             todayUsage = usageRepository.todayUsageByPackage()
             lastSyncAt = System.currentTimeMillis()
+            health.beat(lastSyncAt)
         }.onFailure { Log.w(TAG, "Usage sync failed", it) }
     }
 
@@ -400,6 +419,11 @@ class FocusMonitorService : Service() {
         private const val SESSION_PERSIST_INTERVAL_MS = 15_000L
         private const val INITIAL_EVENT_LOOKBACK_MS = 10 * 60_000L
 
+        /** Da li servis radi u ovom procesu (posle gašenja procesa je ponovo false). */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
         /**
          * Pokreće servis ako je data Usage Access dozvola (bez nje servis
          * nema šta da radi). Bezbedno za višestruko pozivanje.
@@ -411,6 +435,7 @@ class FocusMonitorService : Service() {
             } catch (error: IllegalStateException) {
                 // ForegroundServiceStartNotAllowedException nasleđuje IllegalStateException.
                 Log.w(TAG, "Unable to start FocusMonitorService", error)
+                MonitorKeepAlive.schedule(context, MonitorKeepAlive.RETRY_DELAY_MS)
             }
         }
     }

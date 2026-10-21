@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.screenmanager.domain.PermissionState
 import com.example.screenmanager.domain.ServiceLocator
+import com.example.screenmanager.service.MonitorHealth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,11 +25,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _permissionState = MutableStateFlow(permissions.snapshot())
     val permissionState: StateFlow<PermissionState> = _permissionState.asStateFlow()
 
+    private val monitorHealth = MonitorHealth(application)
+    private val _backgroundStopped = MutableStateFlow(monitorHealth.hasUnacknowledgedStop())
+
+    /** Sistem je ugasio praćenje u pozadini, a korisnik upozorenje još nije sklonio (BUG-018). */
+    val backgroundStopped: StateFlow<Boolean> = _backgroundStopped.asStateFlow()
+
     fun onResume() {
         val current = permissions.snapshot()
         _permissionState.value = current
+        _backgroundStopped.value = monitorHealth.hasUnacknowledgedStop()
         if (current.hasUsageAccess) {
             viewModelScope.launch { runCatching { usageRepository.syncUsageEvents() } }
         }
+    }
+
+    fun acknowledgeBackgroundStop() {
+        monitorHealth.acknowledge(System.currentTimeMillis())
+        _backgroundStopped.value = false
     }
 }

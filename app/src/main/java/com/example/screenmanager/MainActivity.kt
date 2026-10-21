@@ -3,6 +3,7 @@ package com.example.screenmanager
 import android.Manifest
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -10,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.screenmanager.domain.PlatformCompat
 import com.example.screenmanager.service.FocusMonitorService
+import com.example.screenmanager.service.MonitorHealth
 import com.example.screenmanager.ui.ScreenManagerApp
 
 /**
@@ -38,6 +40,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Servis je radio, a sada ne radi → sistem je ugasio proces (BUG-018); Settings to prikazuje.
+        val now = System.currentTimeMillis()
+        MonitorHealth(this).reportIfStopped(
+            serviceRunning = FocusMonitorService.isRunning,
+            now = now,
+            bootAt = now - SystemClock.elapsedRealtime()
+        )
         FocusMonitorService.start(this)
     }
 

@@ -59,9 +59,12 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val permissions by appViewModel.permissionState.collectAsStateWithLifecycle()
+    val backgroundStopped by appViewModel.backgroundStopped.collectAsStateWithLifecycle()
     val dailyGoalMinutes by viewModel.dailyGoalMinutes.collectAsStateWithLifecycle()
     SettingsScreen(
         permissions = permissions,
+        backgroundStopped = backgroundStopped,
+        onDismissBackgroundStopped = appViewModel::acknowledgeBackgroundStop,
         dailyGoalMinutes = dailyGoalMinutes,
         onDailyGoalEnabledChange = viewModel::setDailyGoalEnabled,
         onDailyGoalChange = viewModel::setDailyGoalMinutes,
@@ -77,6 +80,8 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     permissions: PermissionState,
+    backgroundStopped: Boolean,
+    onDismissBackgroundStopped: () -> Unit,
     dailyGoalMinutes: Int?,
     onDailyGoalEnabledChange: (Boolean) -> Unit,
     onDailyGoalChange: (Int) -> Unit,
@@ -104,6 +109,8 @@ fun SettingsScreen(
                 .padding(screenContentPadding()),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
+            if (backgroundStopped) BackgroundStoppedCard(onDismiss = onDismissBackgroundStopped)
+
             SectionHeader(title = "Daily goal")
             AppCard(contentPadding = PaddingValues(0.dp)) {
                 SwitchRow(
@@ -167,6 +174,10 @@ fun SettingsScreen(
                     granted = permissions.batteryUnrestricted,
                     onGrant = { context.openSettings(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
                 )
+                if (BackgroundActivity.isXiaomi) {
+                    CardDivider()
+                    XiaomiBackgroundRows()
+                }
                 CardDivider()
                 PermissionRow(
                     icon = Icons.Rounded.Notifications,

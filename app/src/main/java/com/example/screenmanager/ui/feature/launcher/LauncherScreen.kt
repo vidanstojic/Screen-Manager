@@ -67,11 +67,12 @@ fun LauncherRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val permissions by appViewModel.permissionState.collectAsStateWithLifecycle()
+    val backgroundStopped by appViewModel.backgroundStopped.collectAsStateWithLifecycle()
     OnResume(viewModel::onResume)
 
     LauncherScreen(
         state = state,
-        setupIncomplete = !permissions.setupComplete,
+        setupIncomplete = !permissions.setupComplete || backgroundStopped,
         onOpenScreenManager = onOpenScreenManager,
         onOpenAlarms = onOpenAlarms,
         onOpenSettings = onOpenSettings

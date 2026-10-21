@@ -23,10 +23,10 @@ class MonitorHealth(context: Context) {
     }
 
     /** UI pre pokretanja servisa: beleži gašenje ako je neočekivano. */
-    fun reportIfStopped(serviceRunning: Boolean, now: Long, bootAt: Long) {
+    fun reportIfStopped(serviceRunning: Boolean, now: Long, notBefore: Long) {
         val heartbeat = prefs.getLong(KEY_HEARTBEAT, 0L)
         val reportedAt = prefs.getLong(KEY_STOPPED_AT, 0L)
-        if (MonitorHealthPolicy.isUnexpectedStop(serviceRunning, heartbeat, reportedAt, bootAt)) {
+        if (MonitorHealthPolicy.isUnexpectedStop(serviceRunning, heartbeat, reportedAt, notBefore)) {
             prefs.edit().putLong(KEY_STOPPED_AT, now).apply()
         }
     }
@@ -52,9 +52,10 @@ object MonitorHealthPolicy {
     /**
      * @param heartbeatAt poslednji otkucaj; 0 = servis nikad nije radio ili je uredno ugašen
      * @param lastReportedAt kada je prethodno gašenje već zabeleženo
-     * @param bootAt početak ovog paljenja telefona — otkucaj od pre restarta nije gašenje
-     *   (posle restarta servis podiže BootReceiver, a korisnik može da otvori aplikaciju pre njega)
+     * @param notBefore kasnije od paljenja telefona i poslednjeg ažuriranja aplikacije — otkucaj
+     *   pre toga nije gašenje (proces je uredno prekinut, a BootReceiver ga podiže; korisnik može
+     *   da otvori aplikaciju pre njega, npr. "Open" odmah posle ažuriranja na Play-u)
      */
-    fun isUnexpectedStop(serviceRunning: Boolean, heartbeatAt: Long, lastReportedAt: Long, bootAt: Long): Boolean =
-        !serviceRunning && heartbeatAt > 0L && heartbeatAt > lastReportedAt && heartbeatAt >= bootAt
+    fun isUnexpectedStop(serviceRunning: Boolean, heartbeatAt: Long, lastReportedAt: Long, notBefore: Long): Boolean =
+        !serviceRunning && heartbeatAt > 0L && heartbeatAt > lastReportedAt && heartbeatAt >= notBefore
 }

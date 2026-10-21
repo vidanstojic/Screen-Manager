@@ -42,10 +42,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Servis je radio, a sada ne radi → sistem je ugasio proces (BUG-018); Settings to prikazuje.
         val now = System.currentTimeMillis()
+        val updatedAt = runCatching { packageManager.getPackageInfo(packageName, 0).lastUpdateTime }.getOrDefault(0L)
         MonitorHealth(this).reportIfStopped(
             serviceRunning = FocusMonitorService.isRunning,
             now = now,
-            bootAt = now - SystemClock.elapsedRealtime()
+            notBefore = maxOf(now - SystemClock.elapsedRealtime(), updatedAt)
         )
         FocusMonitorService.start(this)
     }

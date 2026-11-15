@@ -18,8 +18,11 @@ import com.example.screenmanager.ui.components.TextAction
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
-/** Javna politika privatnosti (docs/PRIVACY.md preko GitHub Pages); isti URL ide u Play Console. */
-const val PRIVACY_POLICY_URL = "https://vidanstojic.github.io/Screen-Manager/PRIVACY"
+/**
+ * Javna politika privatnosti na sajtu; isti URL ide u Play Console. Kopija je u docs/PRIVACY.md
+ * (stara GitHub Pages adresa, na koju vodi verzija 1.0.1).
+ */
+const val PRIVACY_POLICY_URL = "https://vidanstojic.me/projects/focus-flow/privacy/"
 
 /** Sažetak politike privatnosti u aplikaciji; ceo tekst je na [PRIVACY_POLICY_URL]. */
 @Composable

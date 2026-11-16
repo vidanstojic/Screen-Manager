@@ -1,5 +1,6 @@
 package com.example.screenmanager.ui.feature.limits.editor
 
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -11,15 +12,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.domain.rules.RuleLockKeys
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.feature.limits.LimitsViewModel
-import com.example.screenmanager.ui.feature.limits.LocalRuleLockedUntil
+import com.example.screenmanager.ui.feature.limits.LocalRuleLock
+import com.example.screenmanager.ui.feature.limits.RuleLockUi
 import com.example.screenmanager.ui.feature.limits.RuleTarget
 import com.example.screenmanager.ui.feature.limits.ShortsApps
-import com.example.screenmanager.ui.feature.limits.rememberLockedUntil
+import com.example.screenmanager.ui.feature.limits.rememberLockNow
 import com.example.screenmanager.ui.theme.AppTheme
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -50,16 +53,25 @@ fun RuleEditorRoute(
         return
     }
     val labelFor = viewModel::appLabel
-    // Zaključani limiti: forma sačuvanog pravila je samo za čitanje (novo pravilo je slobodno).
-    val lockedUntil = rememberLockedUntil(loaded.lock)
-    val existingRule = when (target) {
-        is RuleTarget.AppLimit -> loaded.appLimits.any { it.id == target.ruleId }
-        is RuleTarget.SessionLimit -> loaded.sessionLimits.any { it.id == target.ruleId }
-        is RuleTarget.Schedule -> loaded.schedules.any { it.id == target.ruleId }
-        is RuleTarget.Shorts, RuleTarget.MorningLock -> true
+    // Zaključavanje: ključ samo za SAČUVANO pravilo (novo pravilo je uvek slobodno i nema šta da se zaključa).
+    val ruleKey: String? = when (target) {
+        is RuleTarget.AppLimit -> target.ruleId?.takeIf { id -> loaded.appLimits.any { it.id == id } }?.let(RuleLockKeys::appLimit)
+        is RuleTarget.SessionLimit -> target.ruleId?.takeIf { id -> loaded.sessionLimits.any { it.id == id } }?.let(RuleLockKeys::sessionLimit)
+        is RuleTarget.Schedule -> target.ruleId?.takeIf { id -> loaded.schedules.any { it.id == id } }?.let(RuleLockKeys::schedule)
+        is RuleTarget.Shorts -> RuleLockKeys.SHORTS
+        RuleTarget.MorningLock -> RuleLockKeys.MORNING_LOCK
+    }
+    val now = rememberLockNow()
+    val ruleLock = if (ruleKey == null) {
+        RuleLockUi(lockedUntil = null, onLock = null)
+    } else {
+        RuleLockUi(
+            lockedUntil = loaded.locks.lockedUntil(ruleKey, now, SystemClock.elapsedRealtime()),
+            onLock = { durationMs -> viewModel.lockRule(ruleKey, durationMs) }
+        )
     }
 
-    CompositionLocalProvider(LocalRuleLockedUntil provides lockedUntil?.takeIf { existingRule }) {
+    CompositionLocalProvider(LocalRuleLock provides ruleLock) {
     when (target) {
         is RuleTarget.AppLimit -> {
             val existing = remember(target) { loaded.appLimits.firstOrNull { it.id == target.ruleId } }

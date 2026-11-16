@@ -5,7 +5,9 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.screenmanager.domain.ServiceLocator
+import com.example.screenmanager.domain.rules.LimitLocks
 import com.example.screenmanager.domain.rules.LimitsLock
+import com.example.screenmanager.domain.rules.RuleLockKeys
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.AppOption
 import com.example.screenmanager.model.EmergencySessionConfig
@@ -29,8 +31,8 @@ data class LimitsUiState(
     val morningLock: WakeUpConfig,
     val emergency: EmergencySessionConfig,
     val installedApps: List<AppOption>,
-    /** Poslednje zaključavanje (možda isteklo — proveri [LimitsLock.isActive]). */
-    val lock: LimitsLock? = null
+    /** Opšte i pojedinačna zaključavanja (možda istekla — vidi [LimitLocks.lockedUntil]). */
+    val locks: LimitLocks = LimitLocks()
 )
 
 /**
@@ -48,7 +50,7 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
 
     /** `null` dok se pravila prvi put ne učitaju iz baze (forme čekaju na to). */
     val uiState: StateFlow<LimitsUiState?> =
-        combine(settings.observeRulesSnapshot(), installedApps, lockStore.observe()) { rules, apps, lock ->
+        combine(settings.observeRulesSnapshot(), installedApps, lockStore.observe()) { rules, apps, locks ->
             LimitsUiState(
                 appLimits = rules.appLimits,
                 sessionLimits = rules.sessionLimits,
@@ -57,7 +59,7 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
                 morningLock = rules.wakeUp ?: WakeUpConfig(),
                 emergency = rules.emergency ?: EmergencySessionConfig(),
                 installedApps = apps,
-                lock = lock
+                locks = locks
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -71,17 +73,25 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
     // --- Zaključavanje limita (TODO-002) ---
     // Sve izmene pravila prolaze kroz ovu proveru (i sa liste i iz formi), ne samo kroz UI.
 
-    private fun lockActive(): Boolean =
-        lockStore.current()?.isActive(System.currentTimeMillis(), SystemClock.elapsedRealtime()) == true
+    private fun elapsed(): Long = SystemClock.elapsedRealtime()
+
+    /** Pravilo [ruleKey] je zaključano (samo ono ili sva pravila). */
+    private fun lockedFor(ruleKey: String): Boolean =
+        lockStore.current().lockedUntil(ruleKey, System.currentTimeMillis(), elapsed()) != null
+
+    private fun anyLockActive(): Boolean = lockStore.current().anyActive(System.currentTimeMillis(), elapsed())
 
     /** Pravila još nisu učitana, pa se ne zna da li je izmena novo pravilo: tokom zaključavanja odbij. */
-    private fun rulesNotLoadedWhileLocked(): Boolean = uiState.value == null && lockActive()
+    private fun rulesNotLoadedWhileLocked(): Boolean = uiState.value == null && anyLockActive()
 
-    /** Zaključava (ili produžava zaključavanje) na [durationMs]; aktivno se nikad ne skraćuje. */
-    fun lockLimits(durationMs: Long) {
-        lockStore.save(
-            LimitsLock.lockOrExtend(lockStore.current(), System.currentTimeMillis(), SystemClock.elapsedRealtime(), durationMs)
-        )
+    /** Zaključava SVA pravila na [durationMs]; aktivno zaključavanje se samo produžava. */
+    fun lockAllLimits(durationMs: Long) {
+        lockStore.save(lockStore.current().withAllLocked(System.currentTimeMillis(), elapsed(), durationMs))
+    }
+
+    /** Zaključava jedno pravilo ([RuleLockKeys]) na [durationMs]. */
+    fun lockRule(ruleKey: String, durationMs: Long) {
+        lockStore.save(lockStore.current().withRuleLocked(ruleKey, System.currentTimeMillis(), elapsed(), durationMs))
     }
 
     // --- Dnevni limiti ---
@@ -89,12 +99,12 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
     fun saveAppLimit(rule: AppLimitRule) {
         if (rulesNotLoadedWhileLocked()) return
         val existing = uiState.value?.appLimits?.firstOrNull { it.id == rule.id }
-        if (!LimitsLock.allowsSave(lockActive(), existing, rule) { it.copy(isEnabled = true) }) return
+        if (!LimitsLock.allowsSave(lockedFor(RuleLockKeys.appLimit(rule.id)), existing, rule) { it.copy(isEnabled = true) }) return
         viewModelScope.launch { settings.updateAppLimitRule(rule) }
     }
 
     fun deleteAppLimit(ruleId: String) {
-        if (lockActive()) return
+        if (lockedFor(RuleLockKeys.appLimit(ruleId))) return
         viewModelScope.launch { settings.deleteAppLimitRuleById(ruleId) }
     }
 
@@ -103,12 +113,12 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
     fun saveSessionLimit(rule: SessionLimitRule) {
         if (rulesNotLoadedWhileLocked()) return
         val existing = uiState.value?.sessionLimits?.firstOrNull { it.id == rule.id }
-        if (!LimitsLock.allowsSave(lockActive(), existing, rule) { it.copy(isEnabled = true) }) return
+        if (!LimitsLock.allowsSave(lockedFor(RuleLockKeys.sessionLimit(rule.id)), existing, rule) { it.copy(isEnabled = true) }) return
         viewModelScope.launch { settings.upsertSessionLimitRule(rule) }
     }
 
     fun deleteSessionLimit(ruleId: String) {
-        if (lockActive()) return
+        if (lockedFor(RuleLockKeys.sessionLimit(ruleId))) return
         viewModelScope.launch { settings.deleteSessionLimitRuleById(ruleId) }
     }
 
@@ -117,12 +127,12 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
     fun saveSchedule(rule: ScheduleRule) {
         if (rulesNotLoadedWhileLocked()) return
         val existing = uiState.value?.schedules?.firstOrNull { it.id == rule.id }
-        if (!LimitsLock.allowsSave(lockActive(), existing, rule) { it.copy(isEnabled = true) }) return
+        if (!LimitsLock.allowsSave(lockedFor(RuleLockKeys.schedule(rule.id)), existing, rule) { it.copy(isEnabled = true) }) return
         viewModelScope.launch { settings.updateScheduleRule(rule) }
     }
 
     fun deleteSchedule(ruleId: String) {
-        if (lockActive()) return
+        if (lockedFor(RuleLockKeys.schedule(ruleId))) return
         viewModelScope.launch { settings.deleteScheduleRuleById(ruleId) }
     }
 
@@ -130,20 +140,20 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
 
     fun saveShorts(config: ShortVideoConfig) {
         if (rulesNotLoadedWhileLocked()) return
-        if (!LimitsLock.allowsSave(lockActive(), uiState.value?.shorts, config) { it.copy(isEnabled = true) }) return
+        if (!LimitsLock.allowsSave(lockedFor(RuleLockKeys.SHORTS), uiState.value?.shorts, config) { it.copy(isEnabled = true) }) return
         viewModelScope.launch { settings.updateShortVideoConfig(config) }
     }
 
     fun saveMorningLock(config: WakeUpConfig) {
         if (rulesNotLoadedWhileLocked()) return
-        if (!LimitsLock.allowsSave(lockActive(), uiState.value?.morningLock, config) { it.copy(isEnabled = true) }) return
+        if (!LimitsLock.allowsSave(lockedFor(RuleLockKeys.MORNING_LOCK), uiState.value?.morningLock, config) { it.copy(isEnabled = true) }) return
         viewModelScope.launch { settings.updateWakeUpConfig(config) }
     }
 
-    // --- Emergency pauza (nije dostupna dok su limiti zaključani) ---
+    // --- Emergency pauza (nije dostupna dok traje bilo koje zaključavanje — zaobišla bi ga) ---
 
     fun setEmergencyDuration(minutes: Int) {
-        if (lockActive()) return
+        if (anyLockActive()) return
         viewModelScope.launch {
             val config = settings.getEmergencySessionConfig() ?: EmergencySessionConfig()
             settings.updateEmergencySessionConfig(config.copy(defaultDurationMinutes = minutes))
@@ -152,7 +162,7 @@ class LimitsViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Pokreće pauzu od SADA; čuva se apsolutni trenutak isteka (radi i preko ponoći). */
     fun startEmergencyPause() {
-        if (lockActive()) return
+        if (anyLockActive()) return
         viewModelScope.launch {
             val config = settings.getEmergencySessionConfig() ?: EmergencySessionConfig()
             settings.updateEmergencySessionConfig(config.activated(System.currentTimeMillis()))

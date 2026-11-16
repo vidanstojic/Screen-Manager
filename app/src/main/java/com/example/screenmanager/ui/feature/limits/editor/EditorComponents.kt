@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +31,8 @@ import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.PrimaryButton
 import com.example.screenmanager.ui.components.TextAction
 import com.example.screenmanager.ui.components.screenContentPadding
-import com.example.screenmanager.ui.feature.limits.LocalRuleLockedUntil
+import com.example.screenmanager.ui.feature.limits.LocalRuleLock
+import com.example.screenmanager.ui.feature.limits.LockDurationDialog
 import com.example.screenmanager.ui.feature.limits.LockedRuleBanner
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
@@ -49,14 +51,24 @@ fun RuleEditorScaffold(
     content: @Composable ColumnScope.() -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
-    // Limiti zaključani (vidi LimitsLock): sačuvano pravilo se ne menja i ne briše.
-    val lockedUntil = LocalRuleLockedUntil.current
+    // Zaključano pravilo (vidi LimitLocks): ne menja se i ne briše; katanac zaključava baš ovo pravilo.
+    val ruleLock = LocalRuleLock.current
+    val lockedUntil = ruleLock.lockedUntil
+    val lockRule = ruleLock.onLock
+    var choosingLock by remember { mutableStateOf(false) }
     val deleteAction = onDelete?.takeIf { lockedUntil == null }
 
     AppScreen(
         title = title,
         onBack = onBack,
         actions = {
+            if (lockRule != null) {
+                CircleIconButton(
+                    icon = Icons.Rounded.Lock,
+                    contentDescription = if (lockedUntil != null) "Extend the lock" else "Lock this limit",
+                    onClick = { choosingLock = true }
+                )
+            }
             if (deleteAction != null) {
                 CircleIconButton(
                     icon = Icons.Rounded.DeleteOutline,
@@ -81,6 +93,17 @@ fun RuleEditorScaffold(
             if (lockedUntil != null) LockedRuleBanner(lockedUntil)
             content()
         }
+    }
+
+    if (choosingLock && lockRule != null) {
+        LockDurationDialog(
+            what = "this limit",
+            onLock = {
+                choosingLock = false
+                lockRule(it)
+            },
+            onDismiss = { choosingLock = false }
+        )
     }
 
     if (confirmDelete && deleteAction != null) {

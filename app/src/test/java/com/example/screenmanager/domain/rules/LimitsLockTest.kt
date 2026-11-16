@@ -56,3 +56,31 @@ class LimitsLockTest {
         assertTrue(LimitsLock.allowsSave(locked = false, existing = enabled, updated = enabled.copy(isEnabled = false), enabledCopy = on))
     }
 }
+
+class LimitLocksTest {
+    private val wall = 1_000_000_000L
+    private val elapsed = 50_000L
+    private val key = RuleLockKeys.appLimit("a")
+
+    @Test
+    fun `a rule is locked by its own lock or by the lock of all limits`() {
+        val none = LimitLocks()
+        assertEquals(null, none.lockedUntil(key, wall, elapsed))
+        val ruleOnly = none.withRuleLocked(key, wall, elapsed, HOUR_MS)
+        assertEquals(wall + HOUR_MS, ruleOnly.lockedUntil(key, wall, elapsed))
+        assertEquals(null, ruleOnly.lockedUntil(RuleLockKeys.appLimit("b"), wall, elapsed))
+        assertTrue(ruleOnly.anyActive(wall, elapsed))
+        assertEquals(null, ruleOnly.allLockedUntil(wall, elapsed))
+        val both = ruleOnly.withAllLocked(wall, elapsed, DAY_MS)
+        assertEquals(wall + DAY_MS, both.lockedUntil(key, wall, elapsed))
+        assertEquals(wall + DAY_MS, both.lockedUntil(RuleLockKeys.SHORTS, wall, elapsed))
+    }
+
+    @Test
+    fun `expired rule locks are dropped when another rule is locked`() {
+        val old = LimitLocks().withRuleLocked(key, wall, elapsed, HOUR_MS)
+        val later = old.withRuleLocked(RuleLockKeys.SHORTS, wall + 2 * HOUR_MS, elapsed + 2 * HOUR_MS, HOUR_MS)
+        assertEquals(setOf(RuleLockKeys.SHORTS), later.rules.keys)
+        assertFalse(later.rules.isEmpty())
+    }
+}

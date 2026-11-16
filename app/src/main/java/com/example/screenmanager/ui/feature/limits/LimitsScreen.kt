@@ -1,5 +1,6 @@
 package com.example.screenmanager.ui.feature.limits
 
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.screenmanager.domain.rules.RuleLockKeys
 import com.example.screenmanager.model.AppLimitRule
 import com.example.screenmanager.model.EmergencySessionConfig
 import com.example.screenmanager.model.ScheduleRule
@@ -86,7 +88,7 @@ fun LimitsRoute(
             onEmergencyDurationChange = viewModel::setEmergencyDuration,
             onStartEmergency = viewModel::startEmergencyPause,
             onEndEmergency = viewModel::endEmergencyPause,
-            onLock = viewModel::lockLimits
+            onLockAll = viewModel::lockAllLimits
         )
     )
 }
@@ -110,9 +112,10 @@ fun LimitsScreen(
             }
             return@AppScreen
         }
-        // Dok su limiti zaključani: pravilo se može uključiti, ali ne i isključiti ili obrisati.
-        val lockedUntil = rememberLockedUntil(state.lock)
-        val locked = lockedUntil != null
+        // Zaključano pravilo (samo ono ili sva): može da se uključi, ali ne i isključi ili obriše.
+        val now = rememberLockNow()
+        val elapsed = SystemClock.elapsedRealtime()
+        val lockedUntil = { ruleKey: String -> state.locks.lockedUntil(ruleKey, now, elapsed) }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -130,7 +133,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleAppLimit(rule, it) },
-                            locked = locked,
+                            lockedUntil = lockedUntil(RuleLockKeys.appLimit(rule.id)),
                             onClick = { onEditRule(RuleTarget.AppLimit(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteAppLimit(rule.id) }
                         )
@@ -148,7 +151,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSessionLimit(rule, it) },
-                            locked = locked,
+                            lockedUntil = lockedUntil(RuleLockKeys.sessionLimit(rule.id)),
                             onClick = { onEditRule(RuleTarget.SessionLimit(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteSessionLimit(rule.id) }
                         )
@@ -166,7 +169,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSchedule(rule, it) },
-                            locked = locked,
+                            lockedUntil = lockedUntil(RuleLockKeys.schedule(rule.id)),
                             onClick = { onEditRule(RuleTarget.Schedule(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteSchedule(rule.id) }
                         )
@@ -184,7 +187,7 @@ fun LimitsScreen(
                             summary = "${state.shorts.summary()} · ${appsSummary(state.shorts.selectedAppIds, labelFor)}",
                             enabled = state.shorts.isEnabled,
                             onToggle = actions.onToggleShorts,
-                            locked = locked,
+                            lockedUntil = lockedUntil(RuleLockKeys.SHORTS),
                             onClick = { onEditRule(RuleTarget.Shorts()) },
                             // Ikonice YouTube-a i Instagrama odmah pokazuju na šta se pravilo odnosi;
                             // aplikacija koja nije izabrana (ili ceo red kad je isključen) je prigušena.
@@ -210,7 +213,7 @@ fun LimitsScreen(
                             summary = state.morningLock.summary(labelFor),
                             enabled = state.morningLock.isEnabled,
                             onToggle = actions.onToggleMorningLock,
-                            locked = locked,
+                            lockedUntil = lockedUntil(RuleLockKeys.MORNING_LOCK),
                             onClick = { onEditRule(RuleTarget.MorningLock) }
                         )
                     )
@@ -218,12 +221,12 @@ fun LimitsScreen(
             }
             item(key = "lock") {
                 Spacer(Modifier.height(Spacing.sm))
-                LockLimitsCard(lockedUntil = lockedUntil, onLock = actions.onLock)
+                LockAllLimitsCard(lockedUntil = state.locks.allLockedUntil(now, elapsed), onLock = actions.onLockAll)
             }
             item(key = "emergency") {
                 EmergencyPauseCard(
                     config = state.emergency,
-                    locked = locked,
+                    locked = state.locks.anyActive(now, elapsed),
                     onDurationChange = actions.onEmergencyDurationChange,
                     onStart = actions.onStartEmergency,
                     onEnd = actions.onEndEmergency
@@ -246,7 +249,7 @@ class LimitsActions(
     val onEmergencyDurationChange: (Int) -> Unit,
     val onStartEmergency: () -> Unit,
     val onEndEmergency: () -> Unit,
-    val onLock: (durationMs: Long) -> Unit
+    val onLockAll: (durationMs: Long) -> Unit
 )
 
 /** Jedan red u listi pravila, nezavisno od vrste pravila. */
@@ -257,8 +260,8 @@ private class RuleRowModel(
     val enabled: Boolean,
     val onToggle: (Boolean) -> Unit,
     val onClick: () -> Unit,
-    /** Limiti su zaključani: bez isključivanja i brisanja. */
-    val locked: Boolean = false,
+    /** Kraj zaključavanja ovog pravila (ili svih): bez isključivanja i brisanja; `null` = slobodno. */
+    val lockedUntil: Long? = null,
     /** Dug pritisak na red → potvrda → brisanje; null za pravila koja se ne brišu (Shorts, jutarnja). */
     val onDelete: (() -> Unit)? = null,
     /** Umesto ikonice vrste pravila (npr. ikonice aplikacija). */
@@ -297,7 +300,8 @@ private fun RuleSection(
 @Composable
 private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
-    val onDelete = row.onDelete?.takeUnless { row.locked }
+    val locked = row.lockedUntil != null
+    val onDelete = row.onDelete?.takeUnless { locked }
     if (confirmDelete && onDelete != null) {
         DeleteRuleDialog(
             onConfirm = {
@@ -309,7 +313,7 @@ private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
     }
     ListRow(
         title = row.title,
-        subtitle = row.summary,
+        subtitle = row.lockedUntil?.let { "${row.summary} · Locked until ${formatLockEnd(it)}" } ?: row.summary,
         onClick = row.onClick,
         onLongClick = onDelete?.let { { confirmDelete = true } },
         leading = row.leading ?: {
@@ -322,7 +326,7 @@ private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
             AppSwitch(
                 checked = row.enabled,
                 onCheckedChange = row.onToggle,
-                enabled = !(row.locked && row.enabled)
+                enabled = !(locked && row.enabled)
             )
         }
     )
@@ -385,7 +389,7 @@ private fun EmergencyPauseCard(
             subtitle = if (isActive && activeUntil != null) {
                 "All limits are paused until ${formatClock(activeUntil)}."
             } else if (locked) {
-                "Not available while limits are locked."
+                "Not available while a limit is locked."
             } else {
                 "Pause every limit for a short time when you really need your phone."
             },

@@ -95,8 +95,9 @@ private val control = listOf(
     HelpTopic(
         Icons.Rounded.Lock,
         "Lock limits",
-        "At the bottom of Limits you can lock your limits for 1 hour, 1 day or 1 week. Until then limits can't " +
-            "be turned off, edited or deleted, and the emergency pause is off. You can still add new limits."
+        "Lock all limits at the bottom of Limits, or one limit with the lock button on its own screen, for as many " +
+            "days and hours as you choose. Until then a locked limit can't be turned off, edited or deleted, and the " +
+            "emergency pause is off. You can still add new limits."
     ),
     HelpTopic(
         Icons.Rounded.PauseCircle,

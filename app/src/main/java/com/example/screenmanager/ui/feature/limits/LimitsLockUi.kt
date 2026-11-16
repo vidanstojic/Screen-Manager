@@ -1,6 +1,6 @@
 package com.example.screenmanager.ui.feature.limits
 
-import android.os.SystemClock
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -8,10 +8,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.screenmanager.domain.rules.LimitsLock
 import com.example.screenmanager.ui.common.formatClock
+import com.example.screenmanager.ui.common.pluralize
 import com.example.screenmanager.ui.common.relativeDayLabel
 import com.example.screenmanager.ui.common.rememberNow
 import com.example.screenmanager.ui.components.AppCard
@@ -26,7 +29,7 @@ import com.example.screenmanager.ui.components.CardDivider
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.SecondaryButton
-import com.example.screenmanager.ui.components.SegmentedControl
+import com.example.screenmanager.ui.components.StepperRow
 import com.example.screenmanager.ui.components.TextAction
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
@@ -36,24 +39,19 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Kraj zaključavanja za formu pravila koje je već sačuvano; `null` = forma je slobodna
- * (nema zaključavanja ili je pravilo novo). Postavlja ga RuleEditorRoute, čita RuleEditorScaffold.
+ * Zaključavanje u formi sačuvanog pravila: [lockedUntil] = pravilo je zaključano (samo ono
+ * ili sva pravila), [onLock] = zaključaj baš ovo pravilo. Za novo pravilo oba su `null`.
+ * Postavlja ga RuleEditorRoute, čita RuleEditorScaffold.
  */
-val LocalRuleLockedUntil = compositionLocalOf<Long?> { null }
+class RuleLockUi(val lockedUntil: Long?, val onLock: ((durationMs: Long) -> Unit)?)
 
-/** Koliko dugo se zaključava (izbor na Limits ekranu). */
-enum class LockDuration(val label: String, val durationMs: Long) {
-    HOUR("1 hour", LimitsLock.HOUR_MS),
-    DAY("1 day", LimitsLock.DAY_MS),
-    WEEK("1 week", 7 * LimitsLock.DAY_MS)
-}
+val LocalRuleLock = compositionLocalOf { RuleLockUi(lockedUntil = null, onLock = null) }
 
-/** Kraj aktivnog zaključavanja (osvežava se dok je ekran otvoren), ili `null`. */
+/** Trenutno vreme za prikaz zaključavanja (osvežava se dok je ekran otvoren). */
 @Composable
-fun rememberLockedUntil(lock: LimitsLock?): Long? {
+fun rememberLockNow(): Long {
     val now by rememberNow(intervalMs = 15_000L)
-    val elapsed = SystemClock.elapsedRealtime()
-    return lock?.takeIf { it.isActive(now, elapsed) }?.effectiveEnd(now, elapsed)
+    return now
 }
 
 private val DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.ENGLISH)
@@ -67,48 +65,77 @@ fun formatLockEnd(endsAt: Long, now: Long = System.currentTimeMillis()): String 
         DATE_TIME.format(Instant.ofEpochMilli(endsAt).atZone(ZoneId.systemDefault()))
     }
 
+/** "2 days 5 hours", "3 hours", "1 day". */
+private fun formatLockDuration(days: Int, hours: Int): String = listOfNotNull(
+    days.takeIf { it > 0 }?.let { pluralize(it, "day") },
+    hours.takeIf { it > 0 }?.let { pluralize(it, "hour") }
+).joinToString(" ")
+
 /**
- * Zaključavanje limita na Limits ekranu. Pre zaključavanja potvrda, jer ne može da se
- * poništi; dok traje, kartica samo kaže do kada.
+ * Izbor trajanja (dani + sati) i potvrda; zaključavanje ne može da se poništi, samo produži.
+ *
+ * @param what šta se zaključava, za tekst: "all limits" / "this limit"
  */
 @Composable
-fun LockLimitsCard(lockedUntil: Long?, onLock: (Long) -> Unit) {
-    var duration by rememberSaveable { mutableStateOf(LockDuration.DAY) }
-    var confirm by rememberSaveable { mutableStateOf(false) }
-
-    if (confirm) {
-        val endsAt = System.currentTimeMillis() + duration.durationMs
-        AlertDialog(
-            onDismissRequest = { confirm = false },
-            containerColor = AppTheme.colors.surface,
-            title = { Text("Lock limits for ${duration.label}?", color = AppTheme.colors.textPrimary) },
-            text = {
+fun LockDurationDialog(what: String, onLock: (durationMs: Long) -> Unit, onDismiss: () -> Unit) {
+    var days by rememberSaveable { mutableIntStateOf(1) }
+    var hours by rememberSaveable { mutableIntStateOf(0) }
+    val durationMs = days * LimitsLock.DAY_MS + hours * LimitsLock.HOUR_MS
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppTheme.colors.surface,
+        title = { Text("Lock $what", color = AppTheme.colors.textPrimary) },
+        text = {
+            Column {
+                StepperRow(label = "Days", value = days, onValueChange = { days = it }, range = 0..MAX_DAYS)
+                StepperRow(label = "Hours", value = hours, onValueChange = { hours = it }, range = 0..23)
                 Text(
-                    "Until ${formatLockEnd(endsAt)} you won't be able to turn off, edit or delete your limits, " +
-                        "and the emergency pause won't be available. You can still add new limits or turn limits on. " +
-                        "The lock can't be undone.",
-                    color = AppTheme.colors.textSecondary
+                    text = if (durationMs > 0) {
+                        "Until ${formatLockEnd(System.currentTimeMillis() + durationMs)} you won't be able to turn off, " +
+                            "edit or delete $what, and the emergency pause won't be available. " +
+                            "You can still add new limits. The lock can't be undone, only extended."
+                    } else {
+                        "Choose how long the lock lasts."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppTheme.colors.textSecondary,
+                    modifier = Modifier.padding(top = Spacing.md)
                 )
+            }
+        },
+        confirmButton = {
+            TextAction(
+                text = if (durationMs > 0) "Lock for ${formatLockDuration(days, hours)}" else "Lock",
+                enabled = durationMs > 0,
+                onClick = { onLock(durationMs) }
+            )
+        },
+        dismissButton = { TextAction(text = "Cancel", color = AppTheme.colors.textSecondary, onClick = onDismiss) }
+    )
+}
+
+/** Opšte zaključavanje (sva pravila) na Limits ekranu. */
+@Composable
+fun LockAllLimitsCard(lockedUntil: Long?, onLock: (Long) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    if (choosing) {
+        LockDurationDialog(
+            what = "all limits",
+            onLock = {
+                choosing = false
+                onLock(it)
             },
-            confirmButton = {
-                TextAction(text = "Lock", onClick = {
-                    confirm = false
-                    onLock(duration.durationMs)
-                })
-            },
-            dismissButton = { TextAction(text = "Cancel", color = AppTheme.colors.textSecondary, onClick = { confirm = false }) }
+            onDismiss = { choosing = false }
         )
     }
-
     AppCard(contentPadding = PaddingValues(0.dp)) {
         ListRow(
-            title = if (lockedUntil != null) "Limits are locked" else "Lock limits",
+            title = if (lockedUntil != null) "All limits are locked" else "Lock all limits",
             subtitle = if (lockedUntil != null) {
                 "Until ${formatLockEnd(lockedUntil)}. Limits can't be turned off, edited or deleted until then; " +
                     "you can still add new ones."
             } else {
-                "Keep yourself from turning limits off on impulse: while locked, limits can't be turned off, " +
-                    "edited or deleted."
+                "Keep yourself from turning limits off on impulse. You can also lock a single limit from its own screen."
             },
             leading = {
                 IconBadge(
@@ -117,35 +144,28 @@ fun LockLimitsCard(lockedUntil: Long?, onLock: (Long) -> Unit) {
                 )
             }
         )
-        if (lockedUntil == null) {
-            CardDivider()
-            SegmentedControl(
-                options = LockDuration.entries,
-                selected = duration,
-                onSelected = { duration = it },
-                label = LockDuration::label,
-                modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md)
-            )
-            SecondaryButton(
-                text = "Lock for ${duration.label}",
-                icon = Icons.Rounded.Lock,
-                onClick = { confirm = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.lg)
-            )
-        }
+        CardDivider()
+        SecondaryButton(
+            text = if (lockedUntil != null) "Extend the lock" else "Choose how long",
+            icon = Icons.Rounded.Lock,
+            onClick = { choosing = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg)
+        )
     }
 }
 
-/** Na vrhu forme sačuvanog pravila dok su limiti zaključani (Save i brisanje su tada isključeni). */
+/** Na vrhu forme zaključanog pravila (Save i brisanje su tada isključeni). */
 @Composable
 fun LockedRuleBanner(lockedUntil: Long) {
     AppCard(contentPadding = PaddingValues(0.dp), borderColor = AppTheme.colors.accent) {
         ListRow(
-            title = "Limits are locked",
-            subtitle = "Until ${formatLockEnd(lockedUntil)}. This rule can't be changed or deleted until then.",
+            title = "This limit is locked",
+            subtitle = "Until ${formatLockEnd(lockedUntil)}. It can't be turned off, changed or deleted until then.",
             leading = { IconBadge(icon = Icons.Rounded.Lock, tint = AppTheme.colors.accent) }
         )
     }
 }
+
+private const val MAX_DAYS = 90

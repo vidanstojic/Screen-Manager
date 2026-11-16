@@ -78,4 +78,10 @@ sealed interface Screen : Parcelable {
     data object Settings : Screen {
         override val route: String get() = "settings"
     }
+
+    /** Uputstvo "How Focus Flow works" (otvara se iz Settings). */
+    @Parcelize
+    data object Help : Screen {
+        override val route: String get() = "help"
+    }
 }

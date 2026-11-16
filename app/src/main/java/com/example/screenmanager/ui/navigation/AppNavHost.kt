@@ -34,6 +34,7 @@ import com.example.screenmanager.ui.feature.launcher.LauncherRoute
 import com.example.screenmanager.ui.feature.limits.LimitsRoute
 import com.example.screenmanager.ui.feature.limits.editor.RuleEditorRoute
 import com.example.screenmanager.ui.feature.overview.OverviewRoute
+import com.example.screenmanager.ui.feature.settings.HelpScreen
 import com.example.screenmanager.ui.feature.settings.SettingsRoute
 import com.example.screenmanager.ui.feature.stats.StatsRoute
 import com.example.screenmanager.ui.theme.AppSection
@@ -161,7 +162,9 @@ private fun ScreenContent(screen: Screen, navigator: Navigator) {
 
         is Screen.AlarmEditor -> AlarmEditorRoute(alarmId = screen.alarmId, onDone = navigator::back)
 
-        Screen.Settings -> SettingsRoute(onBack = navigator::back)
+        Screen.Settings -> SettingsRoute(onBack = navigator::back, onOpenHelp = { navigator.push(Screen.Help) })
+
+        Screen.Help -> HelpScreen(onBack = navigator::back)
     }
 }
 
@@ -169,7 +172,7 @@ private const val TAB_ROUTE_PREFIX = "tab/"
 
 /** Kom delu aplikacije ekran pripada — određuje boje (ui/theme/Sections.kt). */
 private fun sectionOf(screen: Screen): AppSection = when (screen) {
-    Screen.Launcher, Screen.Settings -> AppSection.Launcher
+    Screen.Launcher, Screen.Settings, Screen.Help -> AppSection.Launcher
     Screen.Overview, Screen.Stats, Screen.Limits, is Screen.AppDetails, is Screen.RuleEditor -> AppSection.ScreenManager
     Screen.Alarms, is Screen.AlarmEditor -> AppSection.Alarms
 }

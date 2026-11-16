@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.BatteryAlert
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -40,6 +41,7 @@ import com.example.screenmanager.ui.components.AccessibilityDisclosureDialog
 import com.example.screenmanager.ui.components.AppCard
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.components.CardDivider
+import com.example.screenmanager.ui.components.ChevronIcon
 import com.example.screenmanager.ui.components.IconBadge
 import com.example.screenmanager.ui.components.ListRow
 import com.example.screenmanager.ui.components.openAccessibilitySettings
@@ -55,6 +57,7 @@ import com.example.screenmanager.ui.theme.Spacing
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
+    onOpenHelp: () -> Unit,
     appViewModel: AppViewModel = viewModel(),
     viewModel: SettingsViewModel = viewModel()
 ) {
@@ -68,6 +71,7 @@ fun SettingsRoute(
         dailyGoalMinutes = dailyGoalMinutes,
         onDailyGoalEnabledChange = viewModel::setDailyGoalEnabled,
         onDailyGoalChange = viewModel::setDailyGoalMinutes,
+        onOpenHelp = onOpenHelp,
         onBack = onBack
     )
 }
@@ -85,6 +89,7 @@ fun SettingsScreen(
     dailyGoalMinutes: Int?,
     onDailyGoalEnabledChange: (Boolean) -> Unit,
     onDailyGoalChange: (Int) -> Unit,
+    onOpenHelp: () -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -110,6 +115,16 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             if (backgroundStopped) BackgroundStoppedCard(onDismiss = onDismissBackgroundStopped)
+
+            AppCard(contentPadding = PaddingValues(0.dp)) {
+                ListRow(
+                    title = "How Focus Flow works",
+                    subtitle = "A short guide to limits, Shorts blocking, the morning lock and alarms.",
+                    onClick = onOpenHelp,
+                    leading = { IconBadge(icon = Icons.AutoMirrored.Rounded.HelpOutline) },
+                    trailing = { ChevronIcon() }
+                )
+            }
 
             SectionHeader(title = "Daily goal")
             AppCard(contentPadding = PaddingValues(0.dp)) {

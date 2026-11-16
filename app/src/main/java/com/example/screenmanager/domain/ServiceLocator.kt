@@ -6,6 +6,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.screenmanager.data.apps.InstalledAppsSource
 import com.example.screenmanager.data.local.ScreenManagerDatabase
+import com.example.screenmanager.data.preferences.LimitsLockStore
 import com.example.screenmanager.data.preferences.UiPreferences
 import com.example.screenmanager.data.repository.AlarmRepository
 import com.example.screenmanager.data.repository.AppLimitRulesRepository
@@ -37,6 +38,7 @@ object ServiceLocator {
 
     @Volatile
     private var uiPreferences: UiPreferences? = null
+    private var limitsLockStore: LimitsLockStore? = null
 
     fun database(context: Context) = ScreenManagerDatabase.getInstance(context)
 
@@ -86,6 +88,13 @@ object ServiceLocator {
     }
 
     fun permissionStateChecker(context: Context) = PermissionStateChecker(context.applicationContext)
+
+    /** Keširano: zaključavanje limita dele Limits ekran i forme pravila. */
+    fun limitsLockStore(context: Context): LimitsLockStore {
+        return limitsLockStore ?: synchronized(this) {
+            limitsLockStore ?: LimitsLockStore(context).also { limitsLockStore = it }
+        }
+    }
 
     /** Keširano: podešavanja prikaza (dnevni cilj) dele Settings i Overview. */
     fun uiPreferences(context: Context): UiPreferences {

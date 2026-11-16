@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -15,8 +16,10 @@ import com.example.screenmanager.model.ScheduleRule
 import com.example.screenmanager.model.SessionLimitRule
 import com.example.screenmanager.ui.components.AppScreen
 import com.example.screenmanager.ui.feature.limits.LimitsViewModel
+import com.example.screenmanager.ui.feature.limits.LocalRuleLockedUntil
 import com.example.screenmanager.ui.feature.limits.RuleTarget
 import com.example.screenmanager.ui.feature.limits.ShortsApps
+import com.example.screenmanager.ui.feature.limits.rememberLockedUntil
 import com.example.screenmanager.ui.theme.AppTheme
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -47,7 +50,16 @@ fun RuleEditorRoute(
         return
     }
     val labelFor = viewModel::appLabel
+    // Zaključani limiti: forma sačuvanog pravila je samo za čitanje (novo pravilo je slobodno).
+    val lockedUntil = rememberLockedUntil(loaded.lock)
+    val existingRule = when (target) {
+        is RuleTarget.AppLimit -> loaded.appLimits.any { it.id == target.ruleId }
+        is RuleTarget.SessionLimit -> loaded.sessionLimits.any { it.id == target.ruleId }
+        is RuleTarget.Schedule -> loaded.schedules.any { it.id == target.ruleId }
+        is RuleTarget.Shorts, RuleTarget.MorningLock -> true
+    }
 
+    CompositionLocalProvider(LocalRuleLockedUntil provides lockedUntil?.takeIf { existingRule }) {
     when (target) {
         is RuleTarget.AppLimit -> {
             val existing = remember(target) { loaded.appLimits.firstOrNull { it.id == target.ruleId } }
@@ -122,6 +134,7 @@ fun RuleEditorRoute(
                 onBack = onDone
             )
         }
+    }
     }
 }
 

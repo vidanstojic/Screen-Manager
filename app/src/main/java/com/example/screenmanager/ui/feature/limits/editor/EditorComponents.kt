@@ -30,6 +30,8 @@ import com.example.screenmanager.ui.components.CircleIconButton
 import com.example.screenmanager.ui.components.PrimaryButton
 import com.example.screenmanager.ui.components.TextAction
 import com.example.screenmanager.ui.components.screenContentPadding
+import com.example.screenmanager.ui.feature.limits.LocalRuleLockedUntil
+import com.example.screenmanager.ui.feature.limits.LockedRuleBanner
 import com.example.screenmanager.ui.theme.AppTheme
 import com.example.screenmanager.ui.theme.Spacing
 
@@ -47,12 +49,15 @@ fun RuleEditorScaffold(
     content: @Composable ColumnScope.() -> Unit
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    // Limiti zaključani (vidi LimitsLock): sačuvano pravilo se ne menja i ne briše.
+    val lockedUntil = LocalRuleLockedUntil.current
+    val deleteAction = onDelete?.takeIf { lockedUntil == null }
 
     AppScreen(
         title = title,
         onBack = onBack,
         actions = {
-            if (onDelete != null) {
+            if (deleteAction != null) {
                 CircleIconButton(
                     icon = Icons.Rounded.DeleteOutline,
                     contentDescription = "Delete rule",
@@ -62,7 +67,7 @@ fun RuleEditorScaffold(
         },
         bottomBar = {
             BottomActionBar {
-                PrimaryButton(text = "Save", onClick = onSave, enabled = canSave, modifier = Modifier.weight(1f))
+                PrimaryButton(text = "Save", onClick = onSave, enabled = canSave && lockedUntil == null, modifier = Modifier.weight(1f))
             }
         }
     ) {
@@ -71,16 +76,18 @@ fun RuleEditorScaffold(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(screenContentPadding()),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            content = content
-        )
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
+        ) {
+            if (lockedUntil != null) LockedRuleBanner(lockedUntil)
+            content()
+        }
     }
 
-    if (confirmDelete && onDelete != null) {
+    if (confirmDelete && deleteAction != null) {
         DeleteRuleDialog(
             onConfirm = {
                 confirmDelete = false
-                onDelete()
+                deleteAction()
             },
             onDismiss = { confirmDelete = false }
         )

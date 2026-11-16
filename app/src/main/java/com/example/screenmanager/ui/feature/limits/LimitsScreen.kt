@@ -85,7 +85,8 @@ fun LimitsRoute(
             },
             onEmergencyDurationChange = viewModel::setEmergencyDuration,
             onStartEmergency = viewModel::startEmergencyPause,
-            onEndEmergency = viewModel::endEmergencyPause
+            onEndEmergency = viewModel::endEmergencyPause,
+            onLock = viewModel::lockLimits
         )
     )
 }
@@ -109,6 +110,9 @@ fun LimitsScreen(
             }
             return@AppScreen
         }
+        // Dok su limiti zaključani: pravilo se može uključiti, ali ne i isključiti ili obrisati.
+        val lockedUntil = rememberLockedUntil(state.lock)
+        val locked = lockedUntil != null
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -126,6 +130,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleAppLimit(rule, it) },
+                            locked = locked,
                             onClick = { onEditRule(RuleTarget.AppLimit(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteAppLimit(rule.id) }
                         )
@@ -143,6 +148,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSessionLimit(rule, it) },
+                            locked = locked,
                             onClick = { onEditRule(RuleTarget.SessionLimit(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteSessionLimit(rule.id) }
                         )
@@ -160,6 +166,7 @@ fun LimitsScreen(
                             summary = rule.summary(labelFor),
                             enabled = rule.isEnabled,
                             onToggle = { actions.onToggleSchedule(rule, it) },
+                            locked = locked,
                             onClick = { onEditRule(RuleTarget.Schedule(ruleId = rule.id)) },
                             onDelete = { actions.onDeleteSchedule(rule.id) }
                         )
@@ -177,6 +184,7 @@ fun LimitsScreen(
                             summary = "${state.shorts.summary()} · ${appsSummary(state.shorts.selectedAppIds, labelFor)}",
                             enabled = state.shorts.isEnabled,
                             onToggle = actions.onToggleShorts,
+                            locked = locked,
                             onClick = { onEditRule(RuleTarget.Shorts()) },
                             // Ikonice YouTube-a i Instagrama odmah pokazuju na šta se pravilo odnosi;
                             // aplikacija koja nije izabrana (ili ceo red kad je isključen) je prigušena.
@@ -202,15 +210,20 @@ fun LimitsScreen(
                             summary = state.morningLock.summary(labelFor),
                             enabled = state.morningLock.isEnabled,
                             onToggle = actions.onToggleMorningLock,
+                            locked = locked,
                             onClick = { onEditRule(RuleTarget.MorningLock) }
                         )
                     )
                 )
             }
-            item(key = "emergency") {
+            item(key = "lock") {
                 Spacer(Modifier.height(Spacing.sm))
+                LockLimitsCard(lockedUntil = lockedUntil, onLock = actions.onLock)
+            }
+            item(key = "emergency") {
                 EmergencyPauseCard(
                     config = state.emergency,
+                    locked = locked,
                     onDurationChange = actions.onEmergencyDurationChange,
                     onStart = actions.onStartEmergency,
                     onEnd = actions.onEndEmergency
@@ -232,7 +245,8 @@ class LimitsActions(
     val onToggleMorningLock: (Boolean) -> Unit,
     val onEmergencyDurationChange: (Int) -> Unit,
     val onStartEmergency: () -> Unit,
-    val onEndEmergency: () -> Unit
+    val onEndEmergency: () -> Unit,
+    val onLock: (durationMs: Long) -> Unit
 )
 
 /** Jedan red u listi pravila, nezavisno od vrste pravila. */
@@ -243,6 +257,8 @@ private class RuleRowModel(
     val enabled: Boolean,
     val onToggle: (Boolean) -> Unit,
     val onClick: () -> Unit,
+    /** Limiti su zaključani: bez isključivanja i brisanja. */
+    val locked: Boolean = false,
     /** Dug pritisak na red → potvrda → brisanje; null za pravila koja se ne brišu (Shorts, jutarnja). */
     val onDelete: (() -> Unit)? = null,
     /** Umesto ikonice vrste pravila (npr. ikonice aplikacija). */
@@ -281,7 +297,7 @@ private fun RuleSection(
 @Composable
 private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
-    val onDelete = row.onDelete
+    val onDelete = row.onDelete?.takeUnless { row.locked }
     if (confirmDelete && onDelete != null) {
         DeleteRuleDialog(
             onConfirm = {
@@ -302,7 +318,13 @@ private fun RuleRow(kind: RuleKind, row: RuleRowModel) {
                 tint = if (row.enabled) AppTheme.colors.accent else AppTheme.colors.textMuted
             )
         },
-        trailing = { AppSwitch(checked = row.enabled, onCheckedChange = row.onToggle) }
+        trailing = {
+            AppSwitch(
+                checked = row.enabled,
+                onCheckedChange = row.onToggle,
+                enabled = !(row.locked && row.enabled)
+            )
+        }
     )
 }
 
@@ -348,6 +370,7 @@ private fun EmptyRuleRow(icon: ImageVector, text: String) {
 @Composable
 private fun EmergencyPauseCard(
     config: EmergencySessionConfig,
+    locked: Boolean,
     onDurationChange: (Int) -> Unit,
     onStart: () -> Unit,
     onEnd: () -> Unit
@@ -361,6 +384,8 @@ private fun EmergencyPauseCard(
             title = "Emergency pause",
             subtitle = if (isActive && activeUntil != null) {
                 "All limits are paused until ${formatClock(activeUntil)}."
+            } else if (locked) {
+                "Not available while limits are locked."
             } else {
                 "Pause every limit for a short time when you really need your phone."
             },
@@ -371,6 +396,7 @@ private fun EmergencyPauseCard(
                 )
             }
         )
+        if (locked && !isActive) return@AppCard
         CardDivider()
         if (isActive) {
             SecondaryButton(

@@ -1,5 +1,6 @@
 package com.example.screenmanager.alarm.service
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.screenmanager.ui.feature.alarms.ring.AlarmRingRoute
 import com.example.screenmanager.ui.theme.AppSection
@@ -34,6 +36,8 @@ class AlarmRingActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
+
+        startPendingRing(intent)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = Unit
@@ -67,7 +71,22 @@ class AlarmRingActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
-        const val START_TIMEOUT_MS = 5_000L
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        startPendingRing(intent)
+    }
+
+    /** Otvoren iz rezervne notifikacije: zvonjenje se pokreće sada, iz prvog plana. */
+    private fun startPendingRing(intent: Intent?) {
+        if (intent == null) return
+        val ring = IntentCompat.getParcelableExtra(intent, EXTRA_PENDING_RING, Intent::class.java) ?: return
+        intent.removeExtra(EXTRA_PENDING_RING) // ne ponovo pri rotaciji/ponovnom stvaranju
+        AlarmNotifications(this).cancelRingFallback()
+        AlarmRingService.startFromForeground(this, ring)
+    }
+
+    companion object {
+        const val EXTRA_PENDING_RING = "pending_ring"
+        private const val START_TIMEOUT_MS = 5_000L
     }
 }

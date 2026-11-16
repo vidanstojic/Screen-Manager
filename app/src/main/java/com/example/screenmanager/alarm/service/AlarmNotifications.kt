@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
 import com.example.screenmanager.R
 import com.example.screenmanager.domain.AlarmScheduler
@@ -32,6 +34,16 @@ class AlarmNotifications(private val context: Context) {
                 },
                 NotificationChannel(CHANNEL_STATUS, "Alarm status", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Snoozed and missed alarms"
+                },
+                // Samo kad sistem odbije servis za zvonjenje: tada zvuk pušta sama notifikacija.
+                NotificationChannel(CHANNEL_FALLBACK, "Alarms (backup)", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Used only if the system blocks the normal alarm"
+                    setSound(
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                        AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+                    )
+                    enableVibration(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 }
             )
         )
@@ -63,6 +75,35 @@ class AlarmNotifications(private val context: Context) {
         }
         return builder.build()
     }
+
+    /**
+     * Rezerva kad sistem odbije servis za zvonjenje ([AlarmRingService]): notifikacija sa
+     * zvukom alarma, preko celog ekrana; otvara ekran alarma, koji ponovo pokreće [ringIntent].
+     */
+    fun showRingFallback(ringIntent: Intent) {
+        val open = PendingIntent.getActivity(
+            context,
+            FALLBACK_ID,
+            Intent(context, AlarmRingActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(AlarmRingActivity.EXTRA_PENDING_RING, ringIntent),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_FALLBACK)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Alarm")
+            .setContentText("Tap to open the alarm")
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(open)
+            .setFullScreenIntent(open, true)
+            .setAutoCancel(true)
+            .build()
+        runCatching { manager.notify(FALLBACK_ID, notification) }
+    }
+
+    fun cancelRingFallback() = manager.cancel(FALLBACK_ID)
 
     fun showSnoozed(alarmId: Long, label: String, until: Long, canDismiss: Boolean) {
         val builder = NotificationCompat.Builder(context, CHANNEL_STATUS)
@@ -119,8 +160,10 @@ class AlarmNotifications(private val context: Context) {
     companion object {
         const val CHANNEL_RINGING = "alarm_ringing"
         const val CHANNEL_STATUS = "alarm_status"
+        const val CHANNEL_FALLBACK = "alarm_fallback"
         const val RINGING_ID = 41_001
         private const val MISSED_ID = 41_002
+        private const val FALLBACK_ID = 41_003
         private const val SNOOZED_ID_BASE = 42_000_000
     }
 }

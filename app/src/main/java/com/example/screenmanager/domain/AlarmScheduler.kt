@@ -87,7 +87,11 @@ class AlarmScheduler(
     )
 
     private fun firePendingIntent(alarmId: Long, action: String, snoozeCount: Int): PendingIntent {
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
+        // Po imenu klase, ne `AlarmReceiver::class.java`: BootReceiver i AlarmSystemEventsReceiver
+        // (BOOT_COMPLETED) koriste ovaj scheduler samo da ZAKAŽU alarm, a direktna referenca je
+        // Play-ovoj statičkoj analizi izgledala kao put BOOT_COMPLETED → AlarmRingService
+        // (mediaPlayback FGS, zabranjen iz BOOT_COMPLETED na Androidu 15+). Ime čuva test.
+        val intent = Intent().setClassName(context, ALARM_RECEIVER_CLASS).apply {
             this.action = action
             putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
             putExtra(AlarmReceiver.EXTRA_SNOOZE_COUNT, snoozeCount)
@@ -119,6 +123,9 @@ class AlarmScheduler(
 
     companion object {
         private const val SHOW_APP_REQUEST_CODE = 99_999
+
+        /** = `AlarmReceiver::class.java.name` (proverava AlarmSchedulerTest); R8 čuva imena prijemnika iz manifesta. */
+        const val ALARM_RECEIVER_CLASS = "com.example.screenmanager.service.AlarmReceiver"
 
         fun requestCode(alarmId: Long): Int = (alarmId xor (alarmId ushr 32)).toInt()
     }

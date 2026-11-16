@@ -51,11 +51,20 @@ class AlarmRingService : Service() {
         when (intent?.action) {
             ACTION_RING -> {
                 // startForeground mora odmah (rok 5 s), pre čitanja baze.
-                startForeground(
-                    AlarmNotifications.RINGING_ID,
-                    notifications.ringing(AlarmRingSession.active.value),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
+                try {
+                    startForeground(
+                        AlarmNotifications.RINGING_ID,
+                        notifications.ringing(AlarmRingSession.active.value),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } catch (error: RuntimeException) {
+                    // ForegroundServiceStartNotAllowedException / ForegroundServiceTypeException:
+                    // alarm ne sme da propadne — zvoni preko rezervne notifikacije.
+                    Log.w(TAG, "Ringing service not allowed in foreground", error)
+                    notifications.showRingFallback(intent)
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 handleRing(intent)
             }
             ACTION_SNOOZE -> snooze()
@@ -216,7 +225,7 @@ class AlarmRingService : Service() {
                 putExtra(EXTRA_SNOOZE_COUNT, snoozeCount)
                 putExtra(EXTRA_WAKE_CHECK_ROUND, wakeCheckRound)
             }
-            context.startForegroundService(intent)
+            startOrFallback(context, intent)
         }
 
         /** Probno zvonjenje iz forme — sa trenutnim (možda nesačuvanim) podešavanjima. */
@@ -227,7 +236,28 @@ class AlarmRingService : Service() {
                 putExtra(EXTRA_REASON, RingReason.TEST.name)
                 putExtra(EXTRA_DRAFT, draft)
             }
-            context.startForegroundService(intent)
+            startOrFallback(context, intent)
+        }
+
+        /**
+         * Android 12+ može da odbije pokretanje FGS-a iz pozadine (Android 15+ npr. svako
+         * pokretanje `mediaPlayback` servisa iz BOOT_COMPLETED-a). Alarm tada ne sme da
+         * propadne: notifikacija sa zvukom alarma otvara ekran alarma, a on pokreće
+         * zvonjenje iz prvog plana ([startFromForeground]), gde je to uvek dozvoljeno.
+         */
+        private fun startOrFallback(context: Context, intent: Intent) {
+            try {
+                context.startForegroundService(intent)
+            } catch (error: IllegalStateException) {
+                Log.w(TAG, "Ringing service not allowed, using the fallback notification", error)
+                AlarmNotifications(context).showRingFallback(intent)
+            }
+        }
+
+        /** Ponovni pokušaj iz ekrana alarma (aktivnost u prvom planu). */
+        internal fun startFromForeground(context: Context, intent: Intent) {
+            runCatching { context.startForegroundService(intent) }
+                .onFailure { Log.e(TAG, "Ringing from the alarm screen failed", it) }
         }
 
         fun command(context: Context, action: String) {
